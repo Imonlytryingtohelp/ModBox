@@ -1164,6 +1164,36 @@ function injectStyles() {
       to { transform: rotate(360deg); }
     }
 
+    @keyframes rrw-toast-slide-in {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes rrw-toast-slide-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
+    .rrw-toast {
+      pointer-events: auto;
+    }
+
+    .rrw-toast:hover {
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+
     .rrw-close {
       appearance: none;
       -webkit-appearance: none;

@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.1.0 - Fast UX & Background Execution
+
+### Added
+
+- **Background action execution** - Removals, Quick Actions, and Playbooks now execute in background with fast overlay close for snappier UX
+- **Toast notifications** - Real-time feedback on action completion/errors (auto-dismiss after 5 seconds, top-right fixed position)
+- **Complete removal workflow in background** - Removals now run full logic in background including:
+  - Post flair application
+  - Item locking
+  - Removal comment posting
+  - Modmail notifications
+  - Usernote saving
+
+### Improved
+
+- **Playbook step handlers** - Restored all playbook step types:
+  - Removal with full workflow
+  - Comment posting
+  - Lock/unlock items
+  - Approve items
+  - Ban/unban users
+  - Send modmail
+  - Set post/user flair
+  - Add usernotes
+  - Distinguish comments
+- **Quick Actions performance** - Now execute in background with instant overlay close
+- **Overlay data persistence** - Background actions have access to overlay state for feature-complete execution
+
 ## 1.0.1 - Bug Squashing
 
 ### Fixed

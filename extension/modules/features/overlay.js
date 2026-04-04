@@ -1132,8 +1132,7 @@ function renderOverlay() {
       ).actions;
       const action = allActions.find((item) => String(item?.key || "").trim() === actionKey);
       if (!action) {
-        overlay.quickActionsError = "Quick action not found.";
-        renderOverlay();
+        showToast("Quick action not found", "error");
         return;
       }
 
@@ -1144,109 +1143,80 @@ function renderOverlay() {
           fullname = parseTargetToFullname(fullname);
         }
       } catch {
-        overlay.quickActionsError = "Unable to parse target into a valid Reddit fullname.";
-        overlay.submitting = false;
-        renderOverlay();
+        showToast("Unable to parse target into a valid Reddit fullname", "error");
         return;
       }
 
-      const thingKind = (overlay?.resolved?.thingType || (String(fullname || "").startsWith("t3_") ? "submission" : "comment")) === "submission"
-        ? "post"
-        : "comment";
-      const renderedBody = interpolateQuickActionTemplate(action.body, {
-        author: overlay?.resolved?.author,
-        subreddit: overlay?.resolved?.subreddit,
-        kind: thingKind,
-      }).trim();
+      // Close overlay immediately for better UX
+      closeOverlay();
 
-      try {
-        overlay.submitting = true;
-        overlay.quickActionsError = "";
-        overlay.quickActionsStatus = "";
-        overlay.error = "";
-        overlay.status = "";
-        console.log("[ModBox] Quick action submit:", {
-          actionKey,
-          actionTitle: action.title,
-          modOnly: Boolean(action.mod_only),
-          sticky: Boolean(action.sticky),
-          thingKind,
-          fullname,
-          target: overlay.target,
-        });
-        renderOverlay();
+      // Run the action in the background
+      (async () => {
+        try {
+          const thingKind = (overlay?.resolved?.thingType || (String(fullname || "").startsWith("t3_") ? "submission" : "comment")) === "submission"
+            ? "post"
+            : "comment";
+          const renderedBody = interpolateQuickActionTemplate(action.body, {
+            author: overlay?.resolved?.author,
+            subreddit: overlay?.resolved?.subreddit,
+            kind: thingKind,
+          }).trim();
 
-        let lockedPost = false;
-        let usedSubredditCommentWorkaround = false;
+          let lockedPost = false;
+          let usedSubredditCommentWorkaround = false;
 
-        if (renderedBody) {
-          if (Boolean(action.comment_as_subreddit)) {
-            let removedForSubredditComment = false;
-            try {
-              await removeThingViaNativeSession(fullname);
-              removedForSubredditComment = true;
-              await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
-              usedSubredditCommentWorkaround = true;
-            } finally {
-              if (removedForSubredditComment) {
+          if (renderedBody) {
+            if (Boolean(action.comment_as_subreddit)) {
+              let removedForSubredditComment = false;
+              try {
+                await removeThingViaNativeSession(fullname);
+                removedForSubredditComment = true;
+                await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
+                usedSubredditCommentWorkaround = true;
+              } finally {
+                if (removedForSubredditComment) {
+                  try {
+                    await approveThingViaNativeSession(fullname);
+                  } catch {
+                    // Best effort only; avoid masking the primary failure.
+                  }
+                }
+              }
+            } else {
+              const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
+              const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
+              const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
+              if (replyFullname && (action.sticky || action.mod_only)) {
                 try {
-                  await approveThingViaNativeSession(fullname);
+                  await distinguishThingViaNativeSession(
+                    replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                    Boolean(action.sticky),
+                  );
                 } catch {
-                  // Best effort only; avoid masking the primary failure.
+                  // Distinguish/sticky is best effort; posting the comment is the primary action.
                 }
               }
             }
-          } else {
-            const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
-            const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
-            const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
-            if (replyFullname && (action.sticky || action.mod_only)) {
-              try {
-                await distinguishThingViaNativeSession(
-                  replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
-                  Boolean(action.sticky),
-                );
-              } catch {
-                // Distinguish/sticky is best effort; posting the comment is the primary action.
-              }
+          }
+
+          if (action.lock_post && thingKind === "post") {
+            try {
+              await lockThingViaNativeSession(fullname);
+              lockedPost = true;
+            } catch {
+              // Best effort only; posting comment is the primary action.
             }
           }
-        }
 
-        if (action.lock_post && thingKind === "post") {
-          try {
-            await lockThingViaNativeSession(fullname);
-            lockedPost = true;
-          } catch {
-            // Best effort only; posting comment is the primary action.
-          }
+          const details = [];
+          if (usedSubredditCommentWorkaround) details.push("subreddit comment");
+          if (lockedPost) details.push("locked");
+          const detailText = details.length > 0 ? ` (${details.join(", ")})` : "";
+          showToast(`✓ Quick action: ${action.title}${detailText}`, "success");
+        } catch (error) {
+          showToast(`Error: ${error instanceof Error ? error.message : String(error)}`, "error");
         }
-
-        overlay.quickActionsStatus = `Posted quick action: ${action.title}${usedSubredditCommentWorkaround ? " \u00B7 subreddit comment workaround used" : ""}${lockedPost ? " \u00B7 post locked" : ""}`;
-        let shouldAutoClose = overlay.autoCloseOnRemove;
-        console.log("[ModBox][QA] overlay.autoCloseOnRemove at QA submit:", shouldAutoClose);
-        if (typeof shouldAutoClose !== 'boolean') {
-          // Wait for overlay settings if not set yet
-          try {
-            const settings = await getApiBaseUrl();
-            console.log("[ModBox][QA] settings from getApiBaseUrl:", settings);
-            shouldAutoClose = Boolean(settings.autoCloseOnRemove);
-            overlay.autoCloseOnRemove = shouldAutoClose;
-            console.log("[ModBox][QA] overlay.autoCloseOnRemove after settings fetch:", shouldAutoClose);
-          } catch (e) {
-            console.log("[ModBox][QA] Error fetching settings for autoCloseOnRemove:", e);
-          }
-        }
-        if (shouldAutoClose) {
-          console.log("[ModBox][QA] Auto-closing overlay after Quick Action");
-          setTimeout(closeOverlay, 800);
-        }
-      } catch (error) {
-        overlay.quickActionsError = error instanceof Error ? error.message : String(error);
-      } finally {
-        overlay.submitting = false;
-        renderOverlay();
-      }
+      })();
     });
   });
 
@@ -1264,10 +1234,10 @@ function renderOverlay() {
     inputEl.addEventListener("change", updateValue);
   });
 
-  const saveUsernoteForResolvedUser = async (noteTextInput, noteTypeInput = "none") => {
+  const saveUsernoteForResolvedUser = async (noteTextInput, noteTypeInput = "none", overlayObj = null) => {
     // Capture the overlay reference before the first await so writes to it
     // after suspension don't crash if the overlay was closed in the meantime.
-    const overlay = overlayState;
+    const overlay = overlayObj || overlayState;
     const noteText = String(noteTextInput || "").trim();
     const username = String(overlay?.resolved?.author || "").trim();
     const subreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
@@ -1299,11 +1269,66 @@ function renderOverlay() {
     const didSave = await saveUsernoteForResolvedUser(
       overlay.removalNoteText,
       overlay.removalNoteType,
+      overlay,
     );
     if (didSave) {
       overlay.removalNoteText = "";
     }
     return didSave;
+  };
+
+  // Toast notification system for background action results
+  const showToast = (message, type = "success") => {
+    const toastId = `rrw-toast-${Date.now()}-${Math.random()}`;
+    const toast = document.createElement("div");
+    toast.id = toastId;
+    toast.className = `rrw-toast rrw-toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      animation: rrw-toast-slide-in 0.3s ease-out;
+    `;
+    
+    if (type === "success") {
+      toast.style.backgroundColor = "#18a058";
+      toast.style.color = "white";
+    } else if (type === "error") {
+      toast.style.backgroundColor = "#d32f2f";
+      toast.style.color = "white";
+    } else {
+      toast.style.backgroundColor = "#1f1f1f";
+      toast.style.color = "ffffff";
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    const timeoutId = setTimeout(() => {
+      if (toast.parentElement) {
+        toast.style.animation = "rrw-toast-slide-out 0.3s ease-in";
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }
+    }, 5000);
+    
+    // Allow click to dismiss
+    toast.style.cursor = "pointer";
+    toast.addEventListener("click", () => {
+      clearTimeout(timeoutId);
+      toast.style.animation = "rrw-toast-slide-out 0.3s ease-in";
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    });
   };
 
   const callAction = async (action) => {
@@ -1317,6 +1342,226 @@ function renderOverlay() {
       return;
     }
     console.log("[ModBox] callAction triggered for action:", action);
+    
+    // For simple actions (approve, remove, spam, remove_no_reason), close the overlay immediately
+    // and run the action in the background with toast notifications
+    const simpleActions = ["approve", "spam", "remove", "remove_no_reason"];
+    const isSimpleAction = simpleActions.includes(action);
+    
+    if (isSimpleAction) {
+      // Close the overlay immediately for better UX
+      closeOverlay();
+      
+      // Run the action in the background without blocking UI
+      (async () => {
+        try {
+          const fullname = overlay.resolved?.fullname || overlay.target;
+          
+          if (action === "approve") {
+            await approveThingViaNativeSession(fullname);
+            applyActionBorderToElement(fullname, "approve");
+            showToast(`✓ Approved ${fullname}`, "success");
+          } else if (action === "spam") {
+            await removeThingViaNativeSession(fullname, true);
+            applyActionBorderToElement(fullname, "spam");
+            showToast(`✓ Marked as spam: ${fullname}`, "success");
+          } else if (action === "remove" || action === "remove_no_reason") {
+            // Handle removal with full flow (flair, lock, comment, modmail, usernote)
+            const removeWithoutReason = action === "remove_no_reason";
+            if (overlay.skipRedditRemove && (overlay.selectedReasonKeys || []).length === 0) {
+              showToast("Error: Select at least one reason before sending", "error");
+              return;
+            }
+
+            if (!validateSelectedFields()) {
+              showToast("Error: Please check your inputs", "error");
+              return;
+            }
+
+            const currentThingType = overlay?.resolved?.thingType || (String(fullname || "").startsWith("t3_") ? "submission" : "comment");
+            const matchingReasonsForAction = (overlay.reasons || []).filter((reason) => isReasonForThing(reason, currentThingType));
+            const selectedReasonSetForAction = new Set(removeWithoutReason ? [] : (overlay.selectedReasonKeys || []));
+            const selectedReasonsForAction = matchingReasonsForAction.filter((reason) => selectedReasonSetForAction.has(reason.external_key));
+            const resolvedSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+            const author = String(overlay?.resolved?.author || "").trim();
+            const kind = currentThingType === "submission" ? "post" : "comment";
+            const renderedMessage = buildRemovalPreviewMessage(
+              overlay.removalConfig,
+              selectedReasonsForAction,
+              author,
+              kind,
+              resolvedSubreddit,
+              removeWithoutReason ? {} : (overlay.inputValues || {}),
+            ).trim();
+            const pmSubject = buildRemovalPreviewSubject(
+              overlay.removalConfig,
+              author,
+              kind,
+              resolvedSubreddit,
+            );
+            const removalPostFlairId = currentThingType === "submission"
+              ? (selectedReasonsForAction.find((reason) => String(reason?.flair_id || "").trim())?.flair_id || null)
+              : null;
+            const shouldLockItem = selectedReasonsForAction.some((reason) => Boolean(reason?.lock_post));
+            const shouldStickyReply = currentThingType === "submission"
+              && selectedReasonsForAction.some((reason) => Boolean(reason?.sticky_comment));
+            const commentAsSubreddit = normalizeRemovalBoolean(overlay?.removalConfig?.global_settings?.comment_as_subreddit, true);
+            const lockRemovalComment = normalizeRemovalBoolean(overlay?.removalConfig?.global_settings?.lock_removal_comment, false);
+            const autoArchiveModmail = normalizeRemovalBoolean(overlay?.removalConfig?.global_settings?.auto_archive_modmail, true);
+            const effectiveSendMode = normalizeRemovalSendMode(
+              removeWithoutReason ? "none" : (overlay.sendMode || overlay.removalConfig?.global_settings?.default_send_mode),
+              "reply",
+            );
+            const needsOutboundMessage = effectiveSendMode !== "none";
+            if (needsOutboundMessage && !renderedMessage && !removalPostFlairId) {
+              showToast("Error: No message content generated", "error");
+              return;
+            }
+
+            try {
+              // Remove the post
+              if (!overlay.skipRedditRemove) {
+                await removeThingViaNativeSession(fullname);
+                const removedConfirmed = await confirmThingRemovedViaReddit(fullname);
+                if (!removedConfirmed) {
+                  await removeThingViaNativeSession(fullname);
+                  const removedConfirmedAfterRetry = await confirmThingRemovedViaReddit(fullname);
+                  if (!removedConfirmedAfterRetry) {
+                    throw new Error("Native removal did not stick");
+                  }
+                }
+              }
+              applyActionBorderToElement(fullname, "remove");
+
+              // Apply post flair if configured
+              if (removalPostFlairId && resolvedSubreddit && String(fullname || "").startsWith("t3_")) {
+                try {
+                  await applyFlairViaNativeSession({
+                    subreddit: resolvedSubreddit,
+                    flairTemplateId: removalPostFlairId,
+                    linkFullname: fullname,
+                  });
+                } catch (err) {
+                  console.warn("[ModBox] Flair application failed:", err);
+                }
+              }
+
+              // Lock the item if configured
+              if (shouldLockItem && !overlay.skipRedditRemove) {
+                try {
+                  await lockThingViaNativeSession(fullname);
+                } catch {
+                  // Continue even if lock fails
+                }
+              }
+
+              // Send removal comment if configured
+              if (renderedMessage && (effectiveSendMode === "reply" || effectiveSendMode === "both")) {
+                try {
+                  if (commentAsSubreddit) {
+                    await sendRemovalCommentAsSubreddit(fullname, renderedMessage, lockRemovalComment);
+                  } else {
+                    const commentResponse = await postCommentViaNativeSession(fullname, renderedMessage);
+                    const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
+                    const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
+                    if (replyFullname) {
+                      try {
+                        await distinguishThingViaNativeSession(
+                          replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                          shouldStickyReply,
+                        );
+                      } catch {
+                        // Best effort
+                      }
+                      if (lockRemovalComment) {
+                        try {
+                          await lockThingViaNativeSession(
+                            replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                          );
+                        } catch {
+                          // Best effort
+                        }
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.warn("[ModBox] Comment posting failed:", err);
+                }
+              }
+
+              // Send modmail if configured
+              if (renderedMessage && (effectiveSendMode === "pm" || effectiveSendMode === "both")) {
+                try {
+                  if (!author || !resolvedSubreddit) {
+                    throw new Error("Target author or subreddit unavailable");
+                  }
+                  const permalink = String(overlay?.resolved?.permalink || "").trim();
+                  const modmailBody = permalink
+                    ? `${renderedMessage}\n\n---\n[Link to your ${kind}](${permalink})`
+                    : renderedMessage;
+                  if (!pmSubject || !pmSubject.trim()) {
+                    throw new Error("Modmail subject is empty");
+                  }
+                  const modmailResult = await sendModmailViaReddit({
+                    subreddit: resolvedSubreddit,
+                    to: author,
+                    subject: pmSubject.trim(),
+                    body: modmailBody,
+                    isAuthorHidden: true,
+                  });
+                  const conversationId = String(modmailResult?.conversation?.id || "").trim();
+                  const isInternal = Boolean(modmailResult?.conversation?.isInternal);
+                  if (conversationId && !isInternal && autoArchiveModmail) {
+                    try {
+                      await archiveModmailConversationViaReddit(conversationId);
+                    } catch {
+                      // Ignore archive failures
+                    }
+                  }
+                } catch (err) {
+                  console.warn("[ModBox] Modmail send failed:", err);
+                }
+              }
+
+              // Save usernote if configured
+              // First, sync form values from DOM into overlay object
+              const noteTextElement = document.getElementById("rrw-inline-note-text");
+              const noteTypeElement = document.getElementById("rrw-inline-note-type");
+              if (noteTextElement) {
+                overlay.removalNoteText = String(noteTextElement.value || "").trim();
+              }
+              if (noteTypeElement) {
+                overlay.removalNoteType = String(noteTypeElement.value || "none").trim() || "none";
+              }
+
+              let usernoteSaved = false;
+              if (overlay.removalNoteText || overlay.removalNoteType !== "none") {
+                try {
+                  usernoteSaved = await saveInlineRemovalUsernote(overlay);
+                } catch (err) {
+                  console.warn("[ModBox] Usernote save failed:", err);
+                }
+              }
+
+              const toastMsg = usernoteSaved 
+                ? `✓ Removed ${fullname} (usernote added)`
+                : `✓ Removed ${fullname}`;
+              showToast(toastMsg, "success");
+            } catch (err) {
+              showToast(`Error: ${err instanceof Error ? err.message : "Unknown error"}`, "error");
+            }
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error("[ModBox] Background action failed:", errorMsg);
+          showToast(`Error: ${errorMsg}`, "error");
+        }
+      })();
+      
+      return;
+    }
+    
+    // For complex actions (comment nuke, user actions, playbooks, etc), keep the original behavior
     try {
       overlay.submitting = true;
       overlay.status = "";
@@ -1430,6 +1675,7 @@ function renderOverlay() {
             banUsernoteSaved = await saveUsernoteForResolvedUser(
               overlay.banUsernoteText,
               overlay.banUsernoteType,
+              overlay,
             );
             if (banUsernoteSaved) {
               overlay.banUsernoteText = "";
@@ -1816,8 +2062,7 @@ function renderOverlay() {
     ).playbooks;
     const playbook = allPlaybooks.find((item) => String(item?.key || "").trim() === String(playbookKey || "").trim());
     if (!playbook) {
-      overlay.playbooksError = "Playbook not found.";
-      renderOverlay();
+      showToast("Playbook not found", "error");
       return;
     }
 
@@ -1829,352 +2074,348 @@ function renderOverlay() {
       }
     }
 
-    const previousAutoClose = overlay.autoCloseOnRemove;
-    overlay.autoCloseOnRemove = false;
-    overlay.submitting = true;
-    overlay.playbooksError = "";
-    overlay.playbooksStatus = "";
-    overlay.error = "";
-    overlay.status = "";
-    renderOverlay();
+    // For playbooks, keep overlay open during execution (steps need overlayState)
+    // Run the playbook synchronously with the overlay still visible
+    (async () => {
+      const failures = [];
+      let completed = 0;
 
-    const failures = [];
-    let completed = 0;
-
-    try {
-      for (const step of Array.isArray(playbook.steps) ? playbook.steps : []) {
-        try {
-          const stepTypeRaw = String(step?.type || "").trim().toLowerCase();
-          const stepType = stepTypeRaw === "lock_post" ? "lock_item" : stepTypeRaw;
-          if (stepType === "remove") {
-            overlay.selectedReasonKeys = Array.isArray(step.reason_keys)
-              ? step.reason_keys.map((value) => String(value || "").trim()).filter(Boolean)
-              : [];
-            overlay.sendMode = normalizeRemovalSendMode(step.send_mode, overlay.sendMode || "reply");
-            overlay.inputValues = step.inputs && typeof step.inputs === "object" && !Array.isArray(step.inputs)
-              ? step.inputs
-              : {};
-            overlay.skipRedditRemove = Boolean(step.skip_reddit_remove);
-            overlay.error = "";
-            const hasCommentOverride = typeof step.comment_as_subreddit === "boolean";
-            const globalSettings = overlay.removalConfig?.global_settings && typeof overlay.removalConfig.global_settings === "object"
-              ? overlay.removalConfig.global_settings
-              : null;
-            const previousCommentAsSubreddit = globalSettings?.comment_as_subreddit;
-            if (hasCommentOverride && globalSettings) {
-              globalSettings.comment_as_subreddit = Boolean(step.comment_as_subreddit);
-            }
-            try {
-              await callAction(Boolean(step.no_reason) ? "remove_no_reason" : "remove");
-            } finally {
+      try {
+        console.log("[ModBox] Starting playbook execution:", playbook.title, "with", playbook.steps?.length || 0, "steps");
+        for (const step of Array.isArray(playbook.steps) ? playbook.steps : []) {
+          try {
+            const stepTypeRaw = String(step?.type || "").trim().toLowerCase();
+            const stepType = stepTypeRaw === "lock_post" ? "lock_item" : stepTypeRaw;
+            console.log(`[ModBox] Running playbook step ${completed + 1}: ${stepType}`);
+            
+            if (stepType === "remove") {
+              overlay.selectedReasonKeys = Array.isArray(step.reason_keys)
+                ? step.reason_keys.map((value) => String(value || "").trim()).filter(Boolean)
+                : [];
+              overlay.sendMode = normalizeRemovalSendMode(step.send_mode, overlay.sendMode || "reply");
+              overlay.inputValues = step.inputs && typeof step.inputs === "object" && !Array.isArray(step.inputs)
+                ? step.inputs
+                : {};
+              overlay.skipRedditRemove = Boolean(step.skip_reddit_remove);
+              overlay.error = "";
+              const hasCommentOverride = typeof step.comment_as_subreddit === "boolean";
+              const globalSettings = overlay.removalConfig?.global_settings && typeof overlay.removalConfig.global_settings === "object"
+                ? overlay.removalConfig.global_settings
+                : null;
+              const previousCommentAsSubreddit = globalSettings?.comment_as_subreddit;
               if (hasCommentOverride && globalSettings) {
-                if (typeof previousCommentAsSubreddit === "undefined") {
-                  delete globalSettings.comment_as_subreddit;
-                } else {
-                  globalSettings.comment_as_subreddit = previousCommentAsSubreddit;
+                globalSettings.comment_as_subreddit = Boolean(step.comment_as_subreddit);
+              }
+              try {
+                await callAction(Boolean(step.no_reason) ? "remove_no_reason" : "remove");
+              } finally {
+                if (hasCommentOverride && globalSettings) {
+                  if (typeof previousCommentAsSubreddit === "undefined") {
+                    delete globalSettings.comment_as_subreddit;
+                  } else {
+                    globalSettings.comment_as_subreddit = previousCommentAsSubreddit;
+                  }
                 }
               }
+              if (overlay.error) {
+                throw new Error(overlay.error);
+              }
+              console.log(`[ModBox] Step ${completed + 1} (remove) completed successfully`);
+              completed += 1;
+              continue;
             }
-            if (overlay.error) {
-              throw new Error(overlay.error);
+
+            if (stepType === "remove_item") {
+              const fullname = overlay.resolved?.fullname || overlay.target;
+              if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
+                throw new Error("remove_item requires a valid post or comment target.");
+              }
+              await removeThingViaNativeSession(fullname, Boolean(step?.spam));
+              completed += 1;
+              continue;
             }
-            completed += 1;
-            continue;
-          }
 
-          if (stepType === "remove_item") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
-              throw new Error("remove_item requires a valid post or comment target.");
+            if (stepType === "comment") {
+              const fullnameRaw = String(overlay?.resolved?.fullname || overlay?.target || "").trim().toLowerCase();
+              const fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(fullnameRaw)
+                ? fullnameRaw
+                : parseTargetToFullname(fullnameRaw);
+              const resolvedSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              const author = String(overlay?.resolved?.author || "").trim();
+              const kind = (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment";
+              const source = String(step?.source || "custom").trim().toLowerCase();
+              let body = "";
+              if (source === "removal_reason") {
+                const matchingReasons = (overlay.reasons || []).filter(
+                  (reason) => isReasonForThing(reason, kind === "post" ? "submission" : "comment")
+                    && (Array.isArray(step?.reason_keys) ? step.reason_keys : []).includes(reason.external_key),
+                );
+                body = buildRemovalPreviewMessage(
+                  overlay.removalConfig,
+                  matchingReasons,
+                  author,
+                  kind,
+                  resolvedSubreddit,
+                  step?.inputs && typeof step.inputs === "object" && !Array.isArray(step.inputs)
+                    ? step.inputs
+                    : {},
+                ).trim();
+              } else {
+                body = interpolatePlaybookTemplate(step?.body_template || "", {
+                  author,
+                  subreddit: resolvedSubreddit,
+                  kind,
+                  permalink: overlay?.resolved?.permalink,
+                }).trim();
+              }
+              if (!fullname || !body) {
+                throw new Error("comment step requires a valid target and body.");
+              }
+              const commentResponse = await postCommentViaNativeSession(fullname, body);
+              const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
+              const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
+              if (replyFullname && Boolean(step?.sticky)) {
+                try {
+                  await distinguishThingViaNativeSession(
+                    replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                    true,
+                  );
+                } catch {
+                  // Best effort
+                }
+              }
+              completed += 1;
+              continue;
             }
-            await removeThingViaNativeSession(fullname, Boolean(step?.spam));
-            completed += 1;
-            continue;
-          }
 
-          if (stepType === "comment") {
-            const fullnameRaw = String(overlay?.resolved?.fullname || overlay?.target || "").trim().toLowerCase();
-            const fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(fullnameRaw)
-              ? fullnameRaw
-              : parseTargetToFullname(fullnameRaw);
-            const resolvedSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            const author = String(overlay?.resolved?.author || "").trim();
-            const kind = (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment";
-            const source = String(step?.source || "custom").trim().toLowerCase();
+            if (stepType === "lock_item") {
+              const fullname = overlay.resolved?.fullname || overlay.target;
+              if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
+                throw new Error("lock_item requires a valid post or comment target.");
+              }
+              await lockThingViaNativeSession(fullname);
+              completed += 1;
+              continue;
+            }
 
-            let commentText = "";
-            if (source === "removal_reasons") {
-              const currentThingType = overlay?.resolved?.thingType || (String(fullname || "").startsWith("t3_") ? "submission" : "comment");
-              const matchingReasons = (overlay.reasons || []).filter((reason) => isReasonForThing(reason, currentThingType));
-              const selectedKeys = new Set(Array.isArray(step.reason_keys) ? step.reason_keys.map((value) => String(value || "").trim()).filter(Boolean) : []);
-              const selectedReasons = matchingReasons.filter((reason) => selectedKeys.has(String(reason?.external_key || "")));
-              commentText = buildRemovalPreviewMessage(
-                overlay.removalConfig,
-                selectedReasons,
+            if (stepType === "unlock_item") {
+              const fullname = overlay.resolved?.fullname || overlay.target;
+              if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
+                throw new Error("unlock_item requires a valid post or comment target.");
+              }
+              await unlockThingViaNativeSession(fullname);
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "approve_item") {
+              const fullname = overlay.resolved?.fullname || overlay.target;
+              if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
+                throw new Error("approve_item requires a valid post or comment target.");
+              }
+              await approveThingViaNativeSession(fullname);
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "set_post_flair") {
+              const fullname = overlay.resolved?.fullname || overlay.target;
+              if (!String(fullname || "").startsWith("t3_")) {
+                completed += 1;
+                continue;
+              }
+              const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              const flairTemplateId = String(step?.flair_template_id || "").trim();
+              if (!cleanSubreddit || !flairTemplateId) {
+                throw new Error("set_post_flair requires subreddit and flair_template_id.");
+              }
+              await applyFlairViaNativeSession({
+                subreddit: cleanSubreddit,
+                flairTemplateId,
+                linkFullname: fullname,
+              });
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "set_user_flair") {
+              const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              const author = String(overlay?.resolved?.author || "").trim();
+              const flairTemplateId = String(step?.flair_template_id || "").trim();
+              if (!cleanSubreddit || !author || !flairTemplateId) {
+                throw new Error("set_user_flair requires resolved author, subreddit, and flair_template_id.");
+              }
+              await applyFlairViaNativeSession({
+                subreddit: cleanSubreddit,
+                flairTemplateId,
+                username: author,
+              });
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "usernote") {
+              const noteText = interpolatePlaybookTemplate(step.text_template || "", {
+                author: overlay?.resolved?.author,
+                subreddit: overlay?.resolved?.subreddit,
+                kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+                permalink: overlay?.resolved?.permalink,
+              }).trim();
+              if (!noteText) {
+                throw new Error("Usernote step produced empty text.");
+              }
+              const didSave = await saveUsernoteForResolvedUser(noteText, String(step.note_type || "none"), overlay);
+              if (!didSave) {
+                throw new Error("Usernote could not be saved.");
+              }
+              console.log(`[ModBox] Step ${completed + 1} (usernote) completed successfully`);
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "ban_user") {
+              const author = String(overlay?.resolved?.author || "").trim();
+              const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              if (!author || !cleanSubreddit) {
+                throw new Error("ban_user requires resolved author and subreddit.");
+              }
+
+              const durationDays = (() => {
+                const rawDuration = step?.duration_days;
+                const parsedInt = parseInt(rawDuration, 10);
+                return isNaN(parsedInt) ? 0 : Math.max(0, parsedInt);
+              })();
+
+              const banMessage = interpolatePlaybookTemplate(step?.ban_message_template || "", {
                 author,
-                kind,
-                resolvedSubreddit,
-                step.inputs && typeof step.inputs === "object" && !Array.isArray(step.inputs) ? step.inputs : {},
-              ).trim();
-            } else {
-              commentText = interpolatePlaybookTemplate(step?.text_template || "", {
+                subreddit: cleanSubreddit,
+                kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+                permalink: overlay?.resolved?.permalink,
+              }).trim();
+
+              const banNote = interpolatePlaybookTemplate(step?.note_template || "", {
                 author,
-                subreddit: resolvedSubreddit,
+                subreddit: cleanSubreddit,
+                kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+                permalink: overlay?.resolved?.permalink,
+              }).trim();
+
+              await banUserViaNativeSession({
+                subreddit: cleanSubreddit,
+                username: author,
+                durationDays,
+                banMessage,
+                note: banNote,
+              });
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "unban_user") {
+              const author = String(overlay?.resolved?.author || "").trim();
+              const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              if (!author || !cleanSubreddit) {
+                throw new Error("unban_user requires resolved author and subreddit.");
+              }
+              await unbanUserViaNativeSession({ subreddit: cleanSubreddit, username: author });
+              completed += 1;
+              continue;
+            }
+
+            if (stepType === "send_modmail") {
+              const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+              const author = String(overlay?.resolved?.author || "").trim();
+              const kind = (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment";
+              const toMode = (["custom", "subreddit"].includes(String(step?.to_mode || "").trim().toLowerCase())) ? String(step.to_mode).trim().toLowerCase() : "author";
+              const toUsername = toMode === "custom" ? String(step?.to_username || "").trim() : toMode === "subreddit" ? null : author;
+              const subject = interpolatePlaybookTemplate(step?.subject_template || "", {
+                author,
+                subreddit: cleanSubreddit,
                 kind,
                 permalink: overlay?.resolved?.permalink,
               }).trim();
-            }
-
-            if (!commentText) {
-              throw new Error("comment step produced empty text.");
-            }
-
-            const sticky = Boolean(step?.sticky);
-            const lockComment = Boolean(step?.lock_comment);
-            // Playbook comment steps should always post a standard comment.
-            const commentResponse = await postPlaybookCommentStepViaNativeSession(step, fullname, commentText);
-            const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
-            const replyFullnameRaw = String(replyThing?.name || replyThing?.id || "").trim();
-            const replyFullname = replyFullnameRaw
-              ? (replyFullnameRaw.startsWith("t1_") ? replyFullnameRaw : `t1_${replyFullnameRaw}`)
-              : "";
-
-            if (replyFullname) {
-              try {
-                await distinguishThingViaNativeSession(replyFullname, sticky && String(fullname || "").startsWith("t3_"));
-              } catch {
-                // Best effort only.
+              let body = interpolatePlaybookTemplate(step?.body_template || "", {
+                author,
+                subreddit: cleanSubreddit,
+                kind,
+                permalink: overlay?.resolved?.permalink,
+              }).trim();
+              if (step?.include_permalink !== false && String(overlay?.resolved?.permalink || "").trim()) {
+                body = `${body}\n\n---\n[Link to this ${kind}](${String(overlay.resolved.permalink).trim()})`;
               }
-              if (lockComment) {
+              if (!cleanSubreddit || (toMode !== "subreddit" && !toUsername) || !subject || !body) {
+                throw new Error("send_modmail requires subreddit, subject, and body (and a recipient when not sending to modteam).");
+              }
+              const modmailResult = await sendModmailViaReddit({
+                subreddit: cleanSubreddit,
+                to: toUsername,
+                subject,
+                body,
+                isAuthorHidden: true,
+              });
+              const conversationId = String(modmailResult?.conversation?.id || "").trim();
+              const isInternal = Boolean(modmailResult?.conversation?.isInternal);
+              if (step?.auto_archive !== false && conversationId && !isInternal) {
                 try {
-                  await lockThingViaNativeSession(replyFullname);
+                  await archiveModmailConversationViaReddit(conversationId);
                 } catch {
                   // Best effort only.
                 }
               }
-            }
-
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "approve_item") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
-              throw new Error("approve_item requires a valid post or comment target.");
-            }
-            await approveThingViaNativeSession(fullname);
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "remove_item") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
-              throw new Error("remove_item requires a valid post or comment target.");
-            }
-            await removeThingViaNativeSession(fullname, Boolean(step?.spam));
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "usernote") {
-            const noteText = interpolatePlaybookTemplate(step.text_template, {
-              author: overlay?.resolved?.author,
-              subreddit: overlay?.resolved?.subreddit,
-              kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
-              permalink: overlay?.resolved?.permalink,
-            }).trim();
-            if (!noteText) {
-              throw new Error("Usernote step produced empty text.");
-            }
-            const didSave = await saveUsernoteForResolvedUser(noteText, String(step.note_type || "none"));
-            if (!didSave) {
-              throw new Error("Usernote could not be saved.");
-            }
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "lock_item") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
-              throw new Error("lock_item requires a valid post or comment target.");
-            }
-            await lockThingViaNativeSession(fullname);
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "unlock_item") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!/^t[13]_[a-z0-9]{5,10}$/i.test(String(fullname || ""))) {
-              throw new Error("unlock_item requires a valid post or comment target.");
-            }
-            await unlockThingViaNativeSession(fullname);
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "set_post_flair") {
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            if (!String(fullname || "").startsWith("t3_")) {
               completed += 1;
               continue;
             }
-            const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            const flairTemplateId = String(step?.flair_template_id || "").trim();
-            if (!cleanSubreddit || !flairTemplateId) {
-              throw new Error("set_post_flair requires subreddit and flair_template_id.");
-            }
-            await applyFlairViaNativeSession({
-              subreddit: cleanSubreddit,
-              flairTemplateId,
-              linkFullname: fullname,
-            });
-            completed += 1;
-            continue;
-          }
 
-          if (stepType === "set_user_flair") {
-            const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            const author = String(overlay?.resolved?.author || "").trim();
-            const flairTemplateId = String(step?.flair_template_id || "").trim();
-            if (!cleanSubreddit || !author || !flairTemplateId) {
-              throw new Error("set_user_flair requires resolved author, subreddit, and flair_template_id.");
-            }
-            await applyFlairViaNativeSession({
-              subreddit: cleanSubreddit,
-              flairTemplateId,
-              username: author,
-            });
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "ban_user") {
-            const author = String(overlay?.resolved?.author || "").trim();
-            const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            const fullname = overlay.resolved?.fullname || overlay.target;
-            const durationDays = Number.isFinite(Number(step?.duration_days)) && Number(step.duration_days) > 0
-              ? Number(step.duration_days)
-              : 7;
-            const banMessage = interpolatePlaybookTemplate(step?.ban_message_template || "", {
-              author: overlay?.resolved?.author,
-              subreddit: overlay?.resolved?.subreddit,
-              kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
-              permalink: overlay?.resolved?.permalink,
-            }).trim();
-            const banNote = interpolatePlaybookTemplate(step?.ban_note_template || "", {
-              author: overlay?.resolved?.author,
-              subreddit: overlay?.resolved?.subreddit,
-              kind: (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
-              permalink: overlay?.resolved?.permalink,
-            }).trim();
-
-            if (!author || !cleanSubreddit) {
-              throw new Error("ban_user requires resolved author and subreddit.");
-            }
-
-            await banUserViaNativeSession({
-              subreddit: cleanSubreddit,
-              username: author,
-              durationDays,
-              banMessage,
-              note: banNote,
-            });
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "unban_user") {
-            const author = String(overlay?.resolved?.author || "").trim();
-            const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            if (!author || !cleanSubreddit) {
-              throw new Error("unban_user requires resolved author and subreddit.");
-            }
-            await unbanUserViaNativeSession({ subreddit: cleanSubreddit, username: author });
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "send_modmail") {
-            const cleanSubreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
-            const author = String(overlay?.resolved?.author || "").trim();
-            const kind = (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment";
-            const toMode = (["custom", "subreddit"].includes(String(step?.to_mode || "").trim().toLowerCase())) ? String(step.to_mode).trim().toLowerCase() : "author";
-            const toUsername = toMode === "custom" ? String(step?.to_username || "").trim() : toMode === "subreddit" ? null : author;
-            const subject = interpolatePlaybookTemplate(step?.subject_template || "", {
-              author,
-              subreddit: cleanSubreddit,
-              kind,
-              permalink: overlay?.resolved?.permalink,
-            }).trim();
-            let body = interpolatePlaybookTemplate(step?.body_template || "", {
-              author,
-              subreddit: cleanSubreddit,
-              kind,
-              permalink: overlay?.resolved?.permalink,
-            }).trim();
-            if (step?.include_permalink !== false && String(overlay?.resolved?.permalink || "").trim()) {
-              body = `${body}\n\n---\n[Link to this ${kind}](${String(overlay.resolved.permalink).trim()})`;
-            }
-            if (!cleanSubreddit || (toMode !== "subreddit" && !toUsername) || !subject || !body) {
-              throw new Error("send_modmail requires subreddit, subject, and body (and a recipient when not sending to modteam).");
-            }
-            const modmailResult = await sendModmailViaReddit({
-              subreddit: cleanSubreddit,
-              to: toUsername,
-              subject,
-              body,
-              isAuthorHidden: true,
-            });
-            const conversationId = String(modmailResult?.conversation?.id || "").trim();
-            const isInternal = Boolean(modmailResult?.conversation?.isInternal);
-            if (step?.auto_archive !== false && conversationId && !isInternal) {
-              try {
-                await archiveModmailConversationViaReddit(conversationId);
-              } catch {
-                // Best effort only.
+            if (stepType === "distinguish_comment") {
+              const fullname = String(overlay.resolved?.fullname || overlay.target || "").trim().toLowerCase();
+              if (!fullname.startsWith("t1_")) {
+                completed += 1;
+                continue;
               }
-            }
-            completed += 1;
-            continue;
-          }
-
-          if (stepType === "distinguish_comment") {
-            const fullname = String(overlay.resolved?.fullname || overlay.target || "").trim().toLowerCase();
-            if (!fullname.startsWith("t1_")) {
+              await distinguishThingViaNativeSession(fullname, Boolean(step?.sticky));
               completed += 1;
               continue;
             }
-            await distinguishThingViaNativeSession(fullname, Boolean(step?.sticky));
+
+            // Unknown step type - log and skip
+            console.warn(`[ModBox] Unknown playbook step type: ${stepType}, skipping`);
             completed += 1;
-            continue;
-          }
-        } catch (stepError) {
-          failures.push(`step ${completed + 1} (${String(step?.type || "unknown")}): ${getSafeErrorMessage(stepError)}`);
-          if (playbook.stop_on_error !== false) {
-            break;
+          } catch (stepError) {
+            console.error(`[ModBox] Step ${completed + 1} (${String(step?.type || "unknown")}) failed:`, stepError);
+            failures.push(`step ${completed + 1} (${String(step?.type || "unknown")}): ${getSafeErrorMessage(stepError)}`);
+            if (playbook.stop_on_error !== false) {
+              break;
+            }
           }
         }
-      }
 
-      if (failures.length > 0) {
-        overlay.playbooksError = `Playbook completed with ${failures.length} error${failures.length === 1 ? "" : "s"}: ${failures.join(" | ")}`;
+        if (failures.length > 0) {
+          console.warn(`[ModBox] Playbook "${playbook.title}" completed with ${failures.length} error(s):`, failures);
+          showToast(`Playbook "${playbook.title}" completed with ${failures.length} error${failures.length === 1 ? "" : "s"}`, "error");
+        } else {
+          console.log(`[ModBox] Playbook "${playbook.title}" completed successfully: ${completed} step${completed === 1 ? "" : "s"}`);
+          showToast(`✓ Playbook "${playbook.title}" ran ${completed} step${completed === 1 ? "" : "s"}`, "success");
+          // Close overlay after successful completion
+          setTimeout(closeOverlay, 500);
+        }
+      } catch (err) {
+        console.error("[ModBox] Playbook execution error:", err);
+        showToast(`Playbook error: ${err instanceof Error ? err.message : String(err)}`, "error");
       }
-      overlay.playbooksStatus = `Playbook \"${playbook.title}\" ran ${completed} step${completed === 1 ? "" : "s"}.`;
-      if (overlay.quickActionsOnlyMode && failures.length === 0) {
-        setTimeout(closeOverlay, 800);
-      } else if (previousAutoClose && failures.length === 0) {
-        setTimeout(closeOverlay, 150);
-      }
-    } finally {
-      overlay.autoCloseOnRemove = previousAutoClose;
-      overlay.submitting = false;
-      renderOverlay();
-    }
+    })();
   };
+
+
+
+  root.querySelectorAll("[data-playbook-key]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", (event) => {
+      const playbookKey = String(event.currentTarget.getAttribute("data-playbook-key") || "").trim();
+      if (!playbookKey) {
+        return;
+      }
+      void runPlaybook(playbookKey);
+    });
+  });
 
   root.querySelectorAll("[data-playbook-key]").forEach((buttonEl) => {
     buttonEl.addEventListener("click", (event) => {
