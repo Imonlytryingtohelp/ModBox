@@ -1159,12 +1159,6 @@ function renderOverlay() {
         kind: thingKind,
       }).trim();
 
-      if (!renderedBody) {
-        overlay.quickActionsError = "This quick action has an empty comment body.";
-        renderOverlay();
-        return;
-      }
-
       try {
         overlay.submitting = true;
         overlay.quickActionsError = "";
@@ -1185,34 +1179,36 @@ function renderOverlay() {
         let lockedPost = false;
         let usedSubredditCommentWorkaround = false;
 
-        if (Boolean(action.comment_as_subreddit)) {
-          let removedForSubredditComment = false;
-          try {
-            await removeThingViaNativeSession(fullname);
-            removedForSubredditComment = true;
-            await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
-            usedSubredditCommentWorkaround = true;
-          } finally {
-            if (removedForSubredditComment) {
-              try {
-                await approveThingViaNativeSession(fullname);
-              } catch {
-                // Best effort only; avoid masking the primary failure.
+        if (renderedBody) {
+          if (Boolean(action.comment_as_subreddit)) {
+            let removedForSubredditComment = false;
+            try {
+              await removeThingViaNativeSession(fullname);
+              removedForSubredditComment = true;
+              await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
+              usedSubredditCommentWorkaround = true;
+            } finally {
+              if (removedForSubredditComment) {
+                try {
+                  await approveThingViaNativeSession(fullname);
+                } catch {
+                  // Best effort only; avoid masking the primary failure.
+                }
               }
             }
-          }
-        } else {
-          const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
-          const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
-          const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
-          if (replyFullname && (action.sticky || action.mod_only)) {
-            try {
-              await distinguishThingViaNativeSession(
-                replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
-                Boolean(action.sticky),
-              );
-            } catch {
-              // Distinguish/sticky is best effort; posting the comment is the primary action.
+          } else {
+            const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
+            const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
+            const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
+            if (replyFullname && (action.sticky || action.mod_only)) {
+              try {
+                await distinguishThingViaNativeSession(
+                  replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                  Boolean(action.sticky),
+                );
+              } catch {
+                // Distinguish/sticky is best effort; posting the comment is the primary action.
+              }
             }
           }
         }

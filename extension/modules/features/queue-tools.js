@@ -12,6 +12,7 @@ function collectQueueListingItems() {
     "article",
     "shreddit-post",
     "shreddit-comment",
+    "mod-queue-list-item",
     ".Comment",
     ".thing.link",
     ".thing.comment",
@@ -19,18 +20,37 @@ function collectQueueListingItems() {
 
   const seen = new Set();
   const rows = [];
+  let totalFound = 0;
+  console.log("[ModBox] collectQueueListingItems: starting collection with selectors:", selectors);
+  
   selectors.forEach((selector) => {
-    document.querySelectorAll(selector).forEach((container) => {
+    const elements = document.querySelectorAll(selector);
+    console.log("[ModBox] Selector", selector, "found", elements.length, "elements");
+    
+    elements.forEach((container) => {
+      totalFound += 1;
       if (!(container instanceof HTMLElement)) {
         return;
       }
-      const target = pickTargetForContainer(container);
+      
+      // For mod-queue-list-item, extract target from data-ks-item attribute
+      let target;
+      if (container.tagName.toLowerCase() === "mod-queue-list-item") {
+        target = String(container.getAttribute("data-ks-item") || "").trim();
+        console.log("[ModBox] Found mod-queue-list-item with data-ks-item:", target);
+      } else {
+        target = pickTargetForContainer(container);
+      }
+      
       if (!target || !/^t[13]_[a-z0-9]{5,10}$/i.test(target)) {
+        console.log("[ModBox] Skipping container: invalid or empty target:", target);
         return;
       }
 
       const subreddit = resolveContainerSubreddit(container);
+      console.log("[ModBox] Resolved subreddit:", subreddit);
       if (!isAllowedLaunchSubreddit(subreddit)) {
+        console.log("[ModBox] Skipping container: subreddit not allowed:", subreddit);
         return;
       }
 
@@ -55,6 +75,8 @@ function collectQueueListingItems() {
     });
   });
 
+  console.log("[ModBox] collectQueueListingItems: found", totalFound, "containers, filtered to", rows.length, "valid items");
+
   // Ensure insertion anchors use actual page order rather than selector order.
   rows.sort((a, b) => {
     if (a.container === b.container) {
@@ -70,6 +92,7 @@ function collectQueueListingItems() {
     return 0;
   });
 
+  console.log("[ModBox] collectQueueListingItems found", rows.length, "items after filtering");
   return rows;
 }
 
@@ -341,13 +364,21 @@ function renderQueueToolsBar(items) {
 // ──── Queue Tools Binding ────
 
 function bindQueueToolsFeatures() {
-  if (!isQueueListingPage()) {
+  const pathname = String(window.location.pathname || "");
+  const isQueuePage = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(pathname) ||
+                      /\/mod\/\w+\/queue(?:\/|$)/i.test(pathname);
+  console.log("[ModBox] bindQueueToolsFeatures: pathname=", pathname, "isQueuePage=", isQueuePage);
+  
+  if (!isQueuePage) {
+    console.log("[ModBox] Not a queue listing page, removing queue tools");
     document.getElementById("rrw-queue-tools")?.remove();
     document.querySelectorAll(".rrw-queue-filter-hidden").forEach((node) => node.classList.remove("rrw-queue-filter-hidden"));
     return;
   }
 
+  console.log("[ModBox] This is a queue page, proceeding with collection");
   const items = collectQueueListingItems();
+  console.log("[ModBox] Queue tools: collected", items.length, "items");
   const validTargets = new Set(items.map((item) => item.target));
   Array.from(queueToolsSelectedTargets).forEach((target) => {
     if (!validTargets.has(target)) {

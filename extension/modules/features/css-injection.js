@@ -94,16 +94,38 @@ function injectStyles() {
       box-shadow: 0 10px 26px rgba(5, 9, 14, 0.45);
       color: #dbe9ff;
       display: grid;
-      gap: 8px;
-      padding: 10px;
+      gap: 5px;
+      padding: 6px;
       backdrop-filter: blur(2px);
+    }
+
+    .rrw-queuebar[data-collapsed="1"] {
+      min-width: auto;
+      max-width: none;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .rrw-queuebar[data-collapsed="1"][data-reddit-version="new"] {
+      padding: 4px 2px !important;
+      gap: 2px !important;
     }
 
     .rrw-queuebar-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
+      padding: 0;
+    }
+
+    .rrw-queuebar[data-collapsed="1"] .rrw-queuebar-header {
+      align-items: center;
+      justify-content: flex-start;
+      gap: 2px;
+      width: fit-content;
     }
 
     .rrw-queuebar-title-wrap {
@@ -156,13 +178,13 @@ function injectStyles() {
     .rrw-queuebar-badges {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
+      gap: 5px;
     }
 
     .rrw-queuebar-secondary-links {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
+      gap: 4px;
     }
 
     .rrw-queuebar-secondary-link {
@@ -171,7 +193,7 @@ function injectStyles() {
       border: 1px solid rgba(98, 133, 192, 0.5);
       background: rgba(24, 42, 68, 0.88);
       border-radius: 8px;
-      padding: 5px 6px;
+      padding: 4px 5px;
       color: #d8e8ff;
       font-size: 0.74rem;
       font-weight: 600;
@@ -208,10 +230,10 @@ function injectStyles() {
       cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 5px;
       font-size: 0.72rem;
-      min-width: 0;
+      min-width: 38px;
       transition: background-color 0.2s, border-color 0.2s;
     }
 
@@ -255,13 +277,13 @@ function injectStyles() {
       border: 1px solid rgba(98, 133, 192, 0.55);
       background: rgba(28, 49, 78, 0.92);
       border-radius: 10px;
-      padding: 6px 7px;
+      padding: 4px 5px;
       color: #eef4ff;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 5px;
       font-size: 0.84rem;
       transition: background-color 0.2s, border-color 0.2s;
     }
@@ -274,7 +296,7 @@ function injectStyles() {
     .rrw-queuebar-badge-main {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 3px;
       min-width: 0;
     }
 

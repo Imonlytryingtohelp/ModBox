@@ -301,7 +301,7 @@ function renderRemovalConfigEditor() {
                     </label>
                     <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
                       <input type="checkbox" data-qa-index="${index}" data-qa-field="lock_post" ${action.lock_post ? "checked" : ""} />
-                      <span>Lock post after action (posts only)</span>
+                      <span>Lock item</span>
                     </label>
                   </div>
                   <label class="rrw-field">

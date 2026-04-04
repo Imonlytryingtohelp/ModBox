@@ -105,6 +105,7 @@ function resolveRedditLinkHost(linkHostPreference, useOldReddit) {
 
 function extractFullnameFromAttributes(container) {
   const attrCandidates = [
+    "id",
     "data-fullname",
     "fullname",
     "thingid",
@@ -611,7 +612,11 @@ function extractModlogEntriesFromPayload(payload) {
 // ============================================================================
 
 function isQueueListingPage(pathname = window.location.pathname) {
-  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
+  const path = String(pathname || "");
+  const result = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(path) ||
+         /\/mod\/\w+\/queue(?:\/|$)/i.test(path);
+  console.log("[ModBox] isQueueListingPage: pathname=", path, "result=", result);
+  return result;
 }
 
 function getThingTypeLabelFromFullname(fullname) {

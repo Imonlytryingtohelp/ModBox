@@ -33,21 +33,92 @@ function findClosestActionContainer(element) {
   if (!(element instanceof HTMLElement)) {
     return null;
   }
-  return element.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+  // Try to find shreddit-post first, then shreddit-comment
+  let closest = element.closest("shreddit-post");
+  if (closest) return closest;
+  
+  closest = element.closest("shreddit-comment");
+  if (closest) return closest;
+  
+  return element.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
 }
 
 function pickTargetForContainer(container) {
   if (!(container instanceof HTMLElement)) {
     return null;
   }
-  const postId = container.getAttribute("data-post-id") || container.getAttribute("id");
-  if (postId) {
-    return `t3_${postId.replace(/^t3_/, "")}`;
+
+  const isPost = 
+    container.tagName === "SHREDDIT-POST" || 
+    container.classList.contains("link") ||
+    container.getAttribute("data-testid") === "post-container";
+  
+  const isComment = 
+    container.tagName === "SHREDDIT-COMMENT" ||
+    container.classList.contains("comment");
+
+  // **PRIORITY 1**: Use the element's own attributes as-is if they look valid
+  const directId = container.getAttribute("id");
+  if (directId && directId.includes("_") && (directId.startsWith("t1_") || directId.startsWith("t3_"))) {
+    return directId;
   }
-  const thingId = container.getAttribute("data-fullname");
-  if (thingId && (thingId.startsWith("t1_") || thingId.startsWith("t3_"))) {
-    return thingId;
+
+  const dataFullname = container.getAttribute("data-fullname");
+  if (dataFullname && dataFullname.includes("_") && (dataFullname.startsWith("t1_") || dataFullname.startsWith("t3_"))) {
+    return dataFullname;
   }
+
+  // **PRIORITY 2**: Check other direct attributes
+  const otherDirectAttrs = [
+    container.getAttribute("data-post-id"),
+    container.getAttribute("data-id"),
+    container.getAttribute("data-thing-id")
+  ];
+
+  for (const attr of otherDirectAttrs) {
+    if (attr && attr.includes("_") && (attr.startsWith("t1_") || attr.startsWith("t3_"))) {
+      return attr;
+    }
+  }
+
+  // **PRIORITY 3**: Extract from links (fallback only)
+  const extractPostIdFromUrl = (url) => {
+    if (!url) return null;
+    const match = url.match(/\/comments\/([a-z0-9]{5,10})/i);
+    return match ? match[1] : null;
+  };
+
+  const permalinkSelectors = [
+    "a[data-testid='post_title']",
+    "a[data-click-id='body']",
+    "a[href*='/comments/']",
+    "[slot='title'] a",
+    ".post-title a",
+    "h3 a, h2 a"
+  ];
+
+  for (const selector of permalinkSelectors) {
+    const permalinkEl = container.querySelector(selector);
+    if (permalinkEl instanceof HTMLElement) {
+      const href = permalinkEl.getAttribute("href") || "";
+      const postId = extractPostIdFromUrl(href);
+      if (postId) {
+        const result = isComment ? `t1_${postId}` : `t3_${postId}`;
+        return result;
+      }
+    }
+  }
+
+  const anyLink = container.querySelector("a[href*='/comments/']");
+  if (anyLink instanceof HTMLElement) {
+    const href = anyLink.getAttribute("href") || "";
+    const postId = extractPostIdFromUrl(href);
+    if (postId) {
+      const result = isComment ? `t1_${postId}` : `t3_${postId}`;
+      return result;
+    }
+  }
+
   return null;
 }
 
@@ -78,7 +149,7 @@ function resolveTargetFromNativeControl(control) {
   if (stored) {
     return stored;
   }
-  const container = control.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+  const container = control.closest("shreddit-post, shreddit-comment, article, .thing.link, .thing.comment, [data-testid='post-container']");
   if (container instanceof HTMLElement) {
     return pickTargetForContainer(container);
   }
@@ -157,7 +228,9 @@ function bindNativeRemoveInterceptor() {
         }
       }
 
-      const closestPost = targetEl.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+      let closestPost = targetEl.closest("shreddit-post");
+      if (!closestPost) closestPost = targetEl.closest("shreddit-comment");
+      if (!closestPost) closestPost = targetEl.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
       if (closestPost instanceof HTMLElement) {
         const resolved = pickTargetForContainer(closestPost);
         if (resolved) {
@@ -169,7 +242,9 @@ function bindNativeRemoveInterceptor() {
 
       const closestModButton = targetEl.closest("[data-testid*='menu'], [data-testid*='action'], button[aria-label*='more'], [role='button'][aria-label*='more']");
       if (closestModButton instanceof HTMLElement) {
-        const closestPostFromButton = closestModButton.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+      let closestPostFromButton = closestModButton.closest("shreddit-post");
+      if (!closestPostFromButton) closestPostFromButton = closestModButton.closest("shreddit-comment");
+      if (!closestPostFromButton) closestPostFromButton = closestModButton.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
         if (closestPostFromButton instanceof HTMLElement) {
           const resolved = pickTargetForContainer(closestPostFromButton);
           if (resolved) {

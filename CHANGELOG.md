@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.1 - Bug Squashing
+
+### Fixed
+
+- **MOD ACTIONS target detection** - Fixed issue where MOD ACTIONS button would target wrong post/comment on www.reddit and sh.reddit. Now correctly extracts fullname from element `id` attribute as priority #1.
+- **Queue bar spacing** - Fixed inconsistent spacing in queue bar container on www.reddit and sh.reddit layouts (3 locations corrected).
+- **Quick Actions "Lock item" label** - Changed from "Lock post after action (posts only)" to "Lock item" to reflect that it now works on both posts and comments.
+- **Quick Actions optional comment** - Quick Actions no longer require an empty comment body; other actions (lock, ban, etc.) now execute even without a comment.
+- **Pill buttons in new reddit modqueues** - N,H,P and Mod Actions now correctly appear in the new reddit (shreddit) mod queues. 
+
 ## 1.0.0 - First Release
 
 ### Added

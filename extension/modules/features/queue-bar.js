@@ -575,6 +575,9 @@ function renderQueueBar(state) {
   const shell = document.createElement("section");
   shell.className = "rrw-queuebar";
   shell.setAttribute("data-collapsed", queueBarCollapsed ? "1" : "0");
+  
+  const isOldReddit = String(window.location.hostname || "").toLowerCase() === "old.reddit.com";
+  shell.setAttribute("data-reddit-version", isOldReddit ? "old" : "new");
 
   const header = document.createElement("header");
   header.className = "rrw-queuebar-header";

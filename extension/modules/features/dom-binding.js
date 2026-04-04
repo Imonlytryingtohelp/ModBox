@@ -279,6 +279,8 @@ function bindContainer(container) {
     return;
   }
 
+  console.log("[ModBox] bindContainer: starting bind for", container.tagName, "with id=" + container.id, "data-fullname=" + container.getAttribute("data-fullname"));
+
   const containerSubreddit = resolveContainerSubreddit(container);
   if (!isAllowedLaunchSubreddit(containerSubreddit)) {
     console.log("[ModBox] bindContainer: subreddit '" + containerSubreddit + "' not in allowedLaunchSubreddits (loaded=" + allowedLaunchSubredditsLoaded + ", set=" + (allowedLaunchSubreddits instanceof Set ? "yes size=" + allowedLaunchSubreddits.size : "no") + ")");
@@ -287,9 +289,11 @@ function bindContainer(container) {
 
   const target = pickTargetForContainer(container);
   if (!target) {
-    console.log("[ModBox] bindContainer: no target found");
+    console.log("[ModBox] bindContainer: no target found for", container.tagName);
     return;
   }
+  
+  console.log("[ModBox] bindContainer: successfully extracted target =", target, "for element", container.tagName);
 
   tagNativeRemoveControls(container, target);
 
@@ -297,8 +301,11 @@ function bindContainer(container) {
   button.type = "button";
   button.className = BUTTON_CLASS;
   button.textContent = "Mod Actions";
+  button.dataset.rrwButtonTarget = target;
   attachButtonClickHandlers(button, () => {
-    void openOverlay(target);
+    const btnTarget = button.dataset.rrwButtonTarget || target;
+    console.log("[ModBox] MOD ACTIONS button clicked! container=", container.tagName, "target from closure=", target, "target from button attribute=", btnTarget);
+    void openOverlay(btnTarget);
   });
 
   const itemSubreddit =

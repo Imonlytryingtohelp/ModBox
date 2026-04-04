@@ -42,6 +42,14 @@ function start() {
   // Prioritize queue bar on page reload: initialize immediately so counts and links
   // appear without waiting for idle time or timeout fallback.
   void initQueueBar();
+  // Bind queue tools immediately on queue pages so bulk actions toolbar appears
+  const isQueuePage = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(window.location.pathname || "")) ||
+                      /\/mod\/\w+\/queue(?:\/|$)/i.test(String(window.location.pathname || ""));
+  console.log("[ModBox] Checking if this is a queue page:", isQueuePage);
+  if (isQueuePage) {
+    console.log("[ModBox] Calling bindQueueToolsFeatures on page load");
+    bindQueueToolsFeatures();
+  }
   bindContextPopupEvents();
   const pageSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));
   const initAllowedSubreddits = ensureAllowedLaunchSubredditsLoaded();

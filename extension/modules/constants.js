@@ -87,6 +87,7 @@ const BINDABLE_CONTAINER_SELECTORS = [
   ".Comment",
   ".thing.link",
   ".thing.comment",
+  "mod-queue-list-item",
 ];
 const BINDABLE_CONTAINER_SELECTOR = BINDABLE_CONTAINER_SELECTORS.join(", ");
 const MAX_PENDING_BIND_ROOTS = 200;

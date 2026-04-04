@@ -181,6 +181,8 @@ const BINDABLE_CONTAINER_SELECTORS = [
 
   ".thing.comment",
 
+  "mod-queue-list-item",
+
 ];
 
 const BINDABLE_CONTAINER_SELECTOR = BINDABLE_CONTAINER_SELECTORS.join(", ");
@@ -912,6 +914,8 @@ function resolveRedditLinkHost(linkHostPreference, useOldReddit) {
 function extractFullnameFromAttributes(container) {
 
   const attrCandidates = [
+
+    "id",
 
     "data-fullname",
 
@@ -1925,7 +1929,15 @@ function extractModlogEntriesFromPayload(payload) {
 
 function isQueueListingPage(pathname = window.location.pathname) {
 
-  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
+  const path = String(pathname || "");
+
+  const result = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(path) ||
+
+         /\/mod\/\w+\/queue(?:\/|$)/i.test(path);
+
+  console.log("[ModBox] isQueueListingPage: pathname=", path, "result=", result);
+
+  return result;
 
 }
 
@@ -8803,11 +8815,39 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 8px;
+      gap: 5px;
 
-      padding: 10px;
+      padding: 6px;
 
       backdrop-filter: blur(2px);
+
+    }
+
+
+
+    .rrw-queuebar[data-collapsed="1"] {
+
+      min-width: auto;
+
+      max-width: none;
+
+      display: flex;
+
+      gap: 4px;
+
+      align-items: center;
+
+      padding: 4px;
+
+    }
+
+
+
+    .rrw-queuebar[data-collapsed="1"][data-reddit-version="new"] {
+
+      padding: 4px 2px !important;
+
+      gap: 2px !important;
 
     }
 
@@ -8821,7 +8861,23 @@ function injectStyles() {
 
       justify-content: space-between;
 
-      gap: 8px;
+      gap: 6px;
+
+      padding: 0;
+
+    }
+
+
+
+    .rrw-queuebar[data-collapsed="1"] .rrw-queuebar-header {
+
+      align-items: center;
+
+      justify-content: flex-start;
+
+      gap: 2px;
+
+      width: fit-content;
 
     }
 
@@ -8927,7 +8983,7 @@ function injectStyles() {
 
       grid-template-columns: repeat(2, minmax(0, 1fr));
 
-      gap: 8px;
+      gap: 5px;
 
     }
 
@@ -8939,7 +8995,7 @@ function injectStyles() {
 
       grid-template-columns: repeat(3, minmax(0, 1fr));
 
-      gap: 6px;
+      gap: 4px;
 
     }
 
@@ -8957,7 +9013,7 @@ function injectStyles() {
 
       border-radius: 8px;
 
-      padding: 5px 6px;
+      padding: 4px 5px;
 
       color: #d8e8ff;
 
@@ -9031,13 +9087,13 @@ function injectStyles() {
 
       align-items: center;
 
-      justify-content: center;
+      justify-content: space-between;
 
       gap: 5px;
 
       font-size: 0.72rem;
 
-      min-width: 0;
+      min-width: 38px;
 
       transition: background-color 0.2s, border-color 0.2s;
 
@@ -9125,7 +9181,7 @@ function injectStyles() {
 
       border-radius: 10px;
 
-      padding: 6px 7px;
+      padding: 4px 5px;
 
       color: #eef4ff;
 
@@ -9137,7 +9193,7 @@ function injectStyles() {
 
       justify-content: space-between;
 
-      gap: 8px;
+      gap: 5px;
 
       font-size: 0.84rem;
 
@@ -9163,7 +9219,7 @@ function injectStyles() {
 
       align-items: center;
 
-      gap: 6px;
+      gap: 3px;
 
       min-width: 0;
 
@@ -15307,7 +15363,21 @@ function findClosestActionContainer(element) {
 
   }
 
-  return element.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+  // Try to find shreddit-post first, then shreddit-comment
+
+  let closest = element.closest("shreddit-post");
+
+  if (closest) return closest;
+
+  
+
+  closest = element.closest("shreddit-comment");
+
+  if (closest) return closest;
+
+  
+
+  return element.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
 
 }
 
@@ -15321,21 +15391,149 @@ function pickTargetForContainer(container) {
 
   }
 
-  const postId = container.getAttribute("data-post-id") || container.getAttribute("id");
 
-  if (postId) {
 
-    return `t3_${postId.replace(/^t3_/, "")}`;
+  const isPost = 
+
+    container.tagName === "SHREDDIT-POST" || 
+
+    container.classList.contains("link") ||
+
+    container.getAttribute("data-testid") === "post-container";
+
+  
+
+  const isComment = 
+
+    container.tagName === "SHREDDIT-COMMENT" ||
+
+    container.classList.contains("comment");
+
+
+
+  // **PRIORITY 1**: Use the element's own attributes as-is if they look valid
+
+  const directId = container.getAttribute("id");
+
+  if (directId && directId.includes("_") && (directId.startsWith("t1_") || directId.startsWith("t3_"))) {
+
+    return directId;
 
   }
 
-  const thingId = container.getAttribute("data-fullname");
 
-  if (thingId && (thingId.startsWith("t1_") || thingId.startsWith("t3_"))) {
 
-    return thingId;
+  const dataFullname = container.getAttribute("data-fullname");
+
+  if (dataFullname && dataFullname.includes("_") && (dataFullname.startsWith("t1_") || dataFullname.startsWith("t3_"))) {
+
+    return dataFullname;
 
   }
+
+
+
+  // **PRIORITY 2**: Check other direct attributes
+
+  const otherDirectAttrs = [
+
+    container.getAttribute("data-post-id"),
+
+    container.getAttribute("data-id"),
+
+    container.getAttribute("data-thing-id")
+
+  ];
+
+
+
+  for (const attr of otherDirectAttrs) {
+
+    if (attr && attr.includes("_") && (attr.startsWith("t1_") || attr.startsWith("t3_"))) {
+
+      return attr;
+
+    }
+
+  }
+
+
+
+  // **PRIORITY 3**: Extract from links (fallback only)
+
+  const extractPostIdFromUrl = (url) => {
+
+    if (!url) return null;
+
+    const match = url.match(/\/comments\/([a-z0-9]{5,10})/i);
+
+    return match ? match[1] : null;
+
+  };
+
+
+
+  const permalinkSelectors = [
+
+    "a[data-testid='post_title']",
+
+    "a[data-click-id='body']",
+
+    "a[href*='/comments/']",
+
+    "[slot='title'] a",
+
+    ".post-title a",
+
+    "h3 a, h2 a"
+
+  ];
+
+
+
+  for (const selector of permalinkSelectors) {
+
+    const permalinkEl = container.querySelector(selector);
+
+    if (permalinkEl instanceof HTMLElement) {
+
+      const href = permalinkEl.getAttribute("href") || "";
+
+      const postId = extractPostIdFromUrl(href);
+
+      if (postId) {
+
+        const result = isComment ? `t1_${postId}` : `t3_${postId}`;
+
+        return result;
+
+      }
+
+    }
+
+  }
+
+
+
+  const anyLink = container.querySelector("a[href*='/comments/']");
+
+  if (anyLink instanceof HTMLElement) {
+
+    const href = anyLink.getAttribute("href") || "";
+
+    const postId = extractPostIdFromUrl(href);
+
+    if (postId) {
+
+      const result = isComment ? `t1_${postId}` : `t3_${postId}`;
+
+      return result;
+
+    }
+
+  }
+
+
 
   return null;
 
@@ -15397,7 +15595,7 @@ function resolveTargetFromNativeControl(control) {
 
   }
 
-  const container = control.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+  const container = control.closest("shreddit-post, shreddit-comment, article, .thing.link, .thing.comment, [data-testid='post-container']");
 
   if (container instanceof HTMLElement) {
 
@@ -15555,7 +15753,11 @@ function bindNativeRemoveInterceptor() {
 
 
 
-      const closestPost = targetEl.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+      let closestPost = targetEl.closest("shreddit-post");
+
+      if (!closestPost) closestPost = targetEl.closest("shreddit-comment");
+
+      if (!closestPost) closestPost = targetEl.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
 
       if (closestPost instanceof HTMLElement) {
 
@@ -15579,7 +15781,11 @@ function bindNativeRemoveInterceptor() {
 
       if (closestModButton instanceof HTMLElement) {
 
-        const closestPostFromButton = closestModButton.closest("shreddit-post, article, .thing.link, [data-testid='post-container']");
+      let closestPostFromButton = closestModButton.closest("shreddit-post");
+
+      if (!closestPostFromButton) closestPostFromButton = closestModButton.closest("shreddit-comment");
+
+      if (!closestPostFromButton) closestPostFromButton = closestModButton.closest("article, .thing.link, .thing.comment, [data-testid='post-container']");
 
         if (closestPostFromButton instanceof HTMLElement) {
 
@@ -18347,7 +18553,7 @@ function renderRemovalConfigEditor() {
 
                       <input type="checkbox" data-qa-index="${index}" data-qa-field="lock_post" ${action.lock_post ? "checked" : ""} />
 
-                      <span>Lock post after action (posts only)</span>
+                      <span>Lock item</span>
 
                     </label>
 
@@ -22633,6 +22839,12 @@ function renderQueueBar(state) {
 
   shell.setAttribute("data-collapsed", queueBarCollapsed ? "1" : "0");
 
+  
+
+  const isOldReddit = String(window.location.hostname || "").toLowerCase() === "old.reddit.com";
+
+  shell.setAttribute("data-reddit-version", isOldReddit ? "old" : "new");
+
 
 
   const header = document.createElement("header");
@@ -23461,6 +23673,8 @@ function collectQueueListingItems() {
 
     "shreddit-comment",
 
+    "mod-queue-list-item",
+
     ".Comment",
 
     ".thing.link",
@@ -23475,9 +23689,23 @@ function collectQueueListingItems() {
 
   const rows = [];
 
+  let totalFound = 0;
+
+  console.log("[ModBox] collectQueueListingItems: starting collection with selectors:", selectors);
+
+  
+
   selectors.forEach((selector) => {
 
-    document.querySelectorAll(selector).forEach((container) => {
+    const elements = document.querySelectorAll(selector);
+
+    console.log("[ModBox] Selector", selector, "found", elements.length, "elements");
+
+    
+
+    elements.forEach((container) => {
+
+      totalFound += 1;
 
       if (!(container instanceof HTMLElement)) {
 
@@ -23485,9 +23713,29 @@ function collectQueueListingItems() {
 
       }
 
-      const target = pickTargetForContainer(container);
+      
+
+      // For mod-queue-list-item, extract target from data-ks-item attribute
+
+      let target;
+
+      if (container.tagName.toLowerCase() === "mod-queue-list-item") {
+
+        target = String(container.getAttribute("data-ks-item") || "").trim();
+
+        console.log("[ModBox] Found mod-queue-list-item with data-ks-item:", target);
+
+      } else {
+
+        target = pickTargetForContainer(container);
+
+      }
+
+      
 
       if (!target || !/^t[13]_[a-z0-9]{5,10}$/i.test(target)) {
+
+        console.log("[ModBox] Skipping container: invalid or empty target:", target);
 
         return;
 
@@ -23497,7 +23745,11 @@ function collectQueueListingItems() {
 
       const subreddit = resolveContainerSubreddit(container);
 
+      console.log("[ModBox] Resolved subreddit:", subreddit);
+
       if (!isAllowedLaunchSubreddit(subreddit)) {
+
+        console.log("[ModBox] Skipping container: subreddit not allowed:", subreddit);
 
         return;
 
@@ -23547,6 +23799,10 @@ function collectQueueListingItems() {
 
 
 
+  console.log("[ModBox] collectQueueListingItems: found", totalFound, "containers, filtered to", rows.length, "valid items");
+
+
+
   // Ensure insertion anchors use actual page order rather than selector order.
 
   rows.sort((a, b) => {
@@ -23576,6 +23832,8 @@ function collectQueueListingItems() {
   });
 
 
+
+  console.log("[ModBox] collectQueueListingItems found", rows.length, "items after filtering");
 
   return rows;
 
@@ -24119,7 +24377,19 @@ function renderQueueToolsBar(items) {
 
 function bindQueueToolsFeatures() {
 
-  if (!isQueueListingPage()) {
+  const pathname = String(window.location.pathname || "");
+
+  const isQueuePage = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(pathname) ||
+
+                      /\/mod\/\w+\/queue(?:\/|$)/i.test(pathname);
+
+  console.log("[ModBox] bindQueueToolsFeatures: pathname=", pathname, "isQueuePage=", isQueuePage);
+
+  
+
+  if (!isQueuePage) {
+
+    console.log("[ModBox] Not a queue listing page, removing queue tools");
 
     document.getElementById("rrw-queue-tools")?.remove();
 
@@ -24131,7 +24401,11 @@ function bindQueueToolsFeatures() {
 
 
 
+  console.log("[ModBox] This is a queue page, proceeding with collection");
+
   const items = collectQueueListingItems();
+
+  console.log("[ModBox] Queue tools: collected", items.length, "items");
 
   const validTargets = new Set(items.map((item) => item.target));
 
@@ -24795,6 +25069,10 @@ function bindContainer(container) {
 
 
 
+  console.log("[ModBox] bindContainer: starting bind for", container.tagName, "with id=" + container.id, "data-fullname=" + container.getAttribute("data-fullname"));
+
+
+
   const containerSubreddit = resolveContainerSubreddit(container);
 
   if (!isAllowedLaunchSubreddit(containerSubreddit)) {
@@ -24811,11 +25089,15 @@ function bindContainer(container) {
 
   if (!target) {
 
-    console.log("[ModBox] bindContainer: no target found");
+    console.log("[ModBox] bindContainer: no target found for", container.tagName);
 
     return;
 
   }
+
+  
+
+  console.log("[ModBox] bindContainer: successfully extracted target =", target, "for element", container.tagName);
 
 
 
@@ -24831,9 +25113,15 @@ function bindContainer(container) {
 
   button.textContent = "Mod Actions";
 
+  button.dataset.rrwButtonTarget = target;
+
   attachButtonClickHandlers(button, () => {
 
-    void openOverlay(target);
+    const btnTarget = button.dataset.rrwButtonTarget || target;
+
+    console.log("[ModBox] MOD ACTIONS button clicked! container=", container.tagName, "target from closure=", target, "target from button attribute=", btnTarget);
+
+    void openOverlay(btnTarget);
 
   });
 
@@ -28323,18 +28611,6 @@ function renderOverlay() {
 
 
 
-      if (!renderedBody) {
-
-        overlay.quickActionsError = "This quick action has an empty comment body.";
-
-        renderOverlay();
-
-        return;
-
-      }
-
-
-
       try {
 
         overlay.submitting = true;
@@ -28375,61 +28651,65 @@ function renderOverlay() {
 
 
 
-        if (Boolean(action.comment_as_subreddit)) {
+        if (renderedBody) {
 
-          let removedForSubredditComment = false;
+          if (Boolean(action.comment_as_subreddit)) {
 
-          try {
+            let removedForSubredditComment = false;
 
-            await removeThingViaNativeSession(fullname);
+            try {
 
-            removedForSubredditComment = true;
+              await removeThingViaNativeSession(fullname);
 
-            await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
+              removedForSubredditComment = true;
 
-            usedSubredditCommentWorkaround = true;
+              await sendRemovalCommentAsSubreddit(fullname, renderedBody, false);
 
-          } finally {
+              usedSubredditCommentWorkaround = true;
 
-            if (removedForSubredditComment) {
+            } finally {
 
-              try {
+              if (removedForSubredditComment) {
 
-                await approveThingViaNativeSession(fullname);
+                try {
 
-              } catch {
+                  await approveThingViaNativeSession(fullname);
 
-                // Best effort only; avoid masking the primary failure.
+                } catch {
+
+                  // Best effort only; avoid masking the primary failure.
+
+                }
 
               }
 
             }
 
-          }
+          } else {
 
-        } else {
+            const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
 
-          const commentResponse = await postCommentViaNativeSession(fullname, renderedBody);
+            const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
 
-          const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
+            const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
 
-          const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
+            if (replyFullname && (action.sticky || action.mod_only)) {
 
-          if (replyFullname && (action.sticky || action.mod_only)) {
+              try {
 
-            try {
+                await distinguishThingViaNativeSession(
 
-              await distinguishThingViaNativeSession(
+                  replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
 
-                replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                  Boolean(action.sticky),
 
-                Boolean(action.sticky),
+                );
 
-              );
+              } catch {
 
-            } catch {
+                // Distinguish/sticky is best effort; posting the comment is the primary action.
 
-              // Distinguish/sticky is best effort; posting the comment is the primary action.
+              }
 
             }
 
@@ -37196,6 +37476,22 @@ function start() {
   // appear without waiting for idle time or timeout fallback.
 
   void initQueueBar();
+
+  // Bind queue tools immediately on queue pages so bulk actions toolbar appears
+
+  const isQueuePage = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(window.location.pathname || "")) ||
+
+                      /\/mod\/\w+\/queue(?:\/|$)/i.test(String(window.location.pathname || ""));
+
+  console.log("[ModBox] Checking if this is a queue page:", isQueuePage);
+
+  if (isQueuePage) {
+
+    console.log("[ModBox] Calling bindQueueToolsFeatures on page load");
+
+    bindQueueToolsFeatures();
+
+  }
 
   bindContextPopupEvents();
 
