@@ -99,6 +99,9 @@ let inlineHistoryPopupEventsBound = false;
 let inlineModlogPopupState = null;
 let inlineModlogPopupEventsBound = false;
 
+// Queue modlog display state
+let queueModlogDisplayRafScheduled = false;
+
 // Comment nuke state
 const commentNukeBusyTargets = new Set();
 let commentNukeIgnoreDistinguished = false;

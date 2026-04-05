@@ -30567,7 +30567,13 @@ async function loadSubredditModlogIndex(subreddit) {
 
     );
 
+    console.log("[ModBox QueueModlog] Raw payload from modlog API:", payload);
+
+    console.log("[ModBox QueueModlog] Payload type:", typeof payload, "has data?", !!payload?.data, "children count:", payload?.data?.children?.length || 0);
+
     const index = extractModlogEntriesFromPayload(payload);
+
+    console.log("[ModBox QueueModlog] Index after extraction - size:", index.size);
 
     modlogCacheBySubreddit.set(cleanSubreddit, {
 
@@ -30582,6 +30588,8 @@ async function loadSubredditModlogIndex(subreddit) {
     return index;
 
   })().catch((error) => {
+
+    console.error("[ModBox QueueModlog] Error loading modlog index:", error);
 
     modlogCacheBySubreddit.delete(cleanSubreddit);
 

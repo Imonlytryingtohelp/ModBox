@@ -49,6 +49,8 @@ function start() {
   if (isQueuePage) {
     console.log("[ModBox] Calling bindQueueToolsFeatures on page load");
     bindQueueToolsFeatures();
+    console.log("[ModBox] Calling bindQueueModlogDisplay on page load");
+    bindQueueModlogDisplay();
   }
   bindContextPopupEvents();
   const pageSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));

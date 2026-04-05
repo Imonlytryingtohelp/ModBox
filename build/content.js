@@ -397,6 +397,12 @@ let inlineModlogPopupEventsBound = false;
 
 
 
+// Queue modlog display state
+
+let queueModlogDisplayRafScheduled = false;
+
+
+
 // Comment nuke state
 
 const commentNukeBusyTargets = new Set();
@@ -12961,6 +12967,18 @@ function injectStyles() {
 
 
 
+    html[data-rrw-theme="light"] #rrw-profile-root .rrw-profile-item--removed {
+
+      border-color: rgba(200, 60, 60, 0.7);
+
+      background: rgba(255, 200, 200, 0.92);
+
+      color: #731919;
+
+    }
+
+
+
     html[data-rrw-theme="light"] #rrw-profile-root .rrw-profile-empty {
 
       border-color: rgba(153, 179, 212, 0.36);
@@ -15340,6 +15358,176 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-queue-tools-error {
 
       color: #d93f5f;
+
+    }
+
+
+
+    /* Queue Modlog Display */
+
+    .rrw-queue-modlog-display {
+
+      display: grid;
+
+      gap: 4px;
+
+      margin-top: 8px;
+
+      padding: 8px;
+
+      border: 1px solid rgba(98, 133, 192, 0.4);
+
+      border-radius: 6px;
+
+      background: rgba(19, 35, 58, 0.8);
+
+      font-size: 0.85rem;
+
+      font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+
+    }
+
+
+
+    .rrw-queue-modlog-header {
+
+      font-size: 0.75rem;
+
+      font-weight: 600;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.02em;
+
+      color: #a3c2fb;
+
+      margin-bottom: 2px;
+
+    }
+
+
+
+    .rrw-queue-modlog-entries {
+
+      display: grid;
+
+      gap: 6px;
+
+    }
+
+
+
+    .rrw-queue-modlog-entry {
+
+      display: grid;
+
+      gap: 2px;
+
+      padding: 6px 8px;
+
+      border: 1px solid rgba(98, 133, 192, 0.32);
+
+      border-radius: 4px;
+
+      background: rgba(21, 38, 62, 0.95);
+
+      color: #d8e9ff;
+
+      line-height: 1.3;
+
+    }
+
+
+
+    .rrw-queue-modlog-action {
+
+      font-weight: 600;
+
+      color: #9bc2ff;
+
+    }
+
+
+
+    .rrw-queue-modlog-mod,
+
+    .rrw-queue-modlog-time {
+
+      font-size: 0.8rem;
+
+      color: #b0c4e0;
+
+    }
+
+
+
+    .rrw-queue-modlog-details {
+
+      font-size: 0.78rem;
+
+      color: #8fa8c9;
+
+      margin-top: 2px;
+
+    }
+
+
+
+    /* Light theme queue modlog display */
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-display {
+
+      border-color: rgba(156, 183, 214, 0.6);
+
+      background: rgba(245, 250, 255, 0.96);
+
+      color: #224d9b;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-header {
+
+      color: #2d5da1;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-entry {
+
+      border-color: rgba(156, 183, 214, 0.5);
+
+      background: rgba(233, 243, 255, 0.98);
+
+      color: #1f3a5f;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-action {
+
+      color: #1253d6;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-mod,
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-time {
+
+      color: #36579c;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-details {
+
+      color: #5a7fa5;
 
     }
 
@@ -24564,6 +24752,382 @@ function formatQueueItemPreview(item) {
 }
 
 // ------------------------------------------------------------------------------
+// queue-modlog-display.js
+// ------------------------------------------------------------------------------
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Queue Modlog Display Module
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Displays the last 2 modlog entries for posts/comments in mod queues (modqueue, unmoderated, reports).
+
+// Dependencies: constants.js, state.js, utilities.js, features/modlog-popup.js
+
+
+
+// â”€â”€â”€â”€ Queue Modlog Display Functions â”€â”€â”€â”€
+
+
+
+async function renderModlogEntriesForQueueItem(container, target, subreddit) {
+
+  if (!(container instanceof HTMLElement) || !target || !subreddit) {
+
+    console.log("[ModBox QueueModlog] Skipping: invalid params - container:", !!container, "target:", target, "subreddit:", subreddit);
+
+    return;
+
+  }
+
+
+
+  // Remove any existing queue modlog display
+
+  const existingDisplay = container.querySelector("[data-rrw-queue-modlog]");
+
+  if (existingDisplay instanceof HTMLElement) {
+
+    existingDisplay.remove();
+
+  }
+
+
+
+  try {
+
+    console.log("[ModBox QueueModlog] Loading modlog for target:", target, "subreddit:", subreddit);
+
+    
+
+    // Load modlog index for this subreddit
+
+    const index = await loadSubredditModlogIndex(subreddit);
+
+    console.log("[ModBox QueueModlog] Index loaded, total size:", index.size);
+
+    console.log("[ModBox QueueModlog] First 5 keys in index:", Array.from(index.keys()).slice(0, 5));
+
+    console.log("[ModBox QueueModlog] Looking for target:", target);
+
+    console.log("[ModBox QueueModlog] Entries for target:", index.get(target));
+
+    
+
+    const entries = Array.isArray(index.get(target)) ? index.get(target).slice(0, 2) : [];
+
+
+
+    if (entries.length === 0) {
+
+      console.log("[ModBox QueueModlog] No modlog entries for", target);
+
+      return; // No modlog entries for this item
+
+    }
+
+
+
+    console.log("[ModBox QueueModlog] Found", entries.length, 'entries for', target);
+
+
+
+    // Create the display element
+
+    const display = createQueueModlogDisplay(entries);
+
+    if (display instanceof HTMLElement) {
+
+      // Insert after the main content area
+
+      const insertPoint = findQueueItemInsertPoint(container);
+
+      console.log("[ModBox QueueModlog] Insert point found:", !!insertPoint);
+
+      
+
+      if (insertPoint instanceof HTMLElement) {
+
+        insertPoint.parentNode?.insertBefore(display, insertPoint.nextSibling);
+
+        console.log("[ModBox QueueModlog] Display inserted after content");
+
+      } else {
+
+        container.appendChild(display);
+
+        console.log("[ModBox QueueModlog] Display appended to container");
+
+      }
+
+    }
+
+  } catch (error) {
+
+    console.log("[ModBox QueueModlog] Error rendering queue modlog display:", error);
+
+  }
+
+}
+
+
+
+function createQueueModlogDisplay(entries) {
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+
+    return null;
+
+  }
+
+
+
+  const container = document.createElement("div");
+
+  container.setAttribute("data-rrw-queue-modlog", "1");
+
+  container.className = "rrw-queue-modlog-display";
+
+
+
+  // Format entries as a single line: "action by /u/mod 22m ago - details | action by /u/mod 1h ago - details"
+
+  const entryTexts = entries.map((entry) => {
+
+    const details = entry.details ? ` - ${escapeHtml(entry.details)}` : "";
+
+    return `<span class="rrw-queue-modlog-entry">${escapeHtml(entry.action || "unknown")} by /u/${escapeHtml(entry.mod || "unknown")} ${escapeHtml(formatRelativeTime(entry.createdUtc))}${details}</span>`;
+
+  }).join('<span class="rrw-queue-modlog-separator"> | </span>');
+
+
+
+  container.innerHTML = entryTexts;
+
+
+
+  return container;
+
+}
+
+
+
+function findQueueItemInsertPoint(container) {
+
+  if (!(container instanceof HTMLElement)) {
+
+    return null;
+
+  }
+
+
+
+  // For old.reddit queue items (.thing), insert after the content
+
+  const thingContent = container.querySelector(".thing > .entry");
+
+  if (thingContent instanceof HTMLElement) {
+
+    return thingContent;
+
+  }
+
+
+
+  // For new.reddit mod queue items (mod-queue-list-item), insert after the main content
+
+  const modQueueContent = container.querySelector("[data-testid='post-container'], article");
+
+  if (modQueueContent instanceof HTMLElement) {
+
+    return modQueueContent;
+
+  }
+
+
+
+  // Fallback: insert after first major content container
+
+  const contentContainers = [
+
+    container.querySelector("article"),
+
+    container.querySelector(".Post"),
+
+    container.querySelector(".Comment"),
+
+    container.querySelector("[data-testid='post-container']"),
+
+  ];
+
+
+
+  for (const contentContainer of contentContainers) {
+
+    if (contentContainer instanceof HTMLElement) {
+
+      return contentContainer;
+
+    }
+
+  }
+
+
+
+  return null;
+
+}
+
+
+
+function bindQueueModlogDisplay() {
+
+  console.log("[ModBox QueueModlog] Binding queue modlog display feature");
+
+  console.log("[ModBox QueueModlog] Current pathname:", window.location.pathname);
+
+  
+
+  // Track which items we've already processed to avoid duplicate rendering
+
+  const processedItems = new Set();
+
+
+
+  const renderQueueModlogs = async (containers = null) => {
+
+    const itemsToProcess = containers || collectQueueListingItems();
+
+    console.log("[ModBox QueueModlog] Found", itemsToProcess.length, 'queue items to process');
+
+
+
+    for (const item of itemsToProcess) {
+
+      if (!item.container || !item.target || !item.subreddit) {
+
+        console.log("[ModBox QueueModlog] Skipping item: missing container/target/subreddit");
+
+        continue;
+
+      }
+
+
+
+      // Skip if already processed
+
+      const itemKey = `${item.target}|${item.subreddit}`;
+
+      if (processedItems.has(itemKey)) {
+
+        continue;
+
+      }
+
+      processedItems.add(itemKey);
+
+
+
+      console.log("[ModBox QueueModlog] Processing queue item:", itemKey);
+
+      
+
+      // Render modlog entries
+
+      await renderModlogEntriesForQueueItem(item.container, item.target, item.subreddit);
+
+    }
+
+  };
+
+
+
+  // Preload modlog index for the current subreddit to warm up the cache
+
+  const subreddit = parseSubredditFromPath(window.location.pathname);
+
+  console.log("[ModBox QueueModlog] parseSubredditFromPath returned:", subreddit);
+
+  
+
+  if (subreddit) {
+
+    console.log("[ModBox QueueModlog] Preloading modlog index for subreddit:", subreddit);
+
+    loadSubredditModlogIndex(subreddit)
+
+      .then(() => {
+
+        console.log("[ModBox QueueModlog] Modlog index preloaded successfully");
+
+        // Now do the initial render with the warm cache
+
+        renderQueueModlogs().catch((error) => {
+
+          console.log("[ModBox QueueModlog] Error in queue modlog display:", error);
+
+        });
+
+      })
+
+      .catch((error) => {
+
+        console.log("[ModBox QueueModlog] Error preloading modlog index:", error);
+
+      });
+
+  } else {
+
+    console.log("[ModBox QueueModlog] No subreddit found, skipping preload");
+
+  }
+
+
+
+  // Observe DOM for new queue items and re-render
+
+  const observer = new MutationObserver((records) => {
+
+    // Debounce by batching multiple mutations
+
+    if (queueModlogDisplayRafScheduled) {
+
+      return;
+
+    }
+
+    queueModlogDisplayRafScheduled = true;
+
+
+
+    requestAnimationFrame(() => {
+
+      queueModlogDisplayRafScheduled = false;
+
+      renderQueueModlogs().catch((error) => {
+
+        console.log("[ModBox QueueModlog] Error in queue modlog display mutation:", error);
+
+      });
+
+    });
+
+  });
+
+
+
+  observer.observe(document.documentElement, {
+
+    childList: true,
+
+    subtree: true,
+
+  });
+
+}
+
+// ------------------------------------------------------------------------------
 // dom-binding.js
 // ------------------------------------------------------------------------------
 
@@ -30625,6 +31189,14 @@ function renderOverlay() {
 
             if (stepType === "comment") {
 
+              console.log(`[ModBox] Comment step - FULL STEP OBJECT:`, step);
+
+              console.log(`[ModBox] Comment step - ALL PROPERTY KEYS:`, Object.keys(step || {}));
+
+              console.log(`[ModBox] Comment step - sticky: ${step?.sticky}, lock_comment: ${step?.lock_comment}, comment_as_subreddit: ${step?.comment_as_subreddit}`);
+
+              console.log(`[ModBox] Comment step - comment_as_subreddit full value:`, step?.comment_as_subreddit);
+
               const fullnameRaw = String(overlay?.resolved?.fullname || overlay?.target || "").trim().toLowerCase();
 
               const fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(fullnameRaw)
@@ -30642,6 +31214,8 @@ function renderOverlay() {
               const source = String(step?.source || "custom").trim().toLowerCase();
 
               let body = "";
+
+              console.log(`[ModBox] Comment step debug - fullnameRaw: ${fullnameRaw}, fullname: ${fullname}, author: ${author}, kind: ${kind}, source: ${source}, text_template: ${step?.text_template || "(empty)"}`);
 
               if (source === "removal_reason") {
 
@@ -30675,7 +31249,7 @@ function renderOverlay() {
 
               } else {
 
-                body = interpolatePlaybookTemplate(step?.body_template || "", {
+                body = interpolatePlaybookTemplate(step?.text_template || "", {
 
                   author,
 
@@ -30689,37 +31263,89 @@ function renderOverlay() {
 
               }
 
-              if (!fullname || !body) {
+              console.log(`[ModBox] Comment step - fullname check: ${!!fullname}, body length: ${body.length}, body preview: ${body.substring(0, 50)}`);
 
-                throw new Error("comment step requires a valid target and body.");
+              if (!fullname) {
+
+                throw new Error("comment step requires a valid post/comment target (fullname)");
 
               }
 
-              const commentResponse = await postCommentViaNativeSession(fullname, body);
+              if (!body) {
+
+                const configHint = source === "removal_reason" 
+
+                  ? "Ensure 'reason_keys' matches enabled removal reasons and the subreddit has removal reasons configured"
+
+                  : "Ensure the playbook comment step has a 'text_template' field configured (e.g., 'text_template: \"Custom comment message\")";
+
+                throw new Error(`comment step produced empty body. ${configHint}`);
+
+              }
+
+              console.log(`[ModBox] Comment step - calling postPlaybookCommentStepViaNativeSession with comment_as_subreddit: ${step?.comment_as_subreddit}`);
+
+              const commentResponse = await postPlaybookCommentStepViaNativeSession(step, fullname, body);
 
               const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
 
               const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
 
-              if (replyFullname && Boolean(step?.sticky)) {
+              
 
-                try {
+              if (replyFullname) {
 
-                  await distinguishThingViaNativeSession(
+                // Handle sticky/distinguish
 
-                    replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                if (Boolean(step?.sticky)) {
 
-                    true,
+                  try {
 
-                  );
+                    console.log(`[ModBox] Comment step - distinguishing reply: ${replyFullname}`);
 
-                } catch {
+                    await distinguishThingViaNativeSession(
 
-                  // Best effort
+                      replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+
+                      true,
+
+                    );
+
+                  } catch (err) {
+
+                    console.log(`[ModBox] Comment step - distinguish failed: ${err}`);
+
+                  }
+
+                }
+
+                
+
+                // Handle lock_comment
+
+                if (Boolean(step?.lock_comment)) {
+
+                  try {
+
+                    console.log(`[ModBox] Comment step - locking reply: ${replyFullname}`);
+
+                    await lockThingViaNativeSession(
+
+                      replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`
+
+                    );
+
+                  } catch (err) {
+
+                    console.log(`[ModBox] Comment step - lock failed: ${err}`);
+
+                  }
 
                 }
 
               }
+
+              
 
               completed += 1;
 
@@ -31164,26 +31790,6 @@ function renderOverlay() {
 
 
 
-
-
-
-  root.querySelectorAll("[data-playbook-key]").forEach((buttonEl) => {
-
-    buttonEl.addEventListener("click", (event) => {
-
-      const playbookKey = String(event.currentTarget.getAttribute("data-playbook-key") || "").trim();
-
-      if (!playbookKey) {
-
-        return;
-
-      }
-
-      void runPlaybook(playbookKey);
-
-    });
-
-  });
 
 
 
@@ -33383,19 +33989,39 @@ async function loadSubredditModlogIndex(subreddit) {
 
 
 
+  console.log("[ModBox QueueModlog] loadSubredditModlogIndex called with subreddit:", subreddit, "cleaned:", cleanSubreddit);
+
+
+
   const cached = modlogCacheBySubreddit.get(cleanSubreddit);
+
+  console.log("[ModBox QueueModlog] Cache lookup - exists:", !!cached, "has index:", !!cached?.index, "index size:", cached?.index?.size || 0, "has loadingPromise:", !!cached?.loadingPromise);
+
+  
 
   const now = Date.now();
 
-  if (cached && cached.index instanceof Map && now - cached.fetchedAt < MODLOG_CACHE_TTL_MS) {
+  
 
-    return cached.index;
-
-  }
+  // IMPORTANT: Check for pending loadingPromise FIRST, before checking for stale cache!
 
   if (cached?.loadingPromise) {
 
+    console.log("[ModBox QueueModlog] Returning pending loadingPromise (waiting for data)");
+
     return cached.loadingPromise;
+
+  }
+
+  
+
+  // Only return cached index if it's valid and not expired
+
+  if (cached && cached.index instanceof Map && now - cached.fetchedAt < MODLOG_CACHE_TTL_MS) {
+
+    console.log("[ModBox QueueModlog] Returning cached index with size:", cached.index.size);
+
+    return cached.index;
 
   }
 
@@ -33411,7 +34037,13 @@ async function loadSubredditModlogIndex(subreddit) {
 
     );
 
+    console.log("[ModBox QueueModlog] Raw payload from modlog API:", payload);
+
+    console.log("[ModBox QueueModlog] Payload type:", typeof payload, "has data?", !!payload?.data, "children count:", payload?.data?.children?.length || 0);
+
     const index = extractModlogEntriesFromPayload(payload);
+
+    console.log("[ModBox QueueModlog] Index after extraction - size:", index.size);
 
     modlogCacheBySubreddit.set(cleanSubreddit, {
 
@@ -33423,9 +34055,13 @@ async function loadSubredditModlogIndex(subreddit) {
 
     });
 
+    console.log("[ModBox QueueModlog] Cache updated with index size:", index.size);
+
     return index;
 
   })().catch((error) => {
+
+    console.error("[ModBox QueueModlog] Error loading modlog index:", error);
 
     modlogCacheBySubreddit.delete(cleanSubreddit);
 
@@ -33444,6 +34080,8 @@ async function loadSubredditModlogIndex(subreddit) {
     loadingPromise,
 
   });
+
+  console.log("[ModBox QueueModlog] Starting new load - returning promise");
 
 
 
@@ -36317,6 +36955,90 @@ function getProfileEntrySubreddit(entry) {
 
 
 
+function isPostRemoved(entry) {
+
+  if (!entry || typeof entry !== "object") {
+
+    return false;
+
+  }
+
+  
+
+  const data = entry.data;
+
+  if (!data) {
+
+    return false;
+
+  }
+
+  
+
+  // Check if removed flag is set
+
+  if (data.removed === true) {
+
+    return true;
+
+  }
+
+  
+
+  // Check if removed_by_category indicates removal
+
+  if (data.removed_by_category) {
+
+    return true;
+
+  }
+
+  
+
+  // Post/comment is removed if author is null
+
+  if (data.author === null) {
+
+    return true;
+
+  }
+
+  
+
+  // Also check if body/selftext is "[removed]"
+
+  const body = entry.kind === "t1" ? data.body : data.selftext;
+
+  return String(body || "").trim() === "[removed]";
+
+}
+
+
+
+function shouldHighlightRemovedPost(entry) {
+
+  if (!profileViewState) {
+
+    return false;
+
+  }
+
+  if (!isPostRemoved(entry)) {
+
+    return false;
+
+  }
+
+  const entrySubreddit = getProfileEntrySubreddit(entry);
+
+  const myModSubs = profileViewState.currentUserModSubs instanceof Set ? profileViewState.currentUserModSubs : null;
+
+  return myModSubs instanceof Set && myModSubs.has(entrySubreddit);
+
+}
+
+
+
 function applyProfileFilters(items) {
 
   if (!profileViewState) {
@@ -36425,9 +37147,11 @@ function renderProfileEntries(items) {
 
         const bodyHtml = getProfileBodyHtmlFromEntry(entry);
 
+        const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
+
         return `
 
-          <article class="rrw-profile-item rrw-profile-item--comment">
+          <article class="rrw-profile-item rrw-profile-item--comment${removedClass}">
 
             <header class="rrw-profile-item-header">
 
@@ -36463,9 +37187,11 @@ function renderProfileEntries(items) {
 
         const selftextHtml = getProfileBodyHtmlFromEntry(entry);
 
+        const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
+
         return `
 
-          <article class="rrw-profile-item rrw-profile-item--post">
+          <article class="rrw-profile-item rrw-profile-item--post${removedClass}">
 
             <header class="rrw-profile-item-header">
 
@@ -38032,6 +38758,10 @@ function start() {
     console.log("[ModBox] Calling bindQueueToolsFeatures on page load");
 
     bindQueueToolsFeatures();
+
+    console.log("[ModBox] Calling bindQueueModlogDisplay on page load");
+
+    bindQueueModlogDisplay();
 
   }
 

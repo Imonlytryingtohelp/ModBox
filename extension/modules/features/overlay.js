@@ -2136,6 +2136,10 @@ function renderOverlay() {
             }
 
             if (stepType === "comment") {
+              console.log(`[ModBox] Comment step - FULL STEP OBJECT:`, step);
+              console.log(`[ModBox] Comment step - ALL PROPERTY KEYS:`, Object.keys(step || {}));
+              console.log(`[ModBox] Comment step - sticky: ${step?.sticky}, lock_comment: ${step?.lock_comment}, comment_as_subreddit: ${step?.comment_as_subreddit}`);
+              console.log(`[ModBox] Comment step - comment_as_subreddit full value:`, step?.comment_as_subreddit);
               const fullnameRaw = String(overlay?.resolved?.fullname || overlay?.target || "").trim().toLowerCase();
               const fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(fullnameRaw)
                 ? fullnameRaw
@@ -2145,6 +2149,7 @@ function renderOverlay() {
               const kind = (overlay?.resolved?.thingType || "submission") === "submission" ? "post" : "comment";
               const source = String(step?.source || "custom").trim().toLowerCase();
               let body = "";
+              console.log(`[ModBox] Comment step debug - fullnameRaw: ${fullnameRaw}, fullname: ${fullname}, author: ${author}, kind: ${kind}, source: ${source}, text_template: ${step?.text_template || "(empty)"}`);
               if (source === "removal_reason") {
                 const matchingReasons = (overlay.reasons || []).filter(
                   (reason) => isReasonForThing(reason, kind === "post" ? "submission" : "comment")
@@ -2161,29 +2166,55 @@ function renderOverlay() {
                     : {},
                 ).trim();
               } else {
-                body = interpolatePlaybookTemplate(step?.body_template || "", {
+                body = interpolatePlaybookTemplate(step?.text_template || "", {
                   author,
                   subreddit: resolvedSubreddit,
                   kind,
                   permalink: overlay?.resolved?.permalink,
                 }).trim();
               }
-              if (!fullname || !body) {
-                throw new Error("comment step requires a valid target and body.");
+              console.log(`[ModBox] Comment step - fullname check: ${!!fullname}, body length: ${body.length}, body preview: ${body.substring(0, 50)}`);
+              if (!fullname) {
+                throw new Error("comment step requires a valid post/comment target (fullname)");
               }
-              const commentResponse = await postCommentViaNativeSession(fullname, body);
+              if (!body) {
+                const configHint = source === "removal_reason" 
+                  ? "Ensure 'reason_keys' matches enabled removal reasons and the subreddit has removal reasons configured"
+                  : "Ensure the playbook comment step has a 'text_template' field configured (e.g., 'text_template: \"Custom comment message\")";
+                throw new Error(`comment step produced empty body. ${configHint}`);
+              }
+              console.log(`[ModBox] Comment step - calling postPlaybookCommentStepViaNativeSession with comment_as_subreddit: ${step?.comment_as_subreddit}`);
+              const commentResponse = await postPlaybookCommentStepViaNativeSession(step, fullname, body);
               const replyThing = commentResponse?.json?.data?.things?.[0]?.data || null;
               const replyFullname = String(replyThing?.name || replyThing?.id || "").trim();
-              if (replyFullname && Boolean(step?.sticky)) {
-                try {
-                  await distinguishThingViaNativeSession(
-                    replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
-                    true,
-                  );
-                } catch {
-                  // Best effort
+              
+              if (replyFullname) {
+                // Handle sticky/distinguish
+                if (Boolean(step?.sticky)) {
+                  try {
+                    console.log(`[ModBox] Comment step - distinguishing reply: ${replyFullname}`);
+                    await distinguishThingViaNativeSession(
+                      replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`,
+                      true,
+                    );
+                  } catch (err) {
+                    console.log(`[ModBox] Comment step - distinguish failed: ${err}`);
+                  }
+                }
+                
+                // Handle lock_comment
+                if (Boolean(step?.lock_comment)) {
+                  try {
+                    console.log(`[ModBox] Comment step - locking reply: ${replyFullname}`);
+                    await lockThingViaNativeSession(
+                      replyFullname.startsWith("t1_") ? replyFullname : `t1_${replyFullname}`
+                    );
+                  } catch (err) {
+                    console.log(`[ModBox] Comment step - lock failed: ${err}`);
+                  }
                 }
               }
+              
               completed += 1;
               continue;
             }
@@ -2406,16 +2437,6 @@ function renderOverlay() {
   };
 
 
-
-  root.querySelectorAll("[data-playbook-key]").forEach((buttonEl) => {
-    buttonEl.addEventListener("click", (event) => {
-      const playbookKey = String(event.currentTarget.getAttribute("data-playbook-key") || "").trim();
-      if (!playbookKey) {
-        return;
-      }
-      void runPlaybook(playbookKey);
-    });
-  });
 
   root.querySelectorAll("[data-playbook-key]").forEach((buttonEl) => {
     buttonEl.addEventListener("click", (event) => {

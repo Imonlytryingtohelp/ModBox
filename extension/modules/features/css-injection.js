@@ -2167,6 +2167,12 @@ function injectStyles() {
       color: #2a63be;
     }
 
+    html[data-rrw-theme="light"] #rrw-profile-root .rrw-profile-item--removed {
+      border-color: rgba(200, 60, 60, 0.7);
+      background: rgba(255, 200, 200, 0.92);
+      color: #731919;
+    }
+
     html[data-rrw-theme="light"] #rrw-profile-root .rrw-profile-empty {
       border-color: rgba(153, 179, 212, 0.36);
       background: rgba(236, 245, 255, 0.92);
@@ -3357,6 +3363,91 @@ function injectStyles() {
 
     html[data-rrw-theme="light"] .rrw-queue-tools-error {
       color: #d93f5f;
+    }
+
+    /* Queue Modlog Display */
+    .rrw-queue-modlog-display {
+      display: grid;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid rgba(98, 133, 192, 0.4);
+      border-radius: 6px;
+      background: rgba(19, 35, 58, 0.8);
+      font-size: 0.85rem;
+      font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .rrw-queue-modlog-header {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: #a3c2fb;
+      margin-bottom: 2px;
+    }
+
+    .rrw-queue-modlog-entries {
+      display: grid;
+      gap: 6px;
+    }
+
+    .rrw-queue-modlog-entry {
+      display: grid;
+      gap: 2px;
+      padding: 6px 8px;
+      border: 1px solid rgba(98, 133, 192, 0.32);
+      border-radius: 4px;
+      background: rgba(21, 38, 62, 0.95);
+      color: #d8e9ff;
+      line-height: 1.3;
+    }
+
+    .rrw-queue-modlog-action {
+      font-weight: 600;
+      color: #9bc2ff;
+    }
+
+    .rrw-queue-modlog-mod,
+    .rrw-queue-modlog-time {
+      font-size: 0.8rem;
+      color: #b0c4e0;
+    }
+
+    .rrw-queue-modlog-details {
+      font-size: 0.78rem;
+      color: #8fa8c9;
+      margin-top: 2px;
+    }
+
+    /* Light theme queue modlog display */
+    html[data-rrw-theme="light"] .rrw-queue-modlog-display {
+      border-color: rgba(156, 183, 214, 0.6);
+      background: rgba(245, 250, 255, 0.96);
+      color: #224d9b;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-header {
+      color: #2d5da1;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-entry {
+      border-color: rgba(156, 183, 214, 0.5);
+      background: rgba(233, 243, 255, 0.98);
+      color: #1f3a5f;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-action {
+      color: #1253d6;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-mod,
+    html[data-rrw-theme="light"] .rrw-queue-modlog-time {
+      color: #36579c;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queue-modlog-details {
+      color: #5a7fa5;
     }
   `;
   document.documentElement.appendChild(style);

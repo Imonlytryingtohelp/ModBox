@@ -227,13 +227,23 @@ async function loadSubredditModlogIndex(subreddit) {
     return new Map();
   }
 
+  console.log("[ModBox QueueModlog] loadSubredditModlogIndex called with subreddit:", subreddit, "cleaned:", cleanSubreddit);
+
   const cached = modlogCacheBySubreddit.get(cleanSubreddit);
+  console.log("[ModBox QueueModlog] Cache lookup - exists:", !!cached, "has index:", !!cached?.index, "index size:", cached?.index?.size || 0, "has loadingPromise:", !!cached?.loadingPromise);
+  
   const now = Date.now();
-  if (cached && cached.index instanceof Map && now - cached.fetchedAt < MODLOG_CACHE_TTL_MS) {
-    return cached.index;
-  }
+  
+  // IMPORTANT: Check for pending loadingPromise FIRST, before checking for stale cache!
   if (cached?.loadingPromise) {
+    console.log("[ModBox QueueModlog] Returning pending loadingPromise (waiting for data)");
     return cached.loadingPromise;
+  }
+  
+  // Only return cached index if it's valid and not expired
+  if (cached && cached.index instanceof Map && now - cached.fetchedAt < MODLOG_CACHE_TTL_MS) {
+    console.log("[ModBox QueueModlog] Returning cached index with size:", cached.index.size);
+    return cached.index;
   }
 
   const loadingPromise = (async () => {
@@ -241,14 +251,19 @@ async function loadSubredditModlogIndex(subreddit) {
       `/r/${encodeURIComponent(cleanSubreddit)}/about/log.json?limit=200`,
       { oauth: true },
     );
+    console.log("[ModBox QueueModlog] Raw payload from modlog API:", payload);
+    console.log("[ModBox QueueModlog] Payload type:", typeof payload, "has data?", !!payload?.data, "children count:", payload?.data?.children?.length || 0);
     const index = extractModlogEntriesFromPayload(payload);
+    console.log("[ModBox QueueModlog] Index after extraction - size:", index.size);
     modlogCacheBySubreddit.set(cleanSubreddit, {
       fetchedAt: Date.now(),
       index,
       loadingPromise: null,
     });
+    console.log("[ModBox QueueModlog] Cache updated with index size:", index.size);
     return index;
   })().catch((error) => {
+    console.error("[ModBox QueueModlog] Error loading modlog index:", error);
     modlogCacheBySubreddit.delete(cleanSubreddit);
     throw error;
   });
@@ -258,6 +273,7 @@ async function loadSubredditModlogIndex(subreddit) {
     index: cached?.index instanceof Map ? cached.index : new Map(),
     loadingPromise,
   });
+  console.log("[ModBox QueueModlog] Starting new load - returning promise");
 
   return loadingPromise;
 }

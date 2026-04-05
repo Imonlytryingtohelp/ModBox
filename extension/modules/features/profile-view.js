@@ -293,6 +293,48 @@ function getProfileEntrySubreddit(entry) {
   return normalizeSubreddit(entry?.data?.subreddit || "").toLowerCase();
 }
 
+function isPostRemoved(entry) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  
+  const data = entry.data;
+  if (!data) {
+    return false;
+  }
+  
+  // Check if removed flag is set
+  if (data.removed === true) {
+    return true;
+  }
+  
+  // Check if removed_by_category indicates removal
+  if (data.removed_by_category) {
+    return true;
+  }
+  
+  // Post/comment is removed if author is null
+  if (data.author === null) {
+    return true;
+  }
+  
+  // Also check if body/selftext is "[removed]"
+  const body = entry.kind === "t1" ? data.body : data.selftext;
+  return String(body || "").trim() === "[removed]";
+}
+
+function shouldHighlightRemovedPost(entry) {
+  if (!profileViewState) {
+    return false;
+  }
+  if (!isPostRemoved(entry)) {
+    return false;
+  }
+  const entrySubreddit = getProfileEntrySubreddit(entry);
+  const myModSubs = profileViewState.currentUserModSubs instanceof Set ? profileViewState.currentUserModSubs : null;
+  return myModSubs instanceof Set && myModSubs.has(entrySubreddit);
+}
+
 function applyProfileFilters(items) {
   if (!profileViewState) {
     return [];
@@ -347,8 +389,9 @@ function renderProfileEntries(items) {
       if (entry?.kind === "t1") {
         const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
         const bodyHtml = getProfileBodyHtmlFromEntry(entry);
+        const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
         return `
-          <article class="rrw-profile-item rrw-profile-item--comment">
+          <article class="rrw-profile-item rrw-profile-item--comment${removedClass}">
             <header class="rrw-profile-item-header">
               <span class="rrw-profile-item-kind">Comment</span>
               <span class="rrw-profile-item-sub">r/${escapeHtml(String(entry.data?.subreddit || "unknown"))}</span>
@@ -366,8 +409,9 @@ function renderProfileEntries(items) {
       if (entry?.kind === "t3") {
         const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
         const selftextHtml = getProfileBodyHtmlFromEntry(entry);
+        const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
         return `
-          <article class="rrw-profile-item rrw-profile-item--post">
+          <article class="rrw-profile-item rrw-profile-item--post${removedClass}">
             <header class="rrw-profile-item-header">
               <span class="rrw-profile-item-kind">Post</span>
               <span class="rrw-profile-item-sub">r/${escapeHtml(String(entry.data?.subreddit || "unknown"))}</span>

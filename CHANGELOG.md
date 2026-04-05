@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.1.1 - Queue Modlog Display
+
+### Added
+
+- **Modlog entries in mod queues** - Display the last 2 modlog entries (if any) below each post/comment in the modqueue, unmoderated, and reports queues for quick context without leaving the queue page or clicking `ML`.
+- **Removed post highlighting in profile view** - Posts and comments removed in your moderated subreddits are now highlighted with a red background in the profile view modal for quick visual identification.
+
 ## 1.1.0 - Fast UX & Background Execution
 
 ### Added
