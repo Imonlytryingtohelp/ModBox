@@ -27157,7 +27157,7 @@ function applyActionBorderToElement(fullname, actionType) {
 
   /**
 
-   * Applies a colored border to the post/comment element to indicate moderation action.
+   * Applies a colored background to the post/comment element to indicate moderation action.
 
    * @param {string} fullname - The Reddit thing fullname (e.g., t1_abc123, t3_xyz789)
 
@@ -27225,33 +27225,91 @@ function applyActionBorderToElement(fullname, actionType) {
 
 
 
-  // Determine border color based on action type
+  // Determine background and text color based on action type
 
-  let borderColor = "red";
+  // Check if dark theme is active
+
+  const isDarkTheme = document.documentElement.getAttribute("data-rrw-theme") === "dark";
+
+  
+
+  let bgColor, textColor, borderColor;
+
+  
 
   if (actionType === "approve") {
 
-    borderColor = "green";
+    // Green coloring for approvals
+
+    if (isDarkTheme) {
+
+      bgColor = "rgba(50, 120, 80, 0.85)";
+
+      textColor = "#a0ffb8";
+
+      borderColor = "rgba(80, 150, 110, 0.8)";
+
+    } else {
+
+      bgColor = "rgba(200, 255, 220, 0.92)";
+
+      textColor = "#1a5a2a";
+
+      borderColor = "rgba(60, 200, 80, 0.7)";
+
+    }
 
   } else if (["remove", "spam", "comment_nuke", "remove_no_reason"].includes(actionType)) {
 
-    borderColor = "red";
+    // Red coloring for removals and spam
+
+    if (isDarkTheme) {
+
+      bgColor = "rgba(140, 50, 50, 0.85)";
+
+      textColor = "#ffb3b3";
+
+      borderColor = "rgba(220, 100, 100, 0.8)";
+
+    } else {
+
+      bgColor = "rgba(255, 200, 200, 0.92)";
+
+      textColor = "#731919";
+
+      borderColor = "rgba(200, 60, 60, 0.7)";
+
+    }
 
   }
 
 
 
-  // Apply border styling
+  // Apply background styling
 
-  targetElement.style.border = `3px solid ${borderColor}`;
+  if (targetElement.style.border) {
 
-  targetElement.style.borderRadius = "8px";
+    // Remove any existing border styling to avoid conflicts
 
-  targetElement.style.boxShadow = `inset 0 0 0 3px ${borderColor}`;
+    targetElement.style.border = "";
+
+    targetElement.style.boxShadow = "";
+
+  }
 
   
 
-  console.log(`[ModBox] Applied ${borderColor} border to ${cleanFullname} for action: ${actionType}`);
+  targetElement.style.backgroundColor = bgColor;
+
+  targetElement.style.borderRadius = "8px";
+
+  targetElement.style.color = textColor;
+
+  targetElement.style.borderColor = borderColor;
+
+  
+
+  console.log(`[ModBox] Applied ${actionType} background to ${cleanFullname}`);
 
 }
 
