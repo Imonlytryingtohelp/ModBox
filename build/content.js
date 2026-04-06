@@ -12979,6 +12979,18 @@ function injectStyles() {
 
 
 
+    html[data-rrw-theme="dark"] #rrw-profile-root .rrw-profile-item--removed {
+
+      border-color: rgba(220, 80, 80, 0.7);
+
+      background: rgba(60, 15, 15, 0.85);
+
+      color: #ff9999;
+
+    }
+
+
+
     html[data-rrw-theme="light"] #rrw-profile-root .rrw-profile-empty {
 
       border-color: rgba(153, 179, 212, 0.36);
