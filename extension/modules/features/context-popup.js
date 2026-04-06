@@ -335,7 +335,8 @@ function renderContextThreadRows(rows, targetCommentId = "") {
       const commentId = extractCommentIdFromFullname(data.name);
       const isTarget = Boolean(targetCommentId) && commentId === targetCommentId;
       const bodyHtml = getProfileBodyHtmlFromEntry(entry) || "<p>[deleted]</p>";
-      const permalink = data.permalink ? `https://www.reddit.com${data.permalink}` : "";
+      const permalinkPath = data.permalink ? data.permalink : "";
+      const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
       const depth = Math.max(0, Number(row.depth || 0));
       const indent = Math.min(120, depth * 16);
 

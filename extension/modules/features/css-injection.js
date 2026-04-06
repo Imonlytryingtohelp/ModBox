@@ -827,6 +827,19 @@ function injectStyles() {
       background: var(--rrw-card-bg);
     }
 
+    .rrw-usernote-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .rrw-usernote-meta-and-types {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .rrw-usernote-type-wrap {
       display: flex;
       align-items: center;
@@ -836,6 +849,14 @@ function injectStyles() {
       color: var(--rrw-muted);
       font-size: 0.79rem;
       line-height: 1.3;
+    }
+
+    .rrw-usernote-text-display {
+      font-size: 0.95rem;
+      line-height: 1.4;
+      color: var(--rrw-text);
+      word-wrap: break-word;
+      white-space: pre-wrap;
     }
 
     .rrw-usernote-link {
@@ -861,22 +882,22 @@ function injectStyles() {
 
     .rrw-usernote-add-box {
       display: grid;
-      gap: 6px;
+      gap: 4px;
       border: 1px solid var(--rrw-border);
       border-radius: 10px;
       background: var(--rrw-field-bg);
-      padding: 10px;
+      padding: 8px;
     }
 
     .rrw-usernote-add-box h4 {
       margin: 0;
-      font-size: 0.88rem;
+      font-size: 0.8rem;
     }
 
     .rrw-field {
       display: grid;
-      gap: 6px;
-      font-size: 0.86rem;
+      gap: 4px;
+      font-size: 0.8rem;
       color: var(--rrw-text);
     }
 
@@ -884,7 +905,7 @@ function injectStyles() {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     .rrw-field--checkbox input[type="checkbox"] {
@@ -1227,10 +1248,15 @@ function injectStyles() {
       border-radius: 8px;
       background: var(--rrw-card-bg);
       color: var(--rrw-muted);
-      font-size: 0.84rem;
+      font-size: 0.75rem;
       font-weight: 600;
-      padding: 6px 10px;
+      padding: 4px 8px;
       cursor: pointer;
+      white-space: nowrap;
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .rrw-tab-btn--active {
@@ -1280,19 +1306,17 @@ function injectStyles() {
     .rrw-target-body--collapsed {
       max-height: calc(1.35em * 8);
       overflow: hidden;
-      -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-      mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
     }
 
     .rrw-target-expand-btn {
       background: none;
       border: none;
-      padding: 2px 0;
-      font-size: 0.78rem;
+      padding: 0;
+      font-size: 0.7rem;
       color: var(--rrw-link);
       cursor: pointer;
-      display: block;
-      margin-top: 2px;
+      display: inline;
+      margin-top: 0;
     }
 
     .rrw-target-expand-btn:hover {
@@ -1505,7 +1529,7 @@ function injectStyles() {
       white-space: pre-wrap;
       word-break: break-word;
       overflow-y: auto;
-      max-height: 320px;
+      max-height: none;
     }
 
     .rrw-check-item {
@@ -1547,7 +1571,7 @@ function injectStyles() {
 
     .rrw-actions {
       display: flex;
-      gap: 8px;
+      gap: 4px;
       flex-wrap: wrap;
     }
 
@@ -1558,15 +1582,8 @@ function injectStyles() {
     .rrw-quick-actions-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
+      gap: 4px;
       width: 100%;
-    }
-
-    .rrw-quick-action-btn {
-      width: 100%;
-      justify-content: flex-start;
-      text-align: left;
-      min-height: 34px;
     }
 
     .rrw-btn {
@@ -1580,7 +1597,7 @@ function injectStyles() {
       color: #fff;
       font-weight: 600;
       font-size: 0.85rem;
-      line-height: 1.15;
+      line-height: 1.3;
       padding: 6px 11px;
       min-height: 30px;
       cursor: pointer;
@@ -1601,6 +1618,20 @@ function injectStyles() {
 
     .rrw-btn-danger {
       background: #7f1d1d;
+    }
+
+    .rrw-quick-action-btn {
+      display: flex !important;
+      width: 100%;
+      justify-content: center !important;
+      align-items: center !important;
+      text-align: center !important;
+      min-height: 48px;
+      padding: 6px 8px;
+      white-space: normal !important;
+      line-height: 1.3 !important;
+      flex-wrap: wrap;
+      font-size: 0.75rem !important;
     }
 
     .rrw-error {
@@ -1724,7 +1755,7 @@ function injectStyles() {
 
     .rrw-removal-config-tabs {
       display: flex;
-      gap: 8px;
+      gap: 4px;
       padding: 10px 16px 0;
       background: rgba(10, 18, 31, 0.98);
       position: sticky;

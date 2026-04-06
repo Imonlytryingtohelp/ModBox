@@ -14,11 +14,23 @@
 function ensureOverlayRoot() {
   let root = document.getElementById(OVERLAY_ROOT_ID);
   if (root) {
+    console.log("[ModBox] ensureOverlayRoot: Found existing root");
     return root;
   }
+  console.log("[ModBox] ensureOverlayRoot: Creating new root");
   root = document.createElement("div");
   root.id = OVERLAY_ROOT_ID;
-  document.documentElement.appendChild(root);
+  console.log("[ModBox] ensureOverlayRoot: Appending to body");
+  // Append to body instead of documentElement so the element is in the visible document flow
+  if (document.body) {
+    document.body.appendChild(root);
+  } else {
+    // Fallback if body doesn't exist yet
+    document.documentElement.appendChild(root);
+  }
+  console.log("[ModBox] ensureOverlayRoot: Root appended, checking DOM:");
+  console.log("[ModBox]   - In body:", document.body ? document.body.contains(root) : "no body");
+  console.log("[ModBox]   - Root parent:", root.parentElement?.id || root.parentElement?.tagName);
   
   // Apply the current theme to the newly created root
   const activeTheme = resolveActiveTheme(currentThemeMode);
@@ -595,7 +607,7 @@ function renderOverlay() {
               <div class="rrw-target-body${overlayState.targetCardExpanded ? "" : " rrw-target-body--collapsed"}">${targetBodyHtml}</div>
               <button type="button" class="rrw-target-expand-btn" id="rrw-target-card-expand">${overlayState.targetCardExpanded ? "\u25B2 Show less" : "\u25BC Show more"}</button>
             ` : ""}
-            ${resolved?.permalink ? `<a href="${escapeHtml(resolved.permalink)}" target="_blank" rel="noreferrer">Open on Reddit</a>` : ""}
+            ${resolved?.permalink ? `<a href="${escapeHtml(buildRedditUrl(resolved.permalink, preferredRedditLinkHost))}" target="_blank" rel="noreferrer">Open on Reddit</a>` : ""}
           </div>
         ` : ""}
 
@@ -857,6 +869,18 @@ function renderOverlay() {
       renderOverlay();
     }
   });
+
+  // Hide expand button if target body isn't actually overflowing
+  const targetBody = root.querySelector(".rrw-target-body");
+  const expandBtn = root.querySelector("#rrw-target-card-expand");
+  if (targetBody && expandBtn) {
+    // Check if collapsed content has enough height to actually overflow
+    const tempClass = ".rrw-target-body--collapsed";
+    const maxHeightCalc = 1.35 * 16 * 8; // 1.35em line-height * 16px base * 8 lines
+    if (targetBody.scrollHeight <= maxHeightCalc) {
+      expandBtn.style.display = "none";
+    }
+  }
 
   const refreshConfigBtn = root.querySelector("#rrw-refresh-config");
   if (refreshConfigBtn && overlayState) {

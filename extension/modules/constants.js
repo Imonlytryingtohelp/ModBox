@@ -62,7 +62,7 @@ const DEFAULT_TOOLBOX_USERNOTE_TYPES = [
 // ============================================================================
 // CACHE TIMEOUTS (milliseconds)
 // ============================================================================
-const USERNOTES_PREVIEW_LENGTH = 75;
+const USERNOTES_PREVIEW_LENGTH = 15;
 const USERNOTES_CACHE_TTL_MS = 60000;
 const USERNOTE_TYPE_META_CACHE_TTL_MS = 60000;
 const MODLOG_CACHE_TTL_MS = 60000;

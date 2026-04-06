@@ -387,7 +387,8 @@ function renderProfileEntries(items) {
   return filtered
     .map((entry) => {
       if (entry?.kind === "t1") {
-        const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
+        const permalinkPath = entry.data?.permalink ? entry.data.permalink : "";
+        const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
         const bodyHtml = getProfileBodyHtmlFromEntry(entry);
         const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
         return `
@@ -407,7 +408,8 @@ function renderProfileEntries(items) {
       }
 
       if (entry?.kind === "t3") {
-        const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
+        const permalinkPath = entry.data?.permalink ? entry.data.permalink : "";
+        const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
         const selftextHtml = getProfileBodyHtmlFromEntry(entry);
         const removedClass = shouldHighlightRemovedPost(entry) ? " rrw-profile-item--removed" : "";
         return `

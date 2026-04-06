@@ -187,6 +187,24 @@ function normalizeQueueBarLinkHost(value, fallback = "extension_preference") {
     : fallback;
 }
 
+function getRedditHostForLinkHost(linkHostSetting = "extension_preference") {
+  switch (String(linkHostSetting).trim()) {
+    case "old_reddit":
+      return "old.reddit.com";
+    case "new_reddit":
+      return "www.reddit.com";
+    case "extension_preference":
+    default:
+      return "reddit.com";
+  }
+}
+
+function buildRedditUrl(permalink, linkHostSetting = "extension_preference") {
+  const host = getRedditHostForLinkHost(linkHostSetting);
+  const path = String(permalink || "").trim();
+  return `https://${host}${path}`;
+}
+
 function normalizeQueueBarScope(value, fallback = "current_subreddit") {
   const clean = String(value || "").trim();
   if (clean === "configured_subreddit") {

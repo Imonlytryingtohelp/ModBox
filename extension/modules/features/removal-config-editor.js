@@ -830,7 +830,7 @@ function renderRemovalConfigEditor() {
               <small class="rrw-muted rrw-config-help">Used only when scope is Specific moderated subreddit.</small>
             </label>
             <label class="rrw-field">
-              <span>Queue bar link host</span>
+              <span>Open on Reddit link host</span>
               <select data-ext-setting="queue_bar_link_host">
                 <option value="extension_preference" ${extensionSettings.queue_bar_link_host === "extension_preference" ? "selected" : ""}>Follow extension preference</option>
                 <option value="old_reddit" ${extensionSettings.queue_bar_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>

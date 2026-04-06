@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.2.0 - Reddit Native Usernotes
+
+### Added
+
+- **Read-only Reddit native usernotes** - Display native modnotes (Reddit's built-in usernotes) alongside Toolbox usernotes with full deletion support for your own notes
+- **Request deduplication for native notes** - Automatically deduplicate concurrent API requests for the same user to prevent rate limiting when viewing pages with many users
+- **Global "Open on Reddit" link host setting** - The "Open on Reddit link host" setting now applies across all modules (profile view, context popups, and overlay) not just the queue bar
+
+### Improved
+
+- **Extension settings label** - Renamed "Queue bar link host" to "Open on Reddit link host" for clarity on what the setting controls
+
 ## 1.1.2 - Fixes
 
 ### Fixed

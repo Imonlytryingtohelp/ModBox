@@ -987,3 +987,211 @@ async function fetchBanStatusViaReddit(subreddit, username) {
     is_banned: Boolean(matched),
   };
 }
+
+// ============================================================================
+// NATIVE REDDIT MODNOTES API
+// ============================================================================
+
+
+// ============================================================================
+// NATIVE MODNOTES CACHE
+// ============================================================================
+// Cache for native modnotes to prevent rate limiting from repeated API calls
+// Cache entries expire after 5 minutes
+
+const nativeModnotesCache = new Map();
+const NATIVE_MODNOTES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Track in-flight requests to deduplicate concurrent requests for the same user
+const nativeModnotesInFlightRequests = new Map();
+
+function buildNativeModnotesCacheKey(subreddit, username) {
+  const cleanSub = normalizeSubreddit(subreddit);
+  const cleanUser = String(username || "").trim();
+  return `${cleanSub}|${cleanUser}`;
+}
+
+function getNativeModnotesFromCache(subreddit, username) {
+  const key = buildNativeModnotesCacheKey(subreddit, username);
+  const cached = nativeModnotesCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log("[ModBox] Returning native modnotes from cache for:", key);
+    return cached.value;
+  }
+  return null;
+}
+
+function setNativeModnotesCache(subreddit, username, notes) {
+  const key = buildNativeModnotesCacheKey(subreddit, username);
+  nativeModnotesCache.set(key, {
+    value: notes,
+    expiresAt: Date.now() + NATIVE_MODNOTES_CACHE_TTL_MS,
+  });
+  
+  // Prune old entries if cache gets too large
+  if (nativeModnotesCache.size > 100) {
+    const now = Date.now();
+    for (const [cacheKey, cacheValue] of nativeModnotesCache) {
+      if (!cacheValue || cacheValue.expiresAt <= now) {
+        nativeModnotesCache.delete(cacheKey);
+      }
+    }
+  }
+}
+
+async function fetchNativeModnotesViaReddit(subreddit, username) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  const cleanUser = String(username || "").trim();
+  if (!cleanSubreddit || !cleanUser) {
+    console.log("[ModBox] Skipping native modnotes fetch: missing subreddit or username");
+    return [];
+  }
+
+  // Check cache first
+  const cachedNotes = getNativeModnotesFromCache(cleanSubreddit, cleanUser);
+  if (cachedNotes !== null) {
+    return cachedNotes;
+  }
+
+  // Check if a request is already in-flight for this user
+  const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
+  if (nativeModnotesInFlightRequests.has(cacheKey)) {
+    console.log("[ModBox] Returning in-flight request for:", cacheKey);
+    return nativeModnotesInFlightRequests.get(cacheKey);
+  }
+
+  // Create the fetch promise
+  const fetchPromise = (async () => {
+    try {
+      const url = `/api/mod/notes?subreddit=${encodeURIComponent(cleanSubreddit)}&user=${encodeURIComponent(cleanUser)}&limit=100`;
+      console.log("[ModBox] Fetching native modnotes from:", url);
+      
+      const payload = await requestJsonViaBackground(url, { oauth: true });
+      console.log("[ModBox] Native modnotes response:", payload);
+      
+      // Reddit API returns mod_notes, not notes
+      let notes = Array.isArray(payload?.mod_notes) ? payload.mod_notes : [];
+      console.log("[ModBox] Extracted native modnotes count before filtering:", notes.length);
+      
+      // Filter out REMOVAL, APPROVAL, and SPAM notes (action notes, not user notes)
+      const excludedTypes = ["REMOVAL", "APPROVAL", "SPAM", "CONTENT_CHANGE"];
+      notes = notes.filter((note) => !excludedTypes.includes(String(note?.type || "").toUpperCase()));
+      console.log("[ModBox] Extracted native modnotes count after filtering:", notes.length);
+      
+      if (notes.length > 0) {
+        console.log("[ModBox] First note structure:", notes[0]);
+        console.log("[ModBox] First note keys:", Object.keys(notes[0] || {}));
+        console.log("[ModBox] user_note_data:", notes[0]?.user_note_data);
+        
+        // Log all unique types in the filtered response
+        const uniqueTypes = new Set(notes.map(n => String(n?.type || "")).filter(Boolean));
+        console.log("[ModBox] Unique note types after filtering:", Array.from(uniqueTypes));
+      }
+      
+      const transformedNotes = notes.map((note) => ({
+        id: String(note?.id || "").trim(),
+        user: String(note?.user || "").trim(),
+        subreddit: String(note?.subreddit || "").trim(),
+        note: String(note?.user_note_data?.note || "").trim(),
+        label: String(note?.type || "").trim(),
+        created_at: Number(note?.created_at || 0),
+        created_by: String(note?.operator || "unknown").trim(),
+        reddit_id: String(note?.mod_action_data?.action_id || "").trim(),
+      })).filter((note) => note.id);
+      
+      // Cache the result before returning
+      setNativeModnotesCache(cleanSubreddit, cleanUser, transformedNotes);
+      return transformedNotes;
+    } catch (error) {
+      const errorMsg = getSafeErrorMessage(error);
+      console.error("[ModBox] Error fetching native modnotes:", errorMsg);
+      return [];
+    } finally {
+      // Clean up the in-flight request tracker
+      nativeModnotesInFlightRequests.delete(cacheKey);
+    }
+  })();
+
+  // Store the in-flight request promise
+  nativeModnotesInFlightRequests.set(cacheKey, fetchPromise);
+  return fetchPromise;
+}
+
+async function createNativeModNoteViaReddit(subreddit, username, noteText, redditId = null) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  const cleanUser = String(username || "").trim();
+  const cleanNote = String(noteText || "").trim();
+  
+  if (!cleanSubreddit || !cleanUser || !cleanNote) {
+    throw new Error("Missing subreddit, username, or note text for native moderation note");
+  }
+
+  if (cleanNote.length > 250) {
+    throw new Error("Native note text exceeds 250 character limit");
+  }
+
+  const body = {
+    subreddit: cleanSubreddit.toLowerCase(),
+    user: cleanUser,
+    note: cleanNote,
+  };
+
+  if (redditId) {
+    const cleanRedditId = String(redditId || "").trim();
+    if (cleanRedditId) {
+      body.reddit_id = cleanRedditId;
+    }
+  }
+
+  try {
+    console.log("[ModBox] Creating native modnote with body:", JSON.stringify(body));
+    const response = await requestJsonViaBackground(
+      "/api/mod/notes",
+      {
+        method: "POST",
+        oauth: true,
+        body,
+      },
+    );
+    
+    console.log("[ModBox] Native modnote created successfully:", JSON.stringify(response));
+    return {
+      id: String(response?.id || "").trim(),
+      user: cleanUser,
+      subreddit: cleanSubreddit,
+      note: cleanNote,
+      label: String(response?.label || "").trim(),
+      created_at: Number(response?.created_at || Date.now() / 1000),
+      created_by: String(response?.created_by || "").trim(),
+      reddit_id: String(response?.reddit_id || "").trim(),
+    };
+  } catch (error) {
+    console.log("[ModBox] Create native modnote error response:", error);
+    const message = getSafeErrorMessage(error);
+    throw new Error(`Failed to create native moderation note: ${message}`);
+  }
+}
+
+async function deleteNativeModNoteViaReddit(subreddit, username, noteId) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  const cleanUser = String(username || "").trim();
+  const cleanNoteId = String(noteId || "").trim();
+  
+  if (!cleanSubreddit || !cleanUser || !cleanNoteId) {
+    throw new Error("Missing subreddit, username, or note ID for native moderation note deletion");
+  }
+
+  try {
+    await requestJsonViaBackground(
+      `/api/mod/notes?subreddit=${encodeURIComponent(cleanSubreddit)}&user=${encodeURIComponent(cleanUser)}&note_id=${encodeURIComponent(cleanNoteId)}`,
+      {
+        method: "DELETE",
+        oauth: true,
+      },
+    );
+    return true;
+  } catch (error) {
+    const message = getSafeErrorMessage(error);
+    throw new Error(`Failed to delete native moderation note: ${message}`);
+  }
+}

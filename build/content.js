@@ -131,7 +131,7 @@ const DEFAULT_TOOLBOX_USERNOTE_TYPES = [
 
 // ============================================================================
 
-const USERNOTES_PREVIEW_LENGTH = 75;
+const USERNOTES_PREVIEW_LENGTH = 15;
 
 const USERNOTES_CACHE_TTL_MS = 60000;
 
@@ -1080,6 +1080,42 @@ function normalizeQueueBarLinkHost(value, fallback = "extension_preference") {
     ? clean
 
     : fallback;
+
+}
+
+
+
+function getRedditHostForLinkHost(linkHostSetting = "extension_preference") {
+
+  switch (String(linkHostSetting).trim()) {
+
+    case "old_reddit":
+
+      return "old.reddit.com";
+
+    case "new_reddit":
+
+      return "www.reddit.com";
+
+    case "extension_preference":
+
+    default:
+
+      return "reddit.com";
+
+  }
+
+}
+
+
+
+function buildRedditUrl(permalink, linkHostSetting = "extension_preference") {
+
+  const host = getRedditHostForLinkHost(linkHostSetting);
+
+  const path = String(permalink || "").trim();
+
+  return `https://${host}${path}`;
 
 }
 
@@ -4031,6 +4067,422 @@ async function fetchBanStatusViaReddit(subreddit, username) {
 
 }
 
+
+
+// ============================================================================
+
+// NATIVE REDDIT MODNOTES API
+
+// ============================================================================
+
+
+
+
+
+// ============================================================================
+
+// NATIVE MODNOTES CACHE
+
+// ============================================================================
+
+// Cache for native modnotes to prevent rate limiting from repeated API calls
+
+// Cache entries expire after 5 minutes
+
+
+
+const nativeModnotesCache = new Map();
+
+const NATIVE_MODNOTES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+
+
+// Track in-flight requests to deduplicate concurrent requests for the same user
+
+const nativeModnotesInFlightRequests = new Map();
+
+
+
+function buildNativeModnotesCacheKey(subreddit, username) {
+
+  const cleanSub = normalizeSubreddit(subreddit);
+
+  const cleanUser = String(username || "").trim();
+
+  return `${cleanSub}|${cleanUser}`;
+
+}
+
+
+
+function getNativeModnotesFromCache(subreddit, username) {
+
+  const key = buildNativeModnotesCacheKey(subreddit, username);
+
+  const cached = nativeModnotesCache.get(key);
+
+  if (cached && cached.expiresAt > Date.now()) {
+
+    console.log("[ModBox] Returning native modnotes from cache for:", key);
+
+    return cached.value;
+
+  }
+
+  return null;
+
+}
+
+
+
+function setNativeModnotesCache(subreddit, username, notes) {
+
+  const key = buildNativeModnotesCacheKey(subreddit, username);
+
+  nativeModnotesCache.set(key, {
+
+    value: notes,
+
+    expiresAt: Date.now() + NATIVE_MODNOTES_CACHE_TTL_MS,
+
+  });
+
+  
+
+  // Prune old entries if cache gets too large
+
+  if (nativeModnotesCache.size > 100) {
+
+    const now = Date.now();
+
+    for (const [cacheKey, cacheValue] of nativeModnotesCache) {
+
+      if (!cacheValue || cacheValue.expiresAt <= now) {
+
+        nativeModnotesCache.delete(cacheKey);
+
+      }
+
+    }
+
+  }
+
+}
+
+
+
+async function fetchNativeModnotesViaReddit(subreddit, username) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = String(username || "").trim();
+
+  if (!cleanSubreddit || !cleanUser) {
+
+    console.log("[ModBox] Skipping native modnotes fetch: missing subreddit or username");
+
+    return [];
+
+  }
+
+
+
+  // Check cache first
+
+  const cachedNotes = getNativeModnotesFromCache(cleanSubreddit, cleanUser);
+
+  if (cachedNotes !== null) {
+
+    return cachedNotes;
+
+  }
+
+
+
+  // Check if a request is already in-flight for this user
+
+  const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
+
+  if (nativeModnotesInFlightRequests.has(cacheKey)) {
+
+    console.log("[ModBox] Returning in-flight request for:", cacheKey);
+
+    return nativeModnotesInFlightRequests.get(cacheKey);
+
+  }
+
+
+
+  // Create the fetch promise
+
+  const fetchPromise = (async () => {
+
+    try {
+
+      const url = `/api/mod/notes?subreddit=${encodeURIComponent(cleanSubreddit)}&user=${encodeURIComponent(cleanUser)}&limit=100`;
+
+      console.log("[ModBox] Fetching native modnotes from:", url);
+
+      
+
+      const payload = await requestJsonViaBackground(url, { oauth: true });
+
+      console.log("[ModBox] Native modnotes response:", payload);
+
+      
+
+      // Reddit API returns mod_notes, not notes
+
+      let notes = Array.isArray(payload?.mod_notes) ? payload.mod_notes : [];
+
+      console.log("[ModBox] Extracted native modnotes count before filtering:", notes.length);
+
+      
+
+      // Filter out REMOVAL, APPROVAL, and SPAM notes (action notes, not user notes)
+
+      const excludedTypes = ["REMOVAL", "APPROVAL", "SPAM", "CONTENT_CHANGE"];
+
+      notes = notes.filter((note) => !excludedTypes.includes(String(note?.type || "").toUpperCase()));
+
+      console.log("[ModBox] Extracted native modnotes count after filtering:", notes.length);
+
+      
+
+      if (notes.length > 0) {
+
+        console.log("[ModBox] First note structure:", notes[0]);
+
+        console.log("[ModBox] First note keys:", Object.keys(notes[0] || {}));
+
+        console.log("[ModBox] user_note_data:", notes[0]?.user_note_data);
+
+        
+
+        // Log all unique types in the filtered response
+
+        const uniqueTypes = new Set(notes.map(n => String(n?.type || "")).filter(Boolean));
+
+        console.log("[ModBox] Unique note types after filtering:", Array.from(uniqueTypes));
+
+      }
+
+      
+
+      const transformedNotes = notes.map((note) => ({
+
+        id: String(note?.id || "").trim(),
+
+        user: String(note?.user || "").trim(),
+
+        subreddit: String(note?.subreddit || "").trim(),
+
+        note: String(note?.user_note_data?.note || "").trim(),
+
+        label: String(note?.type || "").trim(),
+
+        created_at: Number(note?.created_at || 0),
+
+        created_by: String(note?.operator || "unknown").trim(),
+
+        reddit_id: String(note?.mod_action_data?.action_id || "").trim(),
+
+      })).filter((note) => note.id);
+
+      
+
+      // Cache the result before returning
+
+      setNativeModnotesCache(cleanSubreddit, cleanUser, transformedNotes);
+
+      return transformedNotes;
+
+    } catch (error) {
+
+      const errorMsg = getSafeErrorMessage(error);
+
+      console.error("[ModBox] Error fetching native modnotes:", errorMsg);
+
+      return [];
+
+    } finally {
+
+      // Clean up the in-flight request tracker
+
+      nativeModnotesInFlightRequests.delete(cacheKey);
+
+    }
+
+  })();
+
+
+
+  // Store the in-flight request promise
+
+  nativeModnotesInFlightRequests.set(cacheKey, fetchPromise);
+
+  return fetchPromise;
+
+}
+
+
+
+async function createNativeModNoteViaReddit(subreddit, username, noteText, redditId = null) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = String(username || "").trim();
+
+  const cleanNote = String(noteText || "").trim();
+
+  
+
+  if (!cleanSubreddit || !cleanUser || !cleanNote) {
+
+    throw new Error("Missing subreddit, username, or note text for native moderation note");
+
+  }
+
+
+
+  if (cleanNote.length > 250) {
+
+    throw new Error("Native note text exceeds 250 character limit");
+
+  }
+
+
+
+  const body = {
+
+    subreddit: cleanSubreddit.toLowerCase(),
+
+    user: cleanUser,
+
+    note: cleanNote,
+
+  };
+
+
+
+  if (redditId) {
+
+    const cleanRedditId = String(redditId || "").trim();
+
+    if (cleanRedditId) {
+
+      body.reddit_id = cleanRedditId;
+
+    }
+
+  }
+
+
+
+  try {
+
+    console.log("[ModBox] Creating native modnote with body:", JSON.stringify(body));
+
+    const response = await requestJsonViaBackground(
+
+      "/api/mod/notes",
+
+      {
+
+        method: "POST",
+
+        oauth: true,
+
+        body,
+
+      },
+
+    );
+
+    
+
+    console.log("[ModBox] Native modnote created successfully:", JSON.stringify(response));
+
+    return {
+
+      id: String(response?.id || "").trim(),
+
+      user: cleanUser,
+
+      subreddit: cleanSubreddit,
+
+      note: cleanNote,
+
+      label: String(response?.label || "").trim(),
+
+      created_at: Number(response?.created_at || Date.now() / 1000),
+
+      created_by: String(response?.created_by || "").trim(),
+
+      reddit_id: String(response?.reddit_id || "").trim(),
+
+    };
+
+  } catch (error) {
+
+    console.log("[ModBox] Create native modnote error response:", error);
+
+    const message = getSafeErrorMessage(error);
+
+    throw new Error(`Failed to create native moderation note: ${message}`);
+
+  }
+
+}
+
+
+
+async function deleteNativeModNoteViaReddit(subreddit, username, noteId) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = String(username || "").trim();
+
+  const cleanNoteId = String(noteId || "").trim();
+
+  
+
+  if (!cleanSubreddit || !cleanUser || !cleanNoteId) {
+
+    throw new Error("Missing subreddit, username, or note ID for native moderation note deletion");
+
+  }
+
+
+
+  try {
+
+    await requestJsonViaBackground(
+
+      `/api/mod/notes?subreddit=${encodeURIComponent(cleanSubreddit)}&user=${encodeURIComponent(cleanUser)}&note_id=${encodeURIComponent(cleanNoteId)}`,
+
+      {
+
+        method: "DELETE",
+
+        oauth: true,
+
+      },
+
+    );
+
+    return true;
+
+  } catch (error) {
+
+    const message = getSafeErrorMessage(error);
+
+    throw new Error(`Failed to delete native moderation note: ${message}`);
+
+  }
+
+}
+
 // ------------------------------------------------------------------------------
 // wiki-loader.js
 // ------------------------------------------------------------------------------
@@ -6287,9 +6739,13 @@ async function loadModeratedSubredditsList() {
 
 // Handles subreddit usernotes: fetching, caching, editing, and inline rendering.
 
-// Dependencies: reddit-api.js (requestJsonViaBackground), wiki-loader.js (load/save functions),
+// Supports both Toolbox usernotes (wiki-based) and native Reddit modnotes with deduplication.
 
-// utilities.js (normalizeSubreddit, escapeHtml), constants.js (OVERLAY_ROOT_ID, storage keys)
+// Dependencies: reddit-api.js (requestJsonViaBackground, native modnotes functions),
+
+// wiki-loader.js (load/save functions), utilities.js (normalizeSubreddit, escapeHtml),
+
+// constants.js (OVERLAY_ROOT_ID, storage keys)
 
 
 
@@ -6390,6 +6846,198 @@ function normalizeUsernoteUsername(value) {
   }
 
   return cleaned;
+
+}
+
+
+
+// â”€â”€â”€â”€ Native Modnotes Integration & Deduplication â”€â”€â”€â”€
+
+
+
+function isNoteTextSimilar(text1, text2, minSimilarity = 0.85) {
+
+  const clean1 = String(text1 || "").trim().toLowerCase();
+
+  const clean2 = String(text2 || "").trim().toLowerCase();
+
+  
+
+  if (clean1 === clean2) {
+
+    return true;
+
+  }
+
+  
+
+  // Simple substring check for case-insensitive match
+
+  if (clean1.includes(clean2) || clean2.includes(clean1)) {
+
+    return true;
+
+  }
+
+  
+
+  return false;
+
+}
+
+
+
+function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindowMs = 60000) {
+
+  const allNotes = [];
+
+  const seenSignatures = new Set();
+
+  const dedupeWindow = Number(dedupeWindowMs || 60000);
+
+  
+
+  console.log(`[ModBox] Deduplication starting: toolbox=${Array.isArray(toolboxNotes) ? toolboxNotes.length : 0}, native=${Array.isArray(nativeNotes) ? nativeNotes.length : 0}`);
+
+  
+
+  // Process Toolbox notes first (preferred in duplicates)
+
+  (Array.isArray(toolboxNotes) ? toolboxNotes : []).forEach((note) => {
+
+    if (!note || typeof note !== "object") {
+
+      return;
+
+    }
+
+    
+
+    const toolboxTime = Number(note.time || Date.now());
+
+    const signature = `${String(note.note || "").trim().toLowerCase()}|${toolboxTime}`;
+
+    seenSignatures.add(signature);
+
+    
+
+    allNotes.push({
+
+      id: String(note.id || note.time || ""),
+
+      note: String(note.note || ""),
+
+      time: toolboxTime,
+
+      mod: String(note.mod || "unknown"),
+
+      link: String(note.link || ""),
+
+      type: String(note.type || "none"),
+
+      source: "Modbox",
+
+      original: note,
+
+    });
+
+  });
+
+  
+
+  console.log(`[ModBox] After adding Toolbox notes: allNotes=${allNotes.length}`);
+
+  
+
+  // Process native notes, filtering out duplicates
+
+  (Array.isArray(nativeNotes) ? nativeNotes : []).forEach((note) => {
+
+    if (!note || typeof note !== "object") {
+
+      return;
+
+    }
+
+    
+
+    const nativeTime = Number(note.created_at || 0) * 1000; // Convert from seconds to ms
+
+    const nativeText = String(note.note || "").trim();
+
+    
+
+    // Check for duplicates in Toolbox notes within the window
+
+    let isDuplicate = false;
+
+    for (const toolboxNote of (Array.isArray(toolboxNotes) ? toolboxNotes : [])) {
+
+      const toolboxTime = Number(toolboxNote.time || Date.now());
+
+      const timeDiff = Math.abs(nativeTime - toolboxTime);
+
+      
+
+      if (timeDiff <= dedupeWindow && isNoteTextSimilar(nativeText, toolboxNote.note || "")) {
+
+        isDuplicate = true;
+
+        break;
+
+      }
+
+    }
+
+    
+
+    if (isDuplicate) {
+
+      return; // Skip this native note (duplicate)
+
+    }
+
+    
+
+    allNotes.push({
+
+      id: String(note.id || ""),
+
+      note: nativeText,
+
+      time: nativeTime,
+
+      mod: String(note.created_by || "unknown"),
+
+      link: String(note.reddit_id || ""),
+
+      type: String(note.label || ""), // Native label maps directly
+
+      source: "reddit",
+
+      original: note,
+
+    });
+
+  });
+
+  
+
+  console.log(`[ModBox] After adding native notes: allNotes=${allNotes.length}`);
+
+  
+
+  // Sort by time descending (most recent first)
+
+  allNotes.sort((a, b) => Number(b.time || 0) - Number(a.time || 0));
+
+  
+
+  console.log(`[ModBox] After sorting: allNotes=${allNotes.length}`);
+
+
+
+  return allNotes;
 
 }
 
@@ -6883,6 +7531,126 @@ async function fetchUsernotesViaReddit(subreddit, username, forceRefresh = false
 
 
 
+async function fetchUsernotesWithNativeViaReddit(subreddit, username, forceRefresh = false) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = normalizeUsernoteUsername(username);
+
+  if (!cleanSubreddit || !cleanUser) {
+
+    throw new Error("Missing subreddit or username for usernotes");
+
+  }
+
+
+
+  if (!forceRefresh) {
+
+    const cached = getUsernotesCache(cleanSubreddit, cleanUser);
+
+    if (cached) {
+
+      return cached;
+
+    }
+
+  }
+
+
+
+  try {
+
+    // Fetch both Toolbox and native notes in parallel
+
+    const [notesDoc, typeMeta, nativeNotes] = await Promise.all([
+
+      loadSubredditUsernotesFromWiki(cleanSubreddit),
+
+      fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit),
+
+      fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser),
+
+    ]);
+
+
+
+    // Extract Toolbox notes for the user
+
+    const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
+
+    const toolboxNotes = resolved.entry?.notes || [];
+
+    
+
+    console.log(`[ModBox] Merged notes fetch for ${cleanUser}: toolbox count=${toolboxNotes.length}, native count=${nativeNotes.length || 0}`);
+
+    if (toolboxNotes.length > 0) {
+
+      console.log(`[ModBox] First toolbox note:`, JSON.stringify(toolboxNotes[0]));
+
+    }
+
+    if (nativeNotes && nativeNotes.length > 0) {
+
+      console.log(`[ModBox] First native note:`, JSON.stringify(nativeNotes[0]));
+
+    }
+
+
+
+    // Deduplicate and merge
+
+    const mergedNotes = deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes);
+
+    
+
+    console.log(`[ModBox] After deduplication: merged count=${mergedNotes.length}`);
+
+
+
+    // Build payload with merged notes
+
+    const payload = {
+
+      subreddit: cleanSubreddit,
+
+      username: resolved.canonical || cleanUser,
+
+      note_count: mergedNotes.length,
+
+      latest_note: mergedNotes.length > 0 ? mergedNotes[0] : null,
+
+      notes: mergedNotes,
+
+      note_types: collectUsernoteTypes(notesDoc, typeMeta),
+
+      note_type_colors: typeMeta?.colors && typeof typeMeta.colors === "object" ? typeMeta.colors : {},
+
+      note_type_labels: typeMeta?.labels && typeof typeMeta.labels === "object" ? typeMeta.labels : {},
+
+    };
+
+
+
+    setUsernotesCache(cleanSubreddit, cleanUser, payload);
+
+    return payload;
+
+  } catch (error) {
+
+    // Fallback to Toolbox-only notes if native fetch fails
+
+    console.warn("[ModBox] Native modnotes fetch failed, falling back to Toolbox only:", error);
+
+    return fetchUsernotesViaReddit(cleanSubreddit, cleanUser, forceRefresh);
+
+  }
+
+}
+
+
+
 async function addUsernoteViaReddit(subreddit, username, noteText, noteType = "none", link = "") {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
@@ -7133,6 +7901,388 @@ async function deleteUsernoteViaReddit(subreddit, username, noteId) {
 
 
 
+// â”€â”€â”€â”€ Dual-System Write Operations (Toolbox + Native) â”€â”€â”€â”€
+
+
+
+async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = normalizeUsernoteUsername(username);
+
+  const text = String(noteText || "").trim();
+
+  if (!cleanSubreddit || !cleanUser || !text) {
+
+    throw new Error("Subreddit, username, and note text are required");
+
+  }
+
+
+
+  const results = {
+
+    toolbox: { success: false, error: null },
+
+    native: { success: false, error: null },
+
+    payload: null,
+
+  };
+
+
+
+  // Write to Toolbox (Modbox)
+
+  try {
+
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+
+    const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
+
+    const existingNotes = resolved.entry?.notes ? resolved.entry.notes.map((row) => ({ ...row })) : [];
+
+    const modUsername = await getCurrentRedditUsername();
+
+    const now = Date.now();
+
+    existingNotes.unshift({
+
+      id: String(now),
+
+      note: text,
+
+      time: now,
+
+      mod: modUsername,
+
+      link: String(link || ""),
+
+      type: String(noteType || "none") || "none",
+
+    });
+
+
+
+    notesDoc.users = notesDoc.users && typeof notesDoc.users === "object" ? notesDoc.users : {};
+
+    delete notesDoc.users[cleanUser.toLowerCase()];
+
+    delete notesDoc.users[cleanUser];
+
+    notesDoc.users[cleanUser] = {
+
+      name: cleanUser,
+
+      notes: existingNotes.sort((a, b) => Number(b.time || 0) - Number(a.time || 0)),
+
+    };
+
+
+
+    await saveSubredditUsernotesToWiki(cleanSubreddit, notesDoc, `create note on user ${cleanUser}`);
+
+    results.toolbox.success = true;
+
+  } catch (error) {
+
+    results.toolbox.error = getSafeErrorMessage(error);
+
+    console.error("[ModBox] Failed to write Toolbox note:", results.toolbox.error);
+
+  }
+
+
+
+  // Native Reddit Modnotes: read-only mode
+
+  // Native note creation disabled - use Toolbox to create notes
+
+  results.native.success = false;
+
+  results.native.error = "Native note creation is disabled (read-only mode)";
+
+
+
+  // Fetch updated notes to return
+
+  try {
+
+    const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
+
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+
+    const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
+
+    const toolboxNotes = resolved.entry?.notes || [];
+
+    
+
+    let nativeNotes = [];
+
+    if (results.native.success) {
+
+      try {
+
+        nativeNotes = await fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser);
+
+      } catch {
+
+        // Non-critical: we already wrote the note
+
+      }
+
+    }
+
+
+
+    const mergedNotes = deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes);
+
+    results.payload = {
+
+      subreddit: cleanSubreddit,
+
+      username: resolved.canonical || cleanUser,
+
+      note_count: mergedNotes.length,
+
+      latest_note: mergedNotes.length > 0 ? mergedNotes[0] : null,
+
+      notes: mergedNotes,
+
+      note_types: collectUsernoteTypes(notesDoc, typeMeta),
+
+      note_type_colors: typeMeta?.colors && typeof typeMeta.colors === "object" ? typeMeta.colors : {},
+
+      note_type_labels: typeMeta?.labels && typeof typeMeta.labels === "object" ? typeMeta.labels : {},
+
+    };
+
+    setUsernotesCache(cleanSubreddit, cleanUser, results.payload);
+
+  } catch (error) {
+
+    console.error("[ModBox] Failed to fetch updated notes:", error);
+
+  }
+
+
+
+  // If both failed, throw error
+
+  if (!results.toolbox.success && !results.native.success) {
+
+    throw new Error(`Failed to create note in both systems: Toolbox: ${results.toolbox.error}, Native: ${results.native.error}`);
+
+  }
+
+
+
+  return results;
+
+}
+
+
+
+async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  const cleanUser = normalizeUsernoteUsername(username);
+
+  const targetId = String(noteId || "").trim();
+
+  if (!cleanSubreddit || !cleanUser || !targetId) {
+
+    throw new Error("Subreddit, username, and note id are required");
+
+  }
+
+
+
+  const results = {
+
+    toolbox: { success: false, error: null },
+
+    native: { success: false, error: null },
+
+    payload: null,
+
+  };
+
+
+
+  // Determine which systems to delete from
+
+  const deleteFromToolbox = noteSource === null || noteSource === "Modbox";
+
+  const deleteFromNative = noteSource === null || noteSource === "reddit";
+
+
+
+  // Delete from Toolbox if applicable
+
+  if (deleteFromToolbox) {
+
+    try {
+
+      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+
+      const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
+
+      if (!resolved.entry) {
+
+        throw new Error("No notes found for user");
+
+      }
+
+
+
+      const priorCount = resolved.entry.notes.length;
+
+      const nextNotes = resolved.entry.notes
+
+        .map((row) => ({ ...row }))
+
+        .filter((row) => String(row?.id || row?.time || "") !== targetId);
+
+
+
+      if (nextNotes.length === priorCount) {
+
+        throw new Error("Note not found in Toolbox");
+
+      }
+
+
+
+      notesDoc.users = notesDoc.users && typeof notesDoc.users === "object" ? notesDoc.users : {};
+
+      delete notesDoc.users[cleanUser.toLowerCase()];
+
+      delete notesDoc.users[cleanUser];
+
+      notesDoc.users[cleanUser] = {
+
+        name: cleanUser,
+
+        notes: nextNotes.sort((a, b) => Number(b.time || 0) - Number(a.time || 0)),
+
+      };
+
+
+
+      await saveSubredditUsernotesToWiki(cleanSubreddit, notesDoc, `delete note on user ${cleanUser}`);
+
+      results.toolbox.success = true;
+
+    } catch (error) {
+
+      results.toolbox.error = getSafeErrorMessage(error);
+
+      console.error("[ModBox] Failed to delete Toolbox note:", results.toolbox.error);
+
+    }
+
+  }
+
+
+
+  // Delete from Native if applicable
+
+  if (deleteFromNative) {
+
+    // Native note deletion disabled - treat as success since native is read-only
+
+    results.native.success = true;
+
+  }
+
+
+
+  // Fetch updated notes to return
+
+  try {
+
+    const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
+
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+
+    const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
+
+    const toolboxNotes = resolved.entry?.notes || [];
+
+    
+
+    let nativeNotes = [];
+
+    try {
+
+      nativeNotes = await fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser);
+
+    } catch {
+
+      // Non-critical: continue with Toolbox only
+
+    }
+
+
+
+    const mergedNotes = deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes);
+
+    results.payload = {
+
+      subreddit: cleanSubreddit,
+
+      username: resolved.canonical || cleanUser,
+
+      note_count: mergedNotes.length,
+
+      latest_note: mergedNotes.length > 0 ? mergedNotes[0] : null,
+
+      notes: mergedNotes,
+
+      note_types: collectUsernoteTypes(notesDoc, typeMeta),
+
+      note_type_colors: typeMeta?.colors && typeof typeMeta.colors === "object" ? typeMeta.colors : {},
+
+      note_type_labels: typeMeta?.labels && typeof typeMeta.labels === "object" ? typeMeta.labels : {},
+
+    };
+
+    setUsernotesCache(cleanSubreddit, cleanUser, results.payload);
+
+  } catch (error) {
+
+    console.error("[ModBox] Failed to fetch updated notes:", error);
+
+  }
+
+
+
+  // Check if deletion succeeded from systems we tried
+
+  if (deleteFromToolbox && !results.toolbox.success) {
+
+    throw new Error(`Failed to delete from Toolbox: ${results.toolbox.error}`);
+
+  }
+
+  if (deleteFromNative && !results.native.success) {
+
+    throw new Error(`Failed to delete from Native: ${results.native.error}`);
+
+  }
+
+
+
+  return results;
+
+}
+
+
+
 async function fetchUsernotes(subreddit, username, forceRefresh = false) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
@@ -7168,6 +8318,254 @@ async function fetchUsernotes(subreddit, username, forceRefresh = false) {
 
 
 // â”€â”€â”€â”€ Usernote Editor UI â”€â”€â”€â”€
+
+
+
+function showUsernotesDeleteConfirmation(noteSource) {
+
+  console.log("[ModBox] showUsernotesDeleteConfirmation called with noteSource:", noteSource);
+
+  return new Promise((resolve) => {
+
+    const root = ensureOverlayRoot();
+
+    let backdrop = root.querySelector(".rrw-usernotes-delete-backdrop");
+
+    let modal = root.querySelector(".rrw-usernotes-delete-modal");
+
+    
+
+    if (!(backdrop instanceof HTMLElement)) {
+
+      backdrop = document.createElement("div");
+
+      backdrop.className = "rrw-usernotes-delete-backdrop";
+
+      root.appendChild(backdrop);
+
+    }
+
+    if (!(modal instanceof HTMLElement)) {
+
+      modal = document.createElement("div");
+
+      modal.className = "rrw-usernotes-delete-modal";
+
+      root.appendChild(modal);
+
+    }
+
+
+
+    const isSystemNote = noteSource === "reddit";
+
+    const isToolboxNote = noteSource === "Modbox";
+
+    
+
+    let modalContent = `
+
+      <div class="rrw-delete-modal-content">
+
+        <h4>Delete Usernote</h4>
+
+        <p>This note exists in: <strong>${isSystemNote ? "Reddit's native system" : isToolboxNote ? "Toolbox" : "both systems"}</strong></p>
+
+        <p>Where would you like to delete it from?</p>
+
+        <div class="rrw-delete-modal-buttons">
+
+    `;
+
+    
+
+    // Show appropriate delete options based on note source
+
+    if (isToolboxNote) {
+
+      // Toolbox-only note
+
+      modalContent += `
+
+        <button type="button" class="rrw-btn rrw-btn-primary" data-delete-choice="Modbox">Delete from Toolbox</button>
+
+      `;
+
+    } else if (isSystemNote) {
+
+      // Reddit-only note
+
+      modalContent += `
+
+        <button type="button" class="rrw-btn rrw-btn-primary" data-delete-choice="reddit">Delete from Reddit</button>
+
+      `;
+
+    } else {
+
+      // Both systems (shouldn't happen with current dedup logic, but support it)
+
+      modalContent += `
+
+        <button type="button" class="rrw-btn rrw-btn-primary" data-delete-choice="null">Delete from both</button>
+
+        <button type="button" class="rrw-btn rrw-btn-secondary" data-delete-choice="Modbox">Delete from Toolbox only</button>
+
+        <button type="button" class="rrw-btn rrw-btn-secondary" data-delete-choice="reddit">Delete from Reddit only</button>
+
+      `;
+
+    }
+
+    
+
+    modalContent += `
+
+        <button type="button" class="rrw-btn rrw-btn-tertiary" data-delete-choice="cancel">Cancel</button>
+
+        </div>
+
+      </div>
+
+    `;
+
+    
+
+    modal.innerHTML = modalContent;
+
+    console.log("[ModBox] Delete modal created with buttons");
+
+    console.log("[ModBox] Modal element:", modal);
+
+    console.log("[ModBox] Modal display:", window.getComputedStyle(modal).display);
+
+    console.log("[ModBox] Modal pointer-events:", window.getComputedStyle(modal).pointerEvents);
+
+    console.log("[ModBox] Modal z-index:", window.getComputedStyle(modal).zIndex);
+
+    console.log("[ModBox] Modal position:", window.getComputedStyle(modal).position);
+
+    console.log("[ModBox] Modal visibility:", window.getComputedStyle(modal).visibility);
+
+    console.log("[ModBox] Modal opacity:", window.getComputedStyle(modal).opacity);
+
+    console.log("[ModBox] Modal offsetHeight:", modal.offsetHeight);
+
+    console.log("[ModBox] Modal offsetWidth:", modal.offsetWidth);
+
+    console.log("[ModBox] Modal getBoundingClientRect:", modal.getBoundingClientRect());
+
+    console.log("[ModBox] Backdrop element:", backdrop);
+
+    console.log("[ModBox] Backdrop display:", window.getComputedStyle(backdrop).display);
+
+    console.log("[ModBox] Backdrop pointer-events:", window.getComputedStyle(backdrop).pointerEvents);
+
+    console.log("[ModBox] Backdrop z-index:", window.getComputedStyle(backdrop).zIndex);
+
+    console.log("[ModBox] Root element:", root);
+
+    console.log("[ModBox] Root in DOM:", document.body.contains(root));
+
+    console.log("[ModBox] Root z-index:", window.getComputedStyle(root).zIndex);
+
+    console.log("[ModBox] Root display:", window.getComputedStyle(root).display);
+
+    console.log("[ModBox] Root position:", window.getComputedStyle(root).position);
+
+    
+
+    // Add event listeners
+
+    const buttons = modal.querySelectorAll("[data-delete-choice]");
+
+    console.log("[ModBox] Found", buttons.length, "delete buttons");
+
+    
+
+    // Debug: log button details
+
+    buttons.forEach((btn, idx) => {
+
+      console.log(`[ModBox] Button ${idx}:`, btn);
+
+      console.log(`[ModBox] Button ${idx} display:`, window.getComputedStyle(btn).display);
+
+      console.log(`[ModBox] Button ${idx} pointer-events:`, window.getComputedStyle(btn).pointerEvents);
+
+      console.log(`[ModBox] Button ${idx} data-delete-choice:`, btn.getAttribute("data-delete-choice"));
+
+      console.log(`[ModBox] Button ${idx} parent:`, btn.parentElement);
+
+    });
+
+    
+
+    // Add click listener to modal itself to see if ANY clicks reach it
+
+    modal.addEventListener("click", (e) => {
+
+      console.log("[ModBox] Modal received click event, target:", e.target);
+
+    });
+
+    
+
+    // Add click listener to backdrop to see if clicks are blocked by it
+
+    backdrop.addEventListener("click", (e) => {
+
+      console.log("[ModBox] Backdrop received click event, target:", e.target);
+
+    });
+
+    
+
+    buttons.forEach((btn) => {
+
+      // Try both bubble and capture phases
+
+      btn.addEventListener("click", (e) => {
+
+        const choice = btn.getAttribute("data-delete-choice");
+
+        console.log("[ModBox] Delete button clicked (bubble) with choice:", choice);
+
+        backdrop.remove();
+
+        modal.remove();
+
+        
+
+        if (choice === "cancel") {
+
+          resolve(null);
+
+        } else if (choice === "null") {
+
+          resolve(null); // null means delete from both
+
+        } else {
+
+          resolve(choice); // "Modbox", "reddit", or null
+
+        }
+
+      }, false);
+
+      
+
+      btn.addEventListener("click", (e) => {
+
+        console.log("[ModBox] Delete button clicked (capture) with choice:", btn.getAttribute("data-delete-choice"));
+
+      }, true);
+
+    });
+
+  });
+
+}
 
 
 
@@ -7271,51 +8669,39 @@ function renderUsernotesEditor() {
 
       const noteLink = String(note.link || "").trim();
 
-      const modName = String(note.mod || "unknown");
+      const noteSource = String(note.source || "Modbox");
+
+      const sourceBadgeHtml = `<span class="rrw-note-source-badge">${escapeHtml(noteSource)}</span>`;
 
       const dateText = Number(note.time) ? new Date(Number(note.time)).toLocaleString() : "unknown date";
+
+      const deleteButtonHtml = noteSource === "reddit" ? "" : `<button type="button" class="rrw-btn-trash" data-un-delete-id="${escapeHtml(noteId)}" title="Delete note" ${state.saving ? "disabled" : ""}>
+
+              &times;
+
+            </button>`;
 
       return `
 
         <article class="rrw-usernote-row">
 
-          <div class="rrw-usernote-meta">${escapeHtml(dateText)} &middot; by u/${escapeHtml(modName)}</div>
+          <div class="rrw-usernote-header-row">
 
-          <div class="rrw-usernote-type-wrap">${renderNoteTypeBadge(noteType, "rrw-note-type-pill", typeMeta)}</div>
+            <div class="rrw-usernote-meta-and-types">
+
+              <div class="rrw-usernote-meta">${escapeHtml(dateText)}</div>
+
+              <div class="rrw-usernote-type-wrap">${renderNoteTypeBadge(noteType, "rrw-note-type-pill", typeMeta)}${sourceBadgeHtml}</div>
+
+            </div>
+
+            ${deleteButtonHtml}
+
+          </div>
 
           ${noteLink ? `<a class="rrw-usernote-link" href="${escapeHtml(noteLink)}" target="_blank" rel="noreferrer">Source: ${escapeHtml(noteLink)}</a>` : ""}
 
-          <textarea data-un-note-id="${escapeHtml(noteId)}" rows="3">${escapeHtml(noteText)}</textarea>
-
-          <label class="rrw-field">
-
-            <span>Type</span>
-
-            <select data-un-note-type-id="${escapeHtml(noteId)}">
-
-              ${noteTypes
-
-                .map((value) => {
-
-                  const label = String(typeMeta.labels[String(value).toLowerCase()] || value);
-
-                  return `<option value="${escapeHtml(value)}" ${value === noteType ? "selected" : ""}>${escapeHtml(label)}</option>`;
-
-                })
-
-                .join("")}
-
-            </select>
-
-          </label>
-
-          <div class="rrw-usernote-row-actions">
-
-            <button type="button" class="rrw-btn rrw-btn-secondary" data-un-save-id="${escapeHtml(noteId)}" ${state.saving ? "disabled" : ""}>Save note</button>
-
-            <button type="button" class="rrw-btn rrw-btn-danger" data-un-delete-id="${escapeHtml(noteId)}" ${state.saving ? "disabled" : ""}>Delete note</button>
-
-          </div>
+          <div class="rrw-usernote-text-display">${escapeHtml(noteText)}</div>
 
         </article>
 
@@ -7425,115 +8811,13 @@ function renderUsernotesEditor() {
 
 
 
-  modal.querySelectorAll("[data-un-save-id]").forEach((button) => {
-
-    button.addEventListener("click", async (event) => {
-
-      if (!usernotesEditorState) {
-
-        return;
-
-      }
-
-      const noteId = event.currentTarget.getAttribute("data-un-save-id");
-
-      if (!noteId) {
-
-        return;
-
-      }
-
-      const textarea = modal.querySelector(`[data-un-note-id="${CSS.escape(noteId)}"]`);
-
-      const typeSelect = modal.querySelector(`[data-un-note-type-id="${CSS.escape(noteId)}"]`);
-
-      const nextText = String(textarea?.value || "").trim();
-
-      const selectedType = String(typeSelect?.value || "none").trim() || "none";
-
-      if (!nextText) {
-
-        usernotesEditorState.error = "Note text cannot be empty.";
-
-        renderUsernotesEditor();
-
-        return;
-
-      }
-
-
-
-      try {
-
-        usernotesEditorState.saving = true;
-
-        usernotesEditorState.error = "";
-
-        usernotesEditorState.status = "";
-
-        renderUsernotesEditor();
-
-
-
-        const updated = await updateUsernoteViaReddit(
-
-          usernotesEditorState.subreddit,
-
-          usernotesEditorState.username,
-
-          noteId,
-
-          nextText,
-
-          selectedType,
-
-        );
-
-        clearUsernotesCache(usernotesEditorState.subreddit, usernotesEditorState.username);
-
-        usernotesEditorState.notes = Array.isArray(updated?.notes) ? updated.notes : [];
-
-        usernotesEditorState.noteTypes = Array.isArray(updated?.note_types) ? updated.note_types : ["none"];
-
-        usernotesEditorState.noteTypeColors = updated?.note_type_colors && typeof updated.note_type_colors === "object" ? updated.note_type_colors : {};
-
-        usernotesEditorState.noteTypeLabels = updated?.note_type_labels && typeof updated.note_type_labels === "object" ? updated.note_type_labels : {};
-
-        usernotesEditorState.status = "Note updated.";
-
-        if (typeof usernotesEditorState.onUpdated === "function") {
-
-          usernotesEditorState.onUpdated(updated);
-
-        }
-
-      } catch (error) {
-
-        usernotesEditorState.error = error instanceof Error ? error.message : String(error);
-
-      } finally {
-
-        if (usernotesEditorState) {
-
-          usernotesEditorState.saving = false;
-
-          renderUsernotesEditor();
-
-        }
-
-      }
-
-    });
-
-  });
-
-
-
   modal.querySelectorAll("[data-un-delete-id]").forEach((button) => {
 
     button.addEventListener("click", async (event) => {
 
       if (!usernotesEditorState) {
+
+        console.log("[ModBox] Delete: No editor state");
 
         return;
 
@@ -7543,7 +8827,11 @@ function renderUsernotesEditor() {
 
       const noteId = event.currentTarget.getAttribute("data-un-delete-id");
 
+      console.log("[ModBox] Delete button clicked, noteId:", noteId);
+
       if (!noteId) {
+
+        console.log("[ModBox] Delete: No noteId found");
 
         return;
 
@@ -7551,11 +8839,27 @@ function renderUsernotesEditor() {
 
 
 
-      const confirmed = window.confirm("Delete this usernote? This cannot be undone.");
+      // Find the note to determine its source
 
-      if (!confirmed) {
+      const targetNote = (usernotesEditorState.notes || []).find((note) => String(note.id || note.time || "") === noteId);
 
-        return;
+      const noteSource = targetNote?.source || "Modbox";
+
+      console.log("[ModBox] Target note:", targetNote, "source:", noteSource);
+
+
+
+      // Show delete confirmation with system selection
+
+      const shouldDelete = await showUsernotesDeleteConfirmation(noteSource);
+
+      console.log("[ModBox] Delete confirmation result:", shouldDelete);
+
+      if (shouldDelete === null) {
+
+        console.log("[ModBox] Delete cancelled by user");
+
+        return; // User cancelled
 
       }
 
@@ -7573,7 +8877,11 @@ function renderUsernotesEditor() {
 
 
 
-        const updated = await deleteUsernoteViaReddit(
+        console.log("[ModBox] Calling deleteUsernoteViaBothSystems with noteId:", noteId, "source:", shouldDelete);
+
+        // Use dual-delete function for merged notes, pass source parameter
+
+        const deleteResults = await deleteUsernoteViaBothSystems(
 
           usernotesEditorState.subreddit,
 
@@ -7581,29 +8889,73 @@ function renderUsernotesEditor() {
 
           noteId,
 
+          shouldDelete, // null for both, "Modbox" for Toolbox only, "reddit" for native only
+
         );
+
+        console.log("[ModBox] Delete results:", deleteResults);
+
+
+
+        // Check if deletion succeeded from at least one system
+
+        const deleteSuccessful = deleteResults.toolbox.success || deleteResults.native.success;
+
+        if (!deleteSuccessful) {
+
+          throw new Error("Failed to delete note from all systems");
+
+        }
 
 
 
         clearUsernotesCache(usernotesEditorState.subreddit, usernotesEditorState.username);
 
-        usernotesEditorState.notes = Array.isArray(updated?.notes) ? updated.notes : [];
+        
 
-        usernotesEditorState.noteTypes = Array.isArray(updated?.note_types) ? updated.note_types : ["none"];
+        // Update UI with results
 
-        usernotesEditorState.noteTypeColors = updated?.note_type_colors && typeof updated.note_type_colors === "object" ? updated.note_type_colors : {};
+        if (deleteResults.payload) {
 
-        usernotesEditorState.noteTypeLabels = updated?.note_type_labels && typeof updated.note_type_labels === "object" ? updated.note_type_labels : {};
+          usernotesEditorState.notes = Array.isArray(deleteResults.payload?.notes) ? deleteResults.payload.notes : [];
 
-        usernotesEditorState.status = "Note deleted.";
+          usernotesEditorState.noteTypes = Array.isArray(deleteResults.payload?.note_types) ? deleteResults.payload.note_types : ["none"];
+
+          usernotesEditorState.noteTypeColors = deleteResults.payload?.note_type_colors && typeof deleteResults.payload.note_type_colors === "object" ? deleteResults.payload.note_type_colors : {};
+
+          usernotesEditorState.noteTypeLabels = deleteResults.payload?.note_type_labels && typeof deleteResults.payload.note_type_labels === "object" ? deleteResults.payload.note_type_labels : {};
+
+        }
+
+
+
+        // Show status about what was deleted
+
+        const deletedFrom = [];
+
+        if (deleteResults.toolbox.success) deletedFrom.push("Toolbox");
+
+        if (deleteResults.native.success) deletedFrom.push("native");
+
+        usernotesEditorState.status = deletedFrom.length > 0 
+
+          ? `Note deleted from: ${deletedFrom.join(", ")}.`
+
+          : "Note deleted.";
+
+        console.log("[ModBox] Delete complete. Status:", usernotesEditorState.status);
+
+
 
         if (typeof usernotesEditorState.onUpdated === "function") {
 
-          usernotesEditorState.onUpdated(updated);
+          usernotesEditorState.onUpdated(deleteResults.payload);
 
         }
 
       } catch (error) {
+
+        console.error("[ModBox] Delete error:", error);
 
         usernotesEditorState.error = error instanceof Error ? error.message : String(error);
 
@@ -7673,7 +9025,7 @@ function renderUsernotesEditor() {
 
 
 
-        const updated = await addUsernoteViaReddit(
+        const writeResults = await addUsernoteViaBothSystems(
 
           usernotesEditorState.subreddit,
 
@@ -7689,19 +9041,35 @@ function renderUsernotesEditor() {
 
         clearUsernotesCache(usernotesEditorState.subreddit, usernotesEditorState.username);
 
-        usernotesEditorState.notes = Array.isArray(updated?.notes) ? updated.notes : [];
+        
 
-        usernotesEditorState.noteTypes = Array.isArray(updated?.note_types) ? updated.note_types : ["none"];
+        // Show status about which systems succeeded
 
-        usernotesEditorState.noteTypeColors = updated?.note_type_colors && typeof updated.note_type_colors === "object" ? updated.note_type_colors : {};
+        const addedTo = [];
 
-        usernotesEditorState.noteTypeLabels = updated?.note_type_labels && typeof updated.note_type_labels === "object" ? updated.note_type_labels : {};
+        if (writeResults.toolbox.success) addedTo.push("Toolbox");
 
-        usernotesEditorState.status = "Note added.";
+        if (writeResults.native.success) addedTo.push("native");
+
+        
+
+        if (writeResults.payload) {
+
+          usernotesEditorState.notes = Array.isArray(writeResults.payload?.notes) ? writeResults.payload.notes : [];
+
+          usernotesEditorState.noteTypes = Array.isArray(writeResults.payload?.note_types) ? writeResults.payload.note_types : ["none"];
+
+          usernotesEditorState.noteTypeColors = writeResults.payload?.note_type_colors && typeof writeResults.payload.note_type_colors === "object" ? writeResults.payload.note_type_colors : {};
+
+          usernotesEditorState.noteTypeLabels = writeResults.payload?.note_type_labels && typeof writeResults.payload.note_type_labels === "object" ? writeResults.payload.note_type_labels : {};
+
+        }
+
+        usernotesEditorState.status = addedTo.length > 0 ? `Note added to: ${addedTo.join(", ")}.` : "Note added.";
 
         if (typeof usernotesEditorState.onUpdated === "function") {
 
-          usernotesEditorState.onUpdated(updated);
+          usernotesEditorState.onUpdated(writeResults.payload);
 
         }
 
@@ -7769,7 +9137,7 @@ async function openUsernotesEditor(context) {
 
     const stateRef = usernotesEditorState;
 
-    const data = await fetchUsernotes(stateRef.subreddit, stateRef.username, true);
+    const data = await fetchUsernotesWithNativeViaReddit(stateRef.subreddit, stateRef.username, true);
 
     if (!usernotesEditorState || usernotesEditorState !== stateRef) {
 
@@ -7919,7 +9287,7 @@ async function refreshUsernoteChipsForUser(subreddit, username, payload = null) 
 
       clearUsernotesCache(cleanSubreddit, cleanUser);
 
-      latestPayload = await fetchUsernotes(cleanSubreddit, cleanUser, true);
+      latestPayload = await fetchUsernotesWithNativeViaReddit(cleanSubreddit, cleanUser, true);
 
     } catch {
 
@@ -8017,7 +9385,7 @@ async function setupInlineUsernoteChip(chip, context) {
 
   try {
 
-    const payload = await fetchUsernotes(subreddit, username, false);
+    const payload = await fetchUsernotesWithNativeViaReddit(subreddit, username, false);
 
     renderInlineUsernoteChip(chip, payload);
 
@@ -10287,6 +11655,32 @@ function injectStyles() {
 
 
 
+    .rrw-usernote-header-row {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 6px;
+
+    }
+
+
+
+    .rrw-usernote-meta-and-types {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 4px;
+
+    }
+
+
+
     .rrw-usernote-type-wrap {
 
       display: flex;
@@ -10304,6 +11698,22 @@ function injectStyles() {
       font-size: 0.79rem;
 
       line-height: 1.3;
+
+    }
+
+
+
+    .rrw-usernote-text-display {
+
+      font-size: 0.95rem;
+
+      line-height: 1.4;
+
+      color: var(--rrw-text);
+
+      word-wrap: break-word;
+
+      white-space: pre-wrap;
 
     }
 
@@ -10355,7 +11765,7 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 6px;
+      gap: 4px;
 
       border: 1px solid var(--rrw-border);
 
@@ -10363,7 +11773,7 @@ function injectStyles() {
 
       background: var(--rrw-field-bg);
 
-      padding: 10px;
+      padding: 8px;
 
     }
 
@@ -10373,7 +11783,7 @@ function injectStyles() {
 
       margin: 0;
 
-      font-size: 0.88rem;
+      font-size: 0.8rem;
 
     }
 
@@ -10383,9 +11793,9 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 6px;
+      gap: 4px;
 
-      font-size: 0.86rem;
+      font-size: 0.8rem;
 
       color: var(--rrw-text);
 
@@ -10401,7 +11811,7 @@ function injectStyles() {
 
       gap: 8px;
 
-      font-size: 0.85rem;
+      font-size: 0.8rem;
 
     }
 
@@ -11087,13 +12497,23 @@ function injectStyles() {
 
       color: var(--rrw-muted);
 
-      font-size: 0.84rem;
+      font-size: 0.75rem;
 
       font-weight: 600;
 
-      padding: 6px 10px;
+      padding: 4px 8px;
 
       cursor: pointer;
+
+      white-space: nowrap;
+
+      min-height: 26px;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
 
     }
 
@@ -11193,10 +12613,6 @@ function injectStyles() {
 
       overflow: hidden;
 
-      -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-
-      mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-
     }
 
 
@@ -11207,17 +12623,17 @@ function injectStyles() {
 
       border: none;
 
-      padding: 2px 0;
+      padding: 0;
 
-      font-size: 0.78rem;
+      font-size: 0.7rem;
 
       color: var(--rrw-link);
 
       cursor: pointer;
 
-      display: block;
+      display: inline;
 
-      margin-top: 2px;
+      margin-top: 0;
 
     }
 
@@ -11643,7 +13059,7 @@ function injectStyles() {
 
       overflow-y: auto;
 
-      max-height: 320px;
+      max-height: none;
 
     }
 
@@ -11727,7 +13143,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 8px;
+      gap: 4px;
 
       flex-wrap: wrap;
 
@@ -11749,23 +13165,9 @@ function injectStyles() {
 
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 
-      gap: 8px;
+      gap: 4px;
 
       width: 100%;
-
-    }
-
-
-
-    .rrw-quick-action-btn {
-
-      width: 100%;
-
-      justify-content: flex-start;
-
-      text-align: left;
-
-      min-height: 34px;
 
     }
 
@@ -11793,7 +13195,7 @@ function injectStyles() {
 
       font-size: 0.85rem;
 
-      line-height: 1.15;
+      line-height: 1.3;
 
       padding: 6px 11px;
 
@@ -11834,6 +13236,34 @@ function injectStyles() {
     .rrw-btn-danger {
 
       background: #7f1d1d;
+
+    }
+
+
+
+    .rrw-quick-action-btn {
+
+      display: flex !important;
+
+      width: 100%;
+
+      justify-content: center !important;
+
+      align-items: center !important;
+
+      text-align: center !important;
+
+      min-height: 48px;
+
+      padding: 6px 8px;
+
+      white-space: normal !important;
+
+      line-height: 1.3 !important;
+
+      flex-wrap: wrap;
+
+      font-size: 0.75rem !important;
 
     }
 
@@ -12081,7 +13511,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 8px;
+      gap: 4px;
 
       padding: 10px 16px 0;
 
@@ -19871,7 +21301,7 @@ function renderRemovalConfigEditor() {
 
             <label class="rrw-field">
 
-              <span>Queue bar link host</span>
+              <span>Open on Reddit link host</span>
 
               <select data-ext-setting="queue_bar_link_host">
 
@@ -26957,15 +28387,39 @@ function ensureOverlayRoot() {
 
   if (root) {
 
+    console.log("[ModBox] ensureOverlayRoot: Found existing root");
+
     return root;
 
   }
+
+  console.log("[ModBox] ensureOverlayRoot: Creating new root");
 
   root = document.createElement("div");
 
   root.id = OVERLAY_ROOT_ID;
 
-  document.documentElement.appendChild(root);
+  console.log("[ModBox] ensureOverlayRoot: Appending to body");
+
+  // Append to body instead of documentElement so the element is in the visible document flow
+
+  if (document.body) {
+
+    document.body.appendChild(root);
+
+  } else {
+
+    // Fallback if body doesn't exist yet
+
+    document.documentElement.appendChild(root);
+
+  }
+
+  console.log("[ModBox] ensureOverlayRoot: Root appended, checking DOM:");
+
+  console.log("[ModBox]   - In body:", document.body ? document.body.contains(root) : "no body");
+
+  console.log("[ModBox]   - Root parent:", root.parentElement?.id || root.parentElement?.tagName);
 
   
 
@@ -28119,7 +29573,7 @@ function renderOverlay() {
 
             ` : ""}
 
-            ${resolved?.permalink ? `<a href="${escapeHtml(resolved.permalink)}" target="_blank" rel="noreferrer">Open on Reddit</a>` : ""}
+            ${resolved?.permalink ? `<a href="${escapeHtml(buildRedditUrl(resolved.permalink, preferredRedditLinkHost))}" target="_blank" rel="noreferrer">Open on Reddit</a>` : ""}
 
           </div>
 
@@ -28642,6 +30096,30 @@ function renderOverlay() {
     }
 
   });
+
+
+
+  // Hide expand button if target body isn't actually overflowing
+
+  const targetBody = root.querySelector(".rrw-target-body");
+
+  const expandBtn = root.querySelector("#rrw-target-card-expand");
+
+  if (targetBody && expandBtn) {
+
+    // Check if collapsed content has enough height to actually overflow
+
+    const tempClass = ".rrw-target-body--collapsed";
+
+    const maxHeightCalc = 1.35 * 16 * 8; // 1.35em line-height * 16px base * 8 lines
+
+    if (targetBody.scrollHeight <= maxHeightCalc) {
+
+      expandBtn.style.display = "none";
+
+    }
+
+  }
 
 
 
@@ -35659,7 +37137,9 @@ function renderContextThreadRows(rows, targetCommentId = "") {
 
       const bodyHtml = getProfileBodyHtmlFromEntry(entry) || "<p>[deleted]</p>";
 
-      const permalink = data.permalink ? `https://www.reddit.com${data.permalink}` : "";
+      const permalinkPath = data.permalink ? data.permalink : "";
+
+      const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
 
       const depth = Math.max(0, Number(row.depth || 0));
 
@@ -37213,7 +38693,9 @@ function renderProfileEntries(items) {
 
       if (entry?.kind === "t1") {
 
-        const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
+        const permalinkPath = entry.data?.permalink ? entry.data.permalink : "";
+
+        const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
 
         const bodyHtml = getProfileBodyHtmlFromEntry(entry);
 
@@ -37253,7 +38735,9 @@ function renderProfileEntries(items) {
 
       if (entry?.kind === "t3") {
 
-        const permalink = entry.data?.permalink ? `https://www.reddit.com${entry.data.permalink}` : "";
+        const permalinkPath = entry.data?.permalink ? entry.data.permalink : "";
+
+        const permalink = permalinkPath ? buildRedditUrl(permalinkPath, preferredRedditLinkHost) : "";
 
         const selftextHtml = getProfileBodyHtmlFromEntry(entry);
 
