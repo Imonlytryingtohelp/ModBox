@@ -145,7 +145,7 @@ const QUEUE_BAR_BACKGROUND_POLL_INTERVAL_MS = 180000;
 
 const QUEUE_BAR_CONTEXT_TTL_MS = 120000;
 
-const BACKGROUND_REQUEST_TIMEOUT_MS = 30000;
+const BACKGROUND_REQUEST_TIMEOUT_MS = 20000;
 
 const BACKGROUND_REQUEST_SCHEDULER_MAX_CONCURRENCY = 2;
 
@@ -2135,40 +2135,6 @@ function sendMessage(message) {
 
 
 
-// ============================================================================
-
-// SESSION ERROR TRACKING
-
-// ============================================================================
-
-const sessionErrorsLogged = new Set();
-
-
-
-function shouldLogError(errorKey) {
-
-  if (sessionErrorsLogged.has(errorKey)) {
-
-    return false;
-
-  }
-
-  sessionErrorsLogged.add(errorKey);
-
-  return true;
-
-}
-
-
-
-// ============================================================================
-
-// TIMEOUT UTILITIES
-
-// ============================================================================
-
-
-
 function withTimeout(promise, timeoutMs, timeoutMessage) {
 
   const ms = Number(timeoutMs);
@@ -4121,47 +4087,23 @@ async function fetchBanStatusViaReddit(subreddit, username) {
 
 // Cache for native modnotes to prevent rate limiting from repeated API calls
 
-// Cache entries expire after 15 minutes (increased to reduce rate limit hits)
+// Cache entries expire after 5 minutes
+
+
 
 const nativeModnotesCache = new Map();
 
 const NATIVE_MODNOTES_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-
-
 // Fallback cache for stale data when rate limited (persists for 1 hour)
-
 const nativeModnotesFallbackCache = new Map();
-
 const NATIVE_MODNOTES_FALLBACK_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-
-
 // Track in-flight requests to deduplicate concurrent requests for the same user
-
 const nativeModnotesInFlightRequests = new Map();
 
-
-
 // Track failed attempts per key for exponential backoff
-
 const nativeModnotesRetryTracking = new Map();
-
-
-
-// Throttle requests to prevent rate limiting: only 1 request per 500ms globally
-
-let lastNativeModnotesRequestTime = 0;
-
-const NATIVE_MODNOTES_REQUEST_THROTTLE_MS = 500;
-
-
-
-// Global rate limit cooldown: when hit, stop trying for N seconds
-
-let nativeModnotesRateLimitCooldownUntil = 0;
-
-const NATIVE_MODNOTES_COOLDOWN_MS = 20 * 1000; // 20 second cooldown after rate limit
 
 
 
@@ -4211,24 +4153,6 @@ function setNativeModnotesCache(subreddit, username, notes) {
 
   
 
-  // Also update fallback cache so we can use stale data if rate limited
-
-  nativeModnotesFallbackCache.set(key, {
-
-    value: notes,
-
-    expiresAt: Date.now() + NATIVE_MODNOTES_FALLBACK_CACHE_TTL_MS,
-
-  });
-
-  
-
-  // Reset retry tracking on successful fetch
-
-  nativeModnotesRetryTracking.delete(key);
-
-  
-
   // Prune old entries if cache gets too large
 
   if (nativeModnotesCache.size > 100) {
@@ -4251,31 +4175,7 @@ function setNativeModnotesCache(subreddit, username, notes) {
 
 
 
-function isRateLimitError(error) {
-
-  const message = getSafeErrorMessage(error);
-
-  return message.includes("429") || message.includes("too many requests") || message.includes("rate limit");
-
-}
-
-
-
-function calculateBackoffDelay(retryCount) {
-
-  // Exponential backoff: 1s, 2s, 4s, 8s base, plus random jitter
-
-  const baseDelay = Math.min(1000 * Math.pow(2, Math.max(0, retryCount - 1)), 30000);
-
-  const jitter = Math.random() * 1000; // Up to 1s random jitter
-
-  return baseDelay + jitter;
-
-}
-
-
-
-async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0) {
+async function fetchNativeModnotesViaReddit(subreddit, username) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -4303,32 +4203,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
 
 
 
-  // Check if we're in a rate limit cooldown - if so, only return fallback cache
-
-  const now = Date.now();
-
-  if (nativeModnotesRateLimitCooldownUntil > now) {
-
-    const cooldownRemaining = Math.round((nativeModnotesRateLimitCooldownUntil - now) / 1000);
-
-    console.log(`[ModBox] In rate limit cooldown (${cooldownRemaining}s remaining), returning fallback cache only`);
-
-    const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
-
-    const fallback = nativeModnotesFallbackCache.get(cacheKey);
-
-    if (fallback) {
-
-      return fallback.value;
-
-    }
-
-    return [];
-
-  }
-
-
-
   // Check if a request is already in-flight for this user
 
   const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
@@ -4340,24 +4214,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
     return nativeModnotesInFlightRequests.get(cacheKey);
 
   }
-
-
-
-  // Apply global throttling to prevent rate limiting
-
-  const timeSinceLastRequest = now - lastNativeModnotesRequestTime;
-
-  if (timeSinceLastRequest < NATIVE_MODNOTES_REQUEST_THROTTLE_MS) {
-
-    const waitTime = NATIVE_MODNOTES_REQUEST_THROTTLE_MS - timeSinceLastRequest;
-
-    console.log("[ModBox] Throttling native modnotes request, waiting", Math.round(waitTime), "ms");
-
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-
-  }
-
-  lastNativeModnotesRequestTime = Date.now();
 
 
 
@@ -4373,25 +4229,7 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
 
       
 
-      // Use scheduled request with longer cache TTL to reduce hits
-
-      const payload = await requestJsonViaBackgroundScheduled(
-
-        url,
-
-        { oauth: true },
-
-        {
-
-          cacheTtlMs: 30 * 60 * 1000, // 30 minute cache (very long to reduce requests)
-
-          priority: 1,
-
-          dedupe: true,
-
-        }
-
-      );
+      const payload = await requestJsonViaBackground(url, { oauth: true });
 
       console.log("[ModBox] Native modnotes response:", payload);
 
@@ -4467,47 +4305,7 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
 
       const errorMsg = getSafeErrorMessage(error);
 
-      const isRateLimit = isRateLimitError(error);
-
-      const errorKey = `native-modnotes-${isRateLimit ? 'ratelimit' : 'fetch'}`;
-
-      
-
-      if (shouldLogError(errorKey)) {
-
-        console.error("[ModBox] Native modnotes fetch failed, falling back to Toolbox only. Error:", errorMsg, isRateLimit ? "(RATE LIMITED)" : "");
-
-      }
-
-      
-
-      if (isRateLimit) {
-
-        // Set global cooldown to back off completely
-
-        console.warn("[ModBox] Rate limit hit! Setting cooldown for 20 seconds to respect Reddit's rate limits");
-
-        nativeModnotesRateLimitCooldownUntil = Date.now() + NATIVE_MODNOTES_COOLDOWN_MS;
-
-      }
-
-      
-
-      // On failure, try to return fallback cached data if available
-
-      const fallbackKey = cacheKey;
-
-      const fallback = nativeModnotesFallbackCache.get(fallbackKey);
-
-      if (fallback && fallback.value.length > 0) {
-
-        console.warn("[ModBox] Using stale cached native modnotes due to fetch failure");
-
-        return fallback.value;
-
-      }
-
-      
+      console.error("[ModBox] Error fetching native modnotes:", errorMsg);
 
       return [];
 
@@ -7769,25 +7567,13 @@ async function fetchUsernotesWithNativeViaReddit(subreddit, username, forceRefre
 
     // Fetch both Toolbox and native notes in parallel
 
-    // NOTE: Native notes are currently disabled by default due to Reddit rate limits
-
-    // Only fetch them if explicitly requested (forceRefresh = true indicates explicit request)
-
-    const nativeNotesPromise = forceRefresh 
-
-      ? fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser)
-
-      : Promise.resolve([]);
-
-
-
     const [notesDoc, typeMeta, nativeNotes] = await Promise.all([
 
       loadSubredditUsernotesFromWiki(cleanSubreddit),
 
       fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit),
 
-      nativeNotesPromise,
+      fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser),
 
     ]);
 
@@ -9619,17 +9405,9 @@ async function setupInlineUsernoteChip(chip, context) {
 
     const isPermissionError = errorMsg.includes("Forbidden") || errorMsg.includes("MAY_NOT_VIEW");
 
-    // Only log error once per session (handled by shouldLogError which is imported)
-
-    if (!isPermissionError && typeof shouldLogError === "function" && shouldLogError("usernotes-load-failed")) {
+    if (!isPermissionError) {
 
       console.error("[ModBox] Failed to load usernotes:", error);
-
-    } else if (!isPermissionError && typeof shouldLogError !== "function") {
-
-      // Fallback if shouldLogError isn't available yet - suppress the error to reduce noise
-
-      console.debug("[ModBox] Error loading usernotes (suppressed after first occurrence):", errorMsg);
 
     }
 
@@ -11463,7 +11241,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: auto;
+      z-index: 100;
 
       pointer-events: auto;
 
@@ -26563,7 +26341,7 @@ function createQueueModlogDisplay(entries) {
 
 
 
-  // Format entries as a single line: "action by /u/mod 22m ago - details action by /u/mod 1h ago - details"
+  // Format entries as a single line: "action by /u/mod 22m ago - details | action by /u/mod 1h ago - details"
 
   const entryTexts = entries.map((entry) => {
 

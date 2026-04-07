@@ -1,0 +1,72 @@
+{
+    "manifest_version":  3,
+    "name":  "ModBox",
+    "description":  "Reddit moderation tools.",
+    "version":  "1.4.2",
+    "icons":  {
+                  "16":  "assets/icon-16.png",
+                  "32":  "assets/icon-32.png",
+                  "48":  "assets/icon-48.png",
+                  "128":  "assets/icon-128.png"
+              },
+    "permissions":  [
+                        "storage",
+                        "cookies"
+                    ],
+    "host_permissions":  [
+                             "https://www.reddit.com/*",
+                             "https://old.reddit.com/*",
+                             "https://sh.reddit.com/*",
+                             "https://mod.reddit.com/*",
+                             "https://oauth.reddit.com/*"
+                         ],
+    "background":  {
+                       "service_worker":  "background.js",
+                       "scripts":  [
+                                       "background.js"
+                                   ]
+                   },
+    "action":  {
+                   "default_title":  "ModBox",
+                   "default_icon":  {
+                                        "16":  "assets/icon-16.png",
+                                        "32":  "assets/icon-32.png",
+                                        "48":  "assets/icon-48.png",
+                                        "128":  "assets/icon-128.png"
+                                    }
+               },
+    "content_scripts":  [
+                            {
+                                "matches":  [
+                                                "https://www.reddit.com/*",
+                                                "https://old.reddit.com/*",
+                                                "https://sh.reddit.com/*"
+                                            ],
+                                "js":  [
+                                           "content.js"
+                                       ],
+                                "run_at":  "document_idle"
+                            }
+                        ],
+    "web_accessible_resources":  [
+                                     {
+                                         "resources":  [
+                                                           "assets/modbox-logo.svg"
+                                                       ],
+                                         "matches":  [
+                                                         "https://www.reddit.com/*",
+                                                         "https://old.reddit.com/*",
+                                                         "https://sh.reddit.com/*"
+                                                     ]
+                                     }
+                                 ],
+    "browser_specific_settings":  {
+                                      "gecko":  {
+                                                    "id":  "modbox@slfhstd.uk",
+                                                    "strict_min_version":  "128.0",
+                                                    "data_collection_permissions":  [
+                                                                                        "website_activity"
+                                                                                    ]
+                                                }
+                                  }
+}
