@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.2.2 - Fixes
+
+### Fixed
+
+- **Usernote author display** - Restored moderator name display in usernote popup headers (shows as "u/moderatorname · date")
+
 ## 1.2.0 - Reddit Native Usernotes
 
 ### Added

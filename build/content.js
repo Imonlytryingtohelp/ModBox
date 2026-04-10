@@ -8887,6 +8887,8 @@ function renderUsernotesEditor() {
 
       const noteLink = String(note.link || "").trim();
 
+      const noteMod = String(note.mod || "");
+
       const noteSource = String(note.source || "Modbox");
 
       const sourceBadgeHtml = `<span class="rrw-note-source-badge">${escapeHtml(noteSource)}</span>`;
@@ -8907,7 +8909,7 @@ function renderUsernotesEditor() {
 
             <div class="rrw-usernote-meta-and-types">
 
-              <div class="rrw-usernote-meta">${escapeHtml(dateText)}</div>
+              <div class="rrw-usernote-meta">${noteMod ? `u/${escapeHtml(noteMod)} &middot; ` : ""}${escapeHtml(dateText)}</div>
 
               <div class="rrw-usernote-type-wrap">${renderNoteTypeBadge(noteType, "rrw-note-type-pill", typeMeta)}${sourceBadgeHtml}</div>
 

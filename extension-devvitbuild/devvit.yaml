@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Devvit
+metadata:
+  name: DevBox - ModBox Config Manager
+  description: Companion app for ModBox - manage removal reasons, usernotes config, and moderation settings
+  author: ModBox Team
+  namespace: devbox
+  version: 1.0.0
+
+permissions:
+  - name: moderation
+    description: Perform moderation actions
+  - name: subreddit_id
+    description: Access subreddit ID
+  - name: kvstore
+    description: Store configuration data
+
+subreddits:
+  onLoad: |
+    Enable the DevBox configuration dashboard for your subreddit.
+    This companion app works with the ModBox browser extension to provide
+    centralized configuration management for removal reasons, usernotes types,
+    and moderation automation.
+
+preview:
+  - type: block
+    name: Main Menu
+
+blocks:
+  - name: Main Menu
+    description: DevBox main configuration interface
+  - name: ConfigEditor
+    description: Remove reasons and usernotes editor
+  - name: Dashboard
+    description: Mod statistics and automation dashboard
