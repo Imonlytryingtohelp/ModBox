@@ -1148,7 +1148,7 @@ function injectStyles() {
     .rrw-header-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 2px;
     }
 
     .rrw-overlay-header h2 {
@@ -1169,6 +1169,7 @@ function injectStyles() {
       line-height: 1.2;
       cursor: pointer;
       transition: color 0.15s, border-color 0.15s;
+      margin: 0 !important;
     }
 
     .rrw-refresh-btn:hover {
@@ -1226,6 +1227,7 @@ function injectStyles() {
       line-height: 1.2;
       font-size: 0.84rem;
       cursor: pointer;
+      margin: 0 !important;
     }
 
     .rrw-overlay-body {
@@ -1236,7 +1238,7 @@ function injectStyles() {
 
     .rrw-tabs {
       display: flex;
-      gap: 8px;
+      gap: 2px;
       border-bottom: 1px solid var(--rrw-soft-border);
       padding-bottom: 8px;
     }
@@ -1257,6 +1259,7 @@ function injectStyles() {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      margin: 0 !important;
     }
 
     .rrw-tab-btn--active {
@@ -1269,7 +1272,7 @@ function injectStyles() {
       position: sticky;
       bottom: 0;
       display: grid;
-      gap: 10px;
+      gap: 6px;
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
       border-top: 1px solid var(--rrw-soft-border);
       margin: 4px -16px -16px;
@@ -1570,9 +1573,9 @@ function injectStyles() {
     }
 
     .rrw-actions {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
+      display: flex !important;
+      gap: 2px !important;
+      flex-wrap: wrap !important;
     }
 
     .rrw-actions--inline {
@@ -1581,26 +1584,27 @@ function injectStyles() {
 
     .rrw-quick-actions-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 4px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 2px;
       width: 100%;
     }
 
     .rrw-btn {
-      appearance: none;
-      -webkit-appearance: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 0;
-      border-radius: 8px;
-      color: #fff;
-      font-weight: 600;
-      font-size: 0.85rem;
-      line-height: 1.3;
-      padding: 6px 11px;
-      min-height: 30px;
-      cursor: pointer;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      color: #fff !important;
+      font-weight: 600 !important;
+      font-size: 0.85rem !important;
+      line-height: 1.3 !important;
+      padding: 5px 9px !important;
+      min-height: 28px !important;
+      cursor: pointer !important;
+      margin: 0 !important;
     }
 
     .rrw-btn:disabled {
@@ -1622,16 +1626,17 @@ function injectStyles() {
 
     .rrw-quick-action-btn {
       display: flex !important;
-      width: 100%;
+      width: 100% !important;
       justify-content: center !important;
       align-items: center !important;
       text-align: center !important;
-      min-height: 48px;
-      padding: 6px 8px;
+      min-height: 40px !important;
+      padding: 5px 8px !important;
       white-space: normal !important;
       line-height: 1.3 !important;
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
       font-size: 0.75rem !important;
+      margin: 0 !important;
     }
 
     .rrw-error {
@@ -1720,7 +1725,7 @@ function injectStyles() {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 2px;
       padding: 14px 16px;
       background: rgba(10, 18, 31, 0.98);
       position: sticky;
@@ -1755,7 +1760,7 @@ function injectStyles() {
 
     .rrw-removal-config-tabs {
       display: flex;
-      gap: 4px;
+      gap: 1px;
       padding: 10px 16px 0;
       background: rgba(10, 18, 31, 0.98);
       position: sticky;
@@ -1768,12 +1773,17 @@ function injectStyles() {
       border: 1px solid rgba(57, 86, 130, 0.5);
       border-bottom: 0;
       border-radius: 10px 10px 0 0;
-      padding: 8px 12px;
+      padding: 6px 10px;
       background: rgba(17, 29, 49, 0.9);
       color: #cfe1ff;
       cursor: pointer;
       font-size: 0.86rem;
       font-weight: 600;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      white-space: nowrap;
+      margin: 0 !important;
     }
 
     .rrw-removal-config-tab.is-active {

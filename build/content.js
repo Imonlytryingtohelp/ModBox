@@ -12525,7 +12525,7 @@ function injectStyles() {
 
       align-items: center;
 
-      gap: 6px;
+      gap: 2px;
 
     }
 
@@ -12566,6 +12566,8 @@ function injectStyles() {
       cursor: pointer;
 
       transition: color 0.15s, border-color 0.15s;
+
+      margin: 0 !important;
 
     }
 
@@ -12681,6 +12683,8 @@ function injectStyles() {
 
       cursor: pointer;
 
+      margin: 0 !important;
+
     }
 
 
@@ -12701,7 +12705,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 8px;
+      gap: 2px;
 
       border-bottom: 1px solid var(--rrw-soft-border);
 
@@ -12743,6 +12747,8 @@ function injectStyles() {
 
       justify-content: center;
 
+      margin: 0 !important;
+
     }
 
 
@@ -12767,7 +12773,7 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 10px;
+      gap: 6px;
 
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
 
@@ -13369,11 +13375,11 @@ function injectStyles() {
 
     .rrw-actions {
 
-      display: flex;
+      display: flex !important;
 
-      gap: 4px;
+      gap: 2px !important;
 
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
 
     }
 
@@ -13391,9 +13397,9 @@ function injectStyles() {
 
       display: grid;
 
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 
-      gap: 4px;
+      gap: 2px;
 
       width: 100%;
 
@@ -13403,33 +13409,35 @@ function injectStyles() {
 
     .rrw-btn {
 
-      appearance: none;
+      appearance: none !important;
 
-      -webkit-appearance: none;
+      -webkit-appearance: none !important;
 
-      display: inline-flex;
+      display: inline-flex !important;
 
-      align-items: center;
+      align-items: center !important;
 
-      justify-content: center;
+      justify-content: center !important;
 
-      border: 0;
+      border: 0 !important;
 
-      border-radius: 8px;
+      border-radius: 8px !important;
 
-      color: #fff;
+      color: #fff !important;
 
-      font-weight: 600;
+      font-weight: 600 !important;
 
-      font-size: 0.85rem;
+      font-size: 0.85rem !important;
 
-      line-height: 1.3;
+      line-height: 1.3 !important;
 
-      padding: 6px 11px;
+      padding: 5px 9px !important;
 
-      min-height: 30px;
+      min-height: 28px !important;
 
-      cursor: pointer;
+      cursor: pointer !important;
+
+      margin: 0 !important;
 
     }
 
@@ -13473,7 +13481,7 @@ function injectStyles() {
 
       display: flex !important;
 
-      width: 100%;
+      width: 100% !important;
 
       justify-content: center !important;
 
@@ -13481,17 +13489,19 @@ function injectStyles() {
 
       text-align: center !important;
 
-      min-height: 48px;
+      min-height: 40px !important;
 
-      padding: 6px 8px;
+      padding: 5px 8px !important;
 
       white-space: normal !important;
 
       line-height: 1.3 !important;
 
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
 
       font-size: 0.75rem !important;
+
+      margin: 0 !important;
 
     }
 
@@ -13669,7 +13679,7 @@ function injectStyles() {
 
       justify-content: space-between;
 
-      gap: 12px;
+      gap: 2px;
 
       padding: 14px 16px;
 
@@ -13739,7 +13749,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 4px;
+      gap: 1px;
 
       padding: 10px 16px 0;
 
@@ -13765,7 +13775,7 @@ function injectStyles() {
 
       border-radius: 10px 10px 0 0;
 
-      padding: 8px 12px;
+      padding: 6px 10px;
 
       background: rgba(17, 29, 49, 0.9);
 
@@ -13776,6 +13786,16 @@ function injectStyles() {
       font-size: 0.86rem;
 
       font-weight: 600;
+
+      display: flex !important;
+
+      align-items: center !important;
+
+      justify-content: center !important;
+
+      white-space: nowrap;
+
+      margin: 0 !important;
 
     }
 
