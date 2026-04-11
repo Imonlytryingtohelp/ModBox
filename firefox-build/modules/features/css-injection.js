@@ -458,7 +458,8 @@ function injectStyles() {
     .rrw-history-btn,
     .rrw-modlog-btn,
     .rrw-comment-nuke-btn,
-    .rrw-profile-btn {
+    .rrw-profile-btn,
+    .rrw-quick-actions-pill {
       display: inline-flex;
       align-items: center;
       padding: 1px 5px;
@@ -510,6 +511,14 @@ function injectStyles() {
     }
 
     .rrw-modlog-btn {
+      margin: 0;
+      min-width: 18px;
+      justify-content: center;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .rrw-quick-actions-pill {
       margin: 0;
       min-width: 18px;
       justify-content: center;
@@ -595,7 +604,8 @@ function injectStyles() {
     .rrw-history-btn:hover,
     .rrw-modlog-btn:hover,
     .rrw-comment-nuke-btn:hover,
-    .rrw-profile-btn:hover {
+    .rrw-profile-btn:hover,
+    .rrw-quick-actions-pill:hover {
       background: linear-gradient(180deg, #204a7d 0%, #153861 100%);
       border-color: #4f79b6;
       color: #eaf3ff;
@@ -608,7 +618,8 @@ function injectStyles() {
     .rrw-history-btn:focus-visible,
     .rrw-modlog-btn:focus-visible,
     .rrw-comment-nuke-btn:focus-visible,
-    .rrw-profile-btn:focus-visible {
+    .rrw-profile-btn:focus-visible,
+    .rrw-quick-actions-pill:focus-visible {
       outline: 2px solid #79a9ef;
       outline-offset: 1px;
     }
@@ -628,7 +639,8 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-history-btn,
     html[data-rrw-theme="light"] .rrw-modlog-btn,
     html[data-rrw-theme="light"] .rrw-comment-nuke-btn,
-    html[data-rrw-theme="light"] .rrw-profile-btn {
+    html[data-rrw-theme="light"] .rrw-profile-btn,
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill {
       border: 1px solid #c5d9f1;
       background: linear-gradient(180deg, #e8f1ff 0%, #d8e8ff 100%);
       color: #2c4a70;
@@ -638,7 +650,8 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-usernote-chip:hover,
     html[data-rrw-theme="light"] .rrw-history-btn:hover,
     html[data-rrw-theme="light"] .rrw-modlog-btn:hover,
-    html[data-rrw-theme="light"] .rrw-profile-btn:hover {
+    html[data-rrw-theme="light"] .rrw-profile-btn:hover,
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill:hover {
       background: linear-gradient(180deg, #d8e8ff 0%, #c8dcff 100%);
       border-color: #8fb3d9;
       color: #1a3a5c;
@@ -666,47 +679,6 @@ function injectStyles() {
       border-color: #e5a5a5 !important;
       background: linear-gradient(180deg, #ffe8e8 0%, #ffd8d8 100%) !important;
       color: #9a4a4a !important;
-    }
-
-    .rrw-qa-reply-pill {
-      display: inline-block;
-      padding: 3px 10px;
-      border: 1px solid #355a91;
-      border-radius: 4px;
-      background: linear-gradient(180deg, #173a63 0%, #102a4a 100%);
-      color: #d8e9ff;
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1.4;
-      cursor: pointer;
-      vertical-align: middle;
-      margin-left: 8px;
-      font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .rrw-qa-reply-pill:hover {
-      background: linear-gradient(180deg, #1e487a 0%, #143560 100%);
-      color: #eef4ff;
-      border-color: #6699cc;
-    }
-
-    .rrw-qa-reply-pill:focus-visible {
-      outline: 2px solid #79a9ef;
-      outline-offset: 1px;
-    }
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill {
-      border-color: #747c8e;
-      background: linear-gradient(180deg, #f0f2f5 0%, #e9ecf1 100%);
-      color: #2f5178;
-    }
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill:hover {
-      background: linear-gradient(180deg, #e9ecf1 0%, #dfe5ed 100%);
-      color: #1a3a5c;
-      border-color: #5a6b8f;
     }
 
     .rrw-inline-group.rrw-mm-pills {
@@ -870,6 +842,40 @@ function injectStyles() {
     .rrw-usernote-row-actions {
       display: flex;
       justify-content: flex-end;
+    }
+
+    .rrw-btn-trash {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: none;
+      color: var(--rrw-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+      padding: 4px 6px;
+      min-width: 28px;
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.15s, background-color 0.15s;
+    }
+
+    .rrw-btn-trash:hover {
+      color: #ff6b6b;
+      background-color: rgba(255, 107, 107, 0.1);
+    }
+
+    .rrw-btn-trash:active {
+      color: #ff5252;
+      background-color: rgba(255, 107, 107, 0.2);
+    }
+
+    .rrw-btn-trash:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .rrw-usernote-include-link {
@@ -1148,7 +1154,7 @@ function injectStyles() {
     .rrw-header-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 2px;
     }
 
     .rrw-overlay-header h2 {
@@ -1169,6 +1175,7 @@ function injectStyles() {
       line-height: 1.2;
       cursor: pointer;
       transition: color 0.15s, border-color 0.15s;
+      margin: 0 !important;
     }
 
     .rrw-refresh-btn:hover {
@@ -1226,6 +1233,7 @@ function injectStyles() {
       line-height: 1.2;
       font-size: 0.84rem;
       cursor: pointer;
+      margin: 0 !important;
     }
 
     .rrw-overlay-body {
@@ -1236,7 +1244,7 @@ function injectStyles() {
 
     .rrw-tabs {
       display: flex;
-      gap: 8px;
+      gap: 2px;
       border-bottom: 1px solid var(--rrw-soft-border);
       padding-bottom: 8px;
     }
@@ -1257,6 +1265,7 @@ function injectStyles() {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      margin: 0 !important;
     }
 
     .rrw-tab-btn--active {
@@ -1269,7 +1278,7 @@ function injectStyles() {
       position: sticky;
       bottom: 0;
       display: grid;
-      gap: 10px;
+      gap: 6px;
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
       border-top: 1px solid var(--rrw-soft-border);
       margin: 4px -16px -16px;
@@ -1570,9 +1579,9 @@ function injectStyles() {
     }
 
     .rrw-actions {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
+      display: flex !important;
+      gap: 2px !important;
+      flex-wrap: wrap !important;
     }
 
     .rrw-actions--inline {
@@ -1580,27 +1589,28 @@ function injectStyles() {
     }
 
     .rrw-quick-actions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 4px;
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
       width: 100%;
     }
 
     .rrw-btn {
-      appearance: none;
-      -webkit-appearance: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 0;
-      border-radius: 8px;
-      color: #fff;
-      font-weight: 600;
-      font-size: 0.85rem;
-      line-height: 1.3;
-      padding: 6px 11px;
-      min-height: 30px;
-      cursor: pointer;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      color: #fff !important;
+      font-weight: 600 !important;
+      font-size: 0.85rem !important;
+      line-height: 1.3 !important;
+      padding: 5px 9px !important;
+      min-height: 28px !important;
+      cursor: pointer !important;
+      margin: 0 !important;
     }
 
     .rrw-btn:disabled {
@@ -1622,16 +1632,17 @@ function injectStyles() {
 
     .rrw-quick-action-btn {
       display: flex !important;
-      width: 100%;
+      width: 100% !important;
       justify-content: center !important;
       align-items: center !important;
       text-align: center !important;
-      min-height: 48px;
-      padding: 6px 8px;
+      min-height: 50px !important;
+      padding: 6px 4px !important;
       white-space: normal !important;
-      line-height: 1.3 !important;
-      flex-wrap: wrap;
-      font-size: 0.75rem !important;
+      line-height: 1.2 !important;
+      flex-wrap: wrap !important;
+      font-size: 0.7rem !important;
+      margin: 0 !important;
     }
 
     .rrw-error {
@@ -1720,7 +1731,7 @@ function injectStyles() {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 2px;
       padding: 14px 16px;
       background: rgba(10, 18, 31, 0.98);
       position: sticky;
@@ -1755,7 +1766,7 @@ function injectStyles() {
 
     .rrw-removal-config-tabs {
       display: flex;
-      gap: 4px;
+      gap: 1px;
       padding: 10px 16px 0;
       background: rgba(10, 18, 31, 0.98);
       position: sticky;
@@ -1768,12 +1779,17 @@ function injectStyles() {
       border: 1px solid rgba(57, 86, 130, 0.5);
       border-bottom: 0;
       border-radius: 10px 10px 0 0;
-      padding: 8px 12px;
+      padding: 6px 10px;
       background: rgba(17, 29, 49, 0.9);
       color: #cfe1ff;
       cursor: pointer;
       font-size: 0.86rem;
       font-weight: 600;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      white-space: nowrap;
+      margin: 0 !important;
     }
 
     .rrw-removal-config-tab.is-active {

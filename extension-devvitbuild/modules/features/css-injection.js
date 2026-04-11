@@ -458,7 +458,8 @@ function injectStyles() {
     .rrw-history-btn,
     .rrw-modlog-btn,
     .rrw-comment-nuke-btn,
-    .rrw-profile-btn {
+    .rrw-profile-btn,
+    .rrw-quick-actions-pill {
       display: inline-flex;
       align-items: center;
       padding: 1px 5px;
@@ -510,6 +511,14 @@ function injectStyles() {
     }
 
     .rrw-modlog-btn {
+      margin: 0;
+      min-width: 18px;
+      justify-content: center;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .rrw-quick-actions-pill {
       margin: 0;
       min-width: 18px;
       justify-content: center;
@@ -595,7 +604,8 @@ function injectStyles() {
     .rrw-history-btn:hover,
     .rrw-modlog-btn:hover,
     .rrw-comment-nuke-btn:hover,
-    .rrw-profile-btn:hover {
+    .rrw-profile-btn:hover,
+    .rrw-quick-actions-pill:hover {
       background: linear-gradient(180deg, #204a7d 0%, #153861 100%);
       border-color: #4f79b6;
       color: #eaf3ff;
@@ -608,7 +618,8 @@ function injectStyles() {
     .rrw-history-btn:focus-visible,
     .rrw-modlog-btn:focus-visible,
     .rrw-comment-nuke-btn:focus-visible,
-    .rrw-profile-btn:focus-visible {
+    .rrw-profile-btn:focus-visible,
+    .rrw-quick-actions-pill:focus-visible {
       outline: 2px solid #79a9ef;
       outline-offset: 1px;
     }
@@ -628,7 +639,8 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-history-btn,
     html[data-rrw-theme="light"] .rrw-modlog-btn,
     html[data-rrw-theme="light"] .rrw-comment-nuke-btn,
-    html[data-rrw-theme="light"] .rrw-profile-btn {
+    html[data-rrw-theme="light"] .rrw-profile-btn,
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill {
       border: 1px solid #c5d9f1;
       background: linear-gradient(180deg, #e8f1ff 0%, #d8e8ff 100%);
       color: #2c4a70;
@@ -638,7 +650,8 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-usernote-chip:hover,
     html[data-rrw-theme="light"] .rrw-history-btn:hover,
     html[data-rrw-theme="light"] .rrw-modlog-btn:hover,
-    html[data-rrw-theme="light"] .rrw-profile-btn:hover {
+    html[data-rrw-theme="light"] .rrw-profile-btn:hover,
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill:hover {
       background: linear-gradient(180deg, #d8e8ff 0%, #c8dcff 100%);
       border-color: #8fb3d9;
       color: #1a3a5c;
@@ -1580,9 +1593,9 @@ function injectStyles() {
     }
 
     .rrw-quick-actions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 4px;
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
       width: 100%;
     }
 
@@ -1626,12 +1639,12 @@ function injectStyles() {
       justify-content: center !important;
       align-items: center !important;
       text-align: center !important;
-      min-height: 48px;
-      padding: 6px 8px;
+      min-height: 50px;
+      padding: 6px 4px;
       white-space: normal !important;
-      line-height: 1.3 !important;
+      line-height: 1.2 !important;
       flex-wrap: wrap;
-      font-size: 0.75rem !important;
+      font-size: 0.7rem !important;
     }
 
     .rrw-error {

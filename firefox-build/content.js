@@ -145,7 +145,7 @@ const QUEUE_BAR_BACKGROUND_POLL_INTERVAL_MS = 180000;
 
 const QUEUE_BAR_CONTEXT_TTL_MS = 120000;
 
-const BACKGROUND_REQUEST_TIMEOUT_MS = 20000;
+const BACKGROUND_REQUEST_TIMEOUT_MS = 30000;
 
 const BACKGROUND_REQUEST_SCHEDULER_MAX_CONCURRENCY = 2;
 
@@ -2135,6 +2135,40 @@ function sendMessage(message) {
 
 
 
+// ============================================================================
+
+// SESSION ERROR TRACKING
+
+// ============================================================================
+
+const sessionErrorsLogged = new Set();
+
+
+
+function shouldLogError(errorKey) {
+
+  if (sessionErrorsLogged.has(errorKey)) {
+
+    return false;
+
+  }
+
+  sessionErrorsLogged.add(errorKey);
+
+  return true;
+
+}
+
+
+
+// ============================================================================
+
+// TIMEOUT UTILITIES
+
+// ============================================================================
+
+
+
 function withTimeout(promise, timeoutMs, timeoutMessage) {
 
   const ms = Number(timeoutMs);
@@ -4087,23 +4121,47 @@ async function fetchBanStatusViaReddit(subreddit, username) {
 
 // Cache for native modnotes to prevent rate limiting from repeated API calls
 
-// Cache entries expire after 5 minutes
-
-
+// Cache entries expire after 15 minutes (increased to reduce rate limit hits)
 
 const nativeModnotesCache = new Map();
 
 const NATIVE_MODNOTES_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
+
+
 // Fallback cache for stale data when rate limited (persists for 1 hour)
+
 const nativeModnotesFallbackCache = new Map();
+
 const NATIVE_MODNOTES_FALLBACK_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+
+
 // Track in-flight requests to deduplicate concurrent requests for the same user
+
 const nativeModnotesInFlightRequests = new Map();
 
+
+
 // Track failed attempts per key for exponential backoff
+
 const nativeModnotesRetryTracking = new Map();
+
+
+
+// Throttle requests to prevent rate limiting: only 1 request per 500ms globally
+
+let lastNativeModnotesRequestTime = 0;
+
+const NATIVE_MODNOTES_REQUEST_THROTTLE_MS = 500;
+
+
+
+// Global rate limit cooldown: when hit, stop trying for N seconds
+
+let nativeModnotesRateLimitCooldownUntil = 0;
+
+const NATIVE_MODNOTES_COOLDOWN_MS = 20 * 1000; // 20 second cooldown after rate limit
 
 
 
@@ -4153,6 +4211,24 @@ function setNativeModnotesCache(subreddit, username, notes) {
 
   
 
+  // Also update fallback cache so we can use stale data if rate limited
+
+  nativeModnotesFallbackCache.set(key, {
+
+    value: notes,
+
+    expiresAt: Date.now() + NATIVE_MODNOTES_FALLBACK_CACHE_TTL_MS,
+
+  });
+
+  
+
+  // Reset retry tracking on successful fetch
+
+  nativeModnotesRetryTracking.delete(key);
+
+  
+
   // Prune old entries if cache gets too large
 
   if (nativeModnotesCache.size > 100) {
@@ -4175,7 +4251,31 @@ function setNativeModnotesCache(subreddit, username, notes) {
 
 
 
-async function fetchNativeModnotesViaReddit(subreddit, username) {
+function isRateLimitError(error) {
+
+  const message = getSafeErrorMessage(error);
+
+  return message.includes("429") || message.includes("too many requests") || message.includes("rate limit");
+
+}
+
+
+
+function calculateBackoffDelay(retryCount) {
+
+  // Exponential backoff: 1s, 2s, 4s, 8s base, plus random jitter
+
+  const baseDelay = Math.min(1000 * Math.pow(2, Math.max(0, retryCount - 1)), 30000);
+
+  const jitter = Math.random() * 1000; // Up to 1s random jitter
+
+  return baseDelay + jitter;
+
+}
+
+
+
+async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -4203,6 +4303,32 @@ async function fetchNativeModnotesViaReddit(subreddit, username) {
 
 
 
+  // Check if we're in a rate limit cooldown - if so, only return fallback cache
+
+  const now = Date.now();
+
+  if (nativeModnotesRateLimitCooldownUntil > now) {
+
+    const cooldownRemaining = Math.round((nativeModnotesRateLimitCooldownUntil - now) / 1000);
+
+    console.log(`[ModBox] In rate limit cooldown (${cooldownRemaining}s remaining), returning fallback cache only`);
+
+    const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
+
+    const fallback = nativeModnotesFallbackCache.get(cacheKey);
+
+    if (fallback) {
+
+      return fallback.value;
+
+    }
+
+    return [];
+
+  }
+
+
+
   // Check if a request is already in-flight for this user
 
   const cacheKey = buildNativeModnotesCacheKey(cleanSubreddit, cleanUser);
@@ -4214,6 +4340,24 @@ async function fetchNativeModnotesViaReddit(subreddit, username) {
     return nativeModnotesInFlightRequests.get(cacheKey);
 
   }
+
+
+
+  // Apply global throttling to prevent rate limiting
+
+  const timeSinceLastRequest = now - lastNativeModnotesRequestTime;
+
+  if (timeSinceLastRequest < NATIVE_MODNOTES_REQUEST_THROTTLE_MS) {
+
+    const waitTime = NATIVE_MODNOTES_REQUEST_THROTTLE_MS - timeSinceLastRequest;
+
+    console.log("[ModBox] Throttling native modnotes request, waiting", Math.round(waitTime), "ms");
+
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+
+  }
+
+  lastNativeModnotesRequestTime = Date.now();
 
 
 
@@ -4229,7 +4373,25 @@ async function fetchNativeModnotesViaReddit(subreddit, username) {
 
       
 
-      const payload = await requestJsonViaBackground(url, { oauth: true });
+      // Use scheduled request with longer cache TTL to reduce hits
+
+      const payload = await requestJsonViaBackgroundScheduled(
+
+        url,
+
+        { oauth: true },
+
+        {
+
+          cacheTtlMs: 30 * 60 * 1000, // 30 minute cache (very long to reduce requests)
+
+          priority: 1,
+
+          dedupe: true,
+
+        }
+
+      );
 
       console.log("[ModBox] Native modnotes response:", payload);
 
@@ -4305,7 +4467,47 @@ async function fetchNativeModnotesViaReddit(subreddit, username) {
 
       const errorMsg = getSafeErrorMessage(error);
 
-      console.error("[ModBox] Error fetching native modnotes:", errorMsg);
+      const isRateLimit = isRateLimitError(error);
+
+      const errorKey = `native-modnotes-${isRateLimit ? 'ratelimit' : 'fetch'}`;
+
+      
+
+      if (shouldLogError(errorKey)) {
+
+        console.error("[ModBox] Native modnotes fetch failed, falling back to Toolbox only. Error:", errorMsg, isRateLimit ? "(RATE LIMITED)" : "");
+
+      }
+
+      
+
+      if (isRateLimit) {
+
+        // Set global cooldown to back off completely
+
+        console.warn("[ModBox] Rate limit hit! Setting cooldown for 20 seconds to respect Reddit's rate limits");
+
+        nativeModnotesRateLimitCooldownUntil = Date.now() + NATIVE_MODNOTES_COOLDOWN_MS;
+
+      }
+
+      
+
+      // On failure, try to return fallback cached data if available
+
+      const fallbackKey = cacheKey;
+
+      const fallback = nativeModnotesFallbackCache.get(fallbackKey);
+
+      if (fallback && fallback.value.length > 0) {
+
+        console.warn("[ModBox] Using stale cached native modnotes due to fetch failure");
+
+        return fallback.value;
+
+      }
+
+      
 
       return [];
 
@@ -6969,6 +7171,28 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
 
     const nativeText = String(note.note || "").trim();
 
+    const nativeCreatedBy = String(note.created_by || "unknown").toLowerCase();
+
+    const isToolboxTransferBot = nativeCreatedBy === "toolboxnotesxfer";
+
+    
+
+    // For toolboxnotesxfer bot, strip the ", added by {author}" suffix to get the original text
+
+    let textToCompare = nativeText;
+
+    if (isToolboxTransferBot) {
+
+      const addedByMatch = nativeText.match(/^(.+?),\s*added by\s+\S+$/);
+
+      if (addedByMatch) {
+
+        textToCompare = addedByMatch[1].trim();
+
+      }
+
+    }
+
     
 
     // Check for duplicates in Toolbox notes within the window
@@ -6983,7 +7207,25 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
 
       
 
-      if (timeDiff <= dedupeWindow && isNoteTextSimilar(nativeText, toolboxNote.note || "")) {
+      // For notes from toolboxnotesxfer bot, compare the stripped text exactly
+
+      // For regular native notes, use the normal similar text check
+
+      const textMatches = isToolboxTransferBot 
+
+        ? String(toolboxNote.note || "").trim() === textToCompare
+
+        : isNoteTextSimilar(nativeText, toolboxNote.note || "");
+
+      
+
+      // Use a larger time window for toolboxnotesxfer since the bot takes time to transfer
+
+      const effectiveDedupeWindow = isToolboxTransferBot ? 300000 : dedupeWindow; // 5 minutes for bot, 1 minute for others
+
+      
+
+      if (timeDiff <= effectiveDedupeWindow && textMatches) {
 
         isDuplicate = true;
 
@@ -6996,6 +7238,8 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
     
 
     if (isDuplicate) {
+
+      console.log(`[ModBox] Filtered duplicate native note from ${nativeCreatedBy}: "${nativeText.slice(0, 50)}..."`);
 
       return; // Skip this native note (duplicate)
 
@@ -7567,13 +7811,25 @@ async function fetchUsernotesWithNativeViaReddit(subreddit, username, forceRefre
 
     // Fetch both Toolbox and native notes in parallel
 
+    // NOTE: Native notes are currently disabled by default due to Reddit rate limits
+
+    // Only fetch them if explicitly requested (forceRefresh = true indicates explicit request)
+
+    const nativeNotesPromise = forceRefresh 
+
+      ? fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser)
+
+      : Promise.resolve([]);
+
+
+
     const [notesDoc, typeMeta, nativeNotes] = await Promise.all([
 
       loadSubredditUsernotesFromWiki(cleanSubreddit),
 
       fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit),
 
-      fetchNativeModnotesViaReddit(cleanSubreddit, cleanUser),
+      nativeNotesPromise,
 
     ]);
 
@@ -8673,6 +8929,8 @@ function renderUsernotesEditor() {
 
       const noteLink = String(note.link || "").trim();
 
+      const noteMod = String(note.mod || "");
+
       const noteSource = String(note.source || "Modbox");
 
       const sourceBadgeHtml = `<span class="rrw-note-source-badge">${escapeHtml(noteSource)}</span>`;
@@ -8693,7 +8951,7 @@ function renderUsernotesEditor() {
 
             <div class="rrw-usernote-meta-and-types">
 
-              <div class="rrw-usernote-meta">${escapeHtml(dateText)}</div>
+              <div class="rrw-usernote-meta">${noteMod ? `u/${escapeHtml(noteMod)} &middot; ` : ""}${escapeHtml(dateText)}</div>
 
               <div class="rrw-usernote-type-wrap">${renderNoteTypeBadge(noteType, "rrw-note-type-pill", typeMeta)}${sourceBadgeHtml}</div>
 
@@ -9405,9 +9663,17 @@ async function setupInlineUsernoteChip(chip, context) {
 
     const isPermissionError = errorMsg.includes("Forbidden") || errorMsg.includes("MAY_NOT_VIEW");
 
-    if (!isPermissionError) {
+    // Only log error once per session (handled by shouldLogError which is imported)
+
+    if (!isPermissionError && typeof shouldLogError === "function" && shouldLogError("usernotes-load-failed")) {
 
       console.error("[ModBox] Failed to load usernotes:", error);
+
+    } else if (!isPermissionError && typeof shouldLogError !== "function") {
+
+      // Fallback if shouldLogError isn't available yet - suppress the error to reduce noise
+
+      console.debug("[ModBox] Error loading usernotes (suppressed after first occurrence):", errorMsg);
 
     }
 
@@ -10921,7 +11187,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn,
 
-    .rrw-profile-btn {
+    .rrw-profile-btn,
+
+    .rrw-quick-actions-pill {
 
       display: inline-flex;
 
@@ -11024,6 +11292,22 @@ function injectStyles() {
 
 
     .rrw-modlog-btn {
+
+      margin: 0;
+
+      min-width: 18px;
+
+      justify-content: center;
+
+      font-weight: 700;
+
+      letter-spacing: 0.01em;
+
+    }
+
+
+
+    .rrw-quick-actions-pill {
 
       margin: 0;
 
@@ -11195,7 +11479,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn:hover,
 
-    .rrw-profile-btn:hover {
+    .rrw-profile-btn:hover,
+
+    .rrw-quick-actions-pill:hover {
 
       background: linear-gradient(180deg, #204a7d 0%, #153861 100%);
 
@@ -11221,7 +11507,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn:focus-visible,
 
-    .rrw-profile-btn:focus-visible {
+    .rrw-profile-btn:focus-visible,
+
+    .rrw-quick-actions-pill:focus-visible {
 
       outline: 2px solid #79a9ef;
 
@@ -11241,7 +11529,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: 100;
+      z-index: auto;
 
       pointer-events: auto;
 
@@ -11261,7 +11549,9 @@ function injectStyles() {
 
     html[data-rrw-theme="light"] .rrw-comment-nuke-btn,
 
-    html[data-rrw-theme="light"] .rrw-profile-btn {
+    html[data-rrw-theme="light"] .rrw-profile-btn,
+
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill {
 
       border: 1px solid #c5d9f1;
 
@@ -11281,7 +11571,9 @@ function injectStyles() {
 
     html[data-rrw-theme="light"] .rrw-modlog-btn:hover,
 
-    html[data-rrw-theme="light"] .rrw-profile-btn:hover {
+    html[data-rrw-theme="light"] .rrw-profile-btn:hover,
+
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill:hover {
 
       background: linear-gradient(180deg, #d8e8ff 0%, #c8dcff 100%);
 
@@ -11336,88 +11628,6 @@ function injectStyles() {
       background: linear-gradient(180deg, #ffe8e8 0%, #ffd8d8 100%) !important;
 
       color: #9a4a4a !important;
-
-    }
-
-
-
-    .rrw-qa-reply-pill {
-
-      display: inline-block;
-
-      padding: 3px 10px;
-
-      border: 1px solid #355a91;
-
-      border-radius: 4px;
-
-      background: linear-gradient(180deg, #173a63 0%, #102a4a 100%);
-
-      color: #d8e9ff;
-
-      font-size: 11px;
-
-      font-weight: 600;
-
-      line-height: 1.4;
-
-      cursor: pointer;
-
-      vertical-align: middle;
-
-      margin-left: 8px;
-
-      font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-
-      white-space: nowrap;
-
-      flex-shrink: 0;
-
-    }
-
-
-
-    .rrw-qa-reply-pill:hover {
-
-      background: linear-gradient(180deg, #1e487a 0%, #143560 100%);
-
-      color: #eef4ff;
-
-      border-color: #6699cc;
-
-    }
-
-
-
-    .rrw-qa-reply-pill:focus-visible {
-
-      outline: 2px solid #79a9ef;
-
-      outline-offset: 1px;
-
-    }
-
-
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill {
-
-      border-color: #747c8e;
-
-      background: linear-gradient(180deg, #f0f2f5 0%, #e9ecf1 100%);
-
-      color: #2f5178;
-
-    }
-
-
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill:hover {
-
-      background: linear-gradient(180deg, #e9ecf1 0%, #dfe5ed 100%);
-
-      color: #1a3a5c;
-
-      border-color: #5a6b8f;
 
     }
 
@@ -11744,6 +11954,74 @@ function injectStyles() {
       display: flex;
 
       justify-content: flex-end;
+
+    }
+
+
+
+    .rrw-btn-trash {
+
+      appearance: none;
+
+      -webkit-appearance: none;
+
+      background: none;
+
+      border: none;
+
+      color: var(--rrw-muted);
+
+      cursor: pointer;
+
+      font-size: 1.2rem;
+
+      line-height: 1;
+
+      padding: 4px 6px;
+
+      min-width: 28px;
+
+      min-height: 28px;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      border-radius: 4px;
+
+      transition: color 0.15s, background-color 0.15s;
+
+    }
+
+
+
+    .rrw-btn-trash:hover {
+
+      color: #ff6b6b;
+
+      background-color: rgba(255, 107, 107, 0.1);
+
+    }
+
+
+
+    .rrw-btn-trash:active {
+
+      color: #ff5252;
+
+      background-color: rgba(255, 107, 107, 0.2);
+
+    }
+
+
+
+    .rrw-btn-trash:disabled {
+
+      opacity: 0.5;
+
+      cursor: not-allowed;
 
     }
 
@@ -12301,7 +12579,7 @@ function injectStyles() {
 
       align-items: center;
 
-      gap: 6px;
+      gap: 2px;
 
     }
 
@@ -12342,6 +12620,8 @@ function injectStyles() {
       cursor: pointer;
 
       transition: color 0.15s, border-color 0.15s;
+
+      margin: 0 !important;
 
     }
 
@@ -12457,6 +12737,8 @@ function injectStyles() {
 
       cursor: pointer;
 
+      margin: 0 !important;
+
     }
 
 
@@ -12477,7 +12759,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 8px;
+      gap: 2px;
 
       border-bottom: 1px solid var(--rrw-soft-border);
 
@@ -12519,6 +12801,8 @@ function injectStyles() {
 
       justify-content: center;
 
+      margin: 0 !important;
+
     }
 
 
@@ -12543,7 +12827,7 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 10px;
+      gap: 6px;
 
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
 
@@ -13145,11 +13429,11 @@ function injectStyles() {
 
     .rrw-actions {
 
-      display: flex;
+      display: flex !important;
 
-      gap: 4px;
+      gap: 2px !important;
 
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
 
     }
 
@@ -13165,11 +13449,11 @@ function injectStyles() {
 
     .rrw-quick-actions-grid {
 
-      display: grid;
+      display: grid !important;
 
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(3, 1fr);
 
-      gap: 4px;
+      gap: 6px;
 
       width: 100%;
 
@@ -13179,33 +13463,35 @@ function injectStyles() {
 
     .rrw-btn {
 
-      appearance: none;
+      appearance: none !important;
 
-      -webkit-appearance: none;
+      -webkit-appearance: none !important;
 
-      display: inline-flex;
+      display: inline-flex !important;
 
-      align-items: center;
+      align-items: center !important;
 
-      justify-content: center;
+      justify-content: center !important;
 
-      border: 0;
+      border: 0 !important;
 
-      border-radius: 8px;
+      border-radius: 8px !important;
 
-      color: #fff;
+      color: #fff !important;
 
-      font-weight: 600;
+      font-weight: 600 !important;
 
-      font-size: 0.85rem;
+      font-size: 0.85rem !important;
 
-      line-height: 1.3;
+      line-height: 1.3 !important;
 
-      padding: 6px 11px;
+      padding: 5px 9px !important;
 
-      min-height: 30px;
+      min-height: 28px !important;
 
-      cursor: pointer;
+      cursor: pointer !important;
+
+      margin: 0 !important;
 
     }
 
@@ -13249,7 +13535,7 @@ function injectStyles() {
 
       display: flex !important;
 
-      width: 100%;
+      width: 100% !important;
 
       justify-content: center !important;
 
@@ -13257,17 +13543,19 @@ function injectStyles() {
 
       text-align: center !important;
 
-      min-height: 48px;
+      min-height: 50px !important;
 
-      padding: 6px 8px;
+      padding: 6px 4px !important;
 
       white-space: normal !important;
 
-      line-height: 1.3 !important;
+      line-height: 1.2 !important;
 
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
 
-      font-size: 0.75rem !important;
+      font-size: 0.7rem !important;
+
+      margin: 0 !important;
 
     }
 
@@ -13445,7 +13733,7 @@ function injectStyles() {
 
       justify-content: space-between;
 
-      gap: 12px;
+      gap: 2px;
 
       padding: 14px 16px;
 
@@ -13515,7 +13803,7 @@ function injectStyles() {
 
       display: flex;
 
-      gap: 4px;
+      gap: 1px;
 
       padding: 10px 16px 0;
 
@@ -13541,7 +13829,7 @@ function injectStyles() {
 
       border-radius: 10px 10px 0 0;
 
-      padding: 8px 12px;
+      padding: 6px 10px;
 
       background: rgba(17, 29, 49, 0.9);
 
@@ -13552,6 +13840,16 @@ function injectStyles() {
       font-size: 0.86rem;
 
       font-weight: 600;
+
+      display: flex !important;
+
+      align-items: center !important;
+
+      justify-content: center !important;
+
+      white-space: nowrap;
+
+      margin: 0 !important;
 
     }
 
@@ -26341,7 +26639,7 @@ function createQueueModlogDisplay(entries) {
 
 
 
-  // Format entries as a single line: "action by /u/mod 22m ago - details | action by /u/mod 1h ago - details"
+  // Format entries as a single line: "action by /u/mod 22m ago - details action by /u/mod 1h ago - details"
 
   const entryTexts = entries.map((entry) => {
 
@@ -27549,6 +27847,32 @@ function bindContainer(container) {
 
     inlineGroup.appendChild(modlogButton);
 
+
+
+    const quickActionsButton = document.createElement("button");
+
+    quickActionsButton.type = "button";
+
+    quickActionsButton.className = "rrw-quick-actions-pill";
+
+    quickActionsButton.textContent = "Q";
+
+    quickActionsButton.title = "Open quick actions panel";
+
+    quickActionsButton.dataset.rrwButtonTarget = target;
+
+    attachButtonClickHandlers(quickActionsButton, () => {
+
+      const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+
+      void openOverlay(btnTarget, { quickActionsOnlyMode: true, subreddit: itemSubreddit });
+
+    });
+
+    inlineGroup.appendChild(quickActionsButton);
+
+
+
     inlineGroup.appendChild(button);
 
 
@@ -28171,191 +28495,11 @@ function bindOldRedditReplyFormPills() {
 
 
 
-  if (!oldRedditReplyPillEventsBound) {
+  // Old QA reply pill button removed - now using the better Q pill on comments
 
-    oldRedditReplyPillEventsBound = true;
 
-    document.addEventListener("click", (event) => {
 
-      const target = event.target instanceof Element ? event.target : null;
 
-      const trigger = target?.closest(".rrw-qa-reply-pill");
-
-      if (!(trigger instanceof HTMLButtonElement)) {
-
-        return;
-
-      }
-
-
-
-      event.preventDefault();
-
-      event.stopPropagation();
-
-
-
-      const replyForm = trigger.closest(".usertext-edit");
-
-      const formThingIdInput = replyForm instanceof HTMLElement
-
-        ? replyForm.querySelector('input[name="thing_id"]')
-
-        : null;
-
-      const formThingId = formThingIdInput instanceof HTMLInputElement
-
-        ? String(formThingIdInput.value || "").trim().toLowerCase()
-
-        : "";
-
-
-
-      const formThingContainer = replyForm instanceof HTMLElement
-
-        ? replyForm.closest(".thing.link, .thing.comment")
-
-        : null;
-
-
-
-      // Priority: formThingId -> container detection -> page URL
-
-      let targetValue = "";
-
-      if (/^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)) {
-
-        targetValue = formThingId;
-
-      } else if (formThingContainer) {
-
-        targetValue = pickTargetForContainer(formThingContainer);
-
-      } else {
-
-        targetValue = window.location.href;
-
-      }
-
-
-
-      let targetFullname = "";
-
-      try {
-
-        targetFullname = parseTargetToFullname(targetValue);
-
-      } catch (err) {
-
-        console.warn("[ModBox] QA button: could not parse target", err);
-
-        return;
-
-      }
-
-
-
-      // Determine the subreddit context from the form's container or page URL
-
-      const subredditFromContainer = formThingContainer && resolveContainerSubreddit(formThingContainer);
-
-      const subredditFromPath = parseSubredditFromPath(window.location.pathname);
-
-      const subreddit = normalizeSubreddit(subredditFromContainer || subredditFromPath || "");
-
-
-
-      void openOverlay(targetFullname, { quickActionsOnlyMode: true, subreddit });
-
-    }, true);
-
-  }
-
-
-
-  document.querySelectorAll(".usertext-edit").forEach((form) => {
-
-    if (!(form instanceof HTMLElement)) return;
-
-    if (form.dataset.rrwQaPillBound === "1") return;
-
-
-
-    const buttonsEl = form.querySelector(".usertext-buttons");
-
-    if (!buttonsEl) return;
-
-
-
-    const formThingIdInput = form.querySelector('input[name="thing_id"]');
-
-    const formThingId = formThingIdInput instanceof HTMLInputElement
-
-      ? String(formThingIdInput.value || "").trim().toLowerCase()
-
-      : "";
-
-
-
-    const thingContainer = form.closest(".thing.link, .thing.comment");
-
-    let fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)
-
-      ? formThingId
-
-      : (thingContainer ? pickTargetForContainer(thingContainer) : null);
-
-    if (!fullname) {
-
-      const postId = parsePostIdFromPath(window.location.pathname);
-
-      if (postId) {
-
-        fullname = `t3_${postId}`;
-
-      }
-
-    }
-
-    if (!fullname) return;
-
-
-
-    const subreddit = normalizeSubreddit(
-
-      (thingContainer && resolveContainerSubreddit(thingContainer)) ||
-
-      parseSubredditFromPath(window.location.pathname)
-
-    );
-
-    if (!isAllowedLaunchSubreddit(subreddit)) {
-
-      form.dataset.rrwQaPillBound = "1";
-
-      return;
-
-    }
-
-
-
-    form.dataset.rrwQaPillBound = "1";
-
-
-
-    const pill = document.createElement("button");
-
-    pill.type = "button";
-
-    pill.className = "rrw-qa-reply-pill";
-
-    pill.textContent = "QA";
-
-    pill.title = "Open ModBox Quick Actions for this item";
-
-    buttonsEl.appendChild(pill);
-
-  });
 
 }
 
@@ -28781,295 +28925,7 @@ function applyActionBorderToElement(fullname, actionType) {
 
 
 
-async function openOverlay(target, options = {}) {
 
-  const cleanTarget = String(target || "").trim();
-
-  if (!cleanTarget) {
-
-    console.warn("[ModBox] openOverlay called with empty target");
-
-    return;
-
-  }
-
-
-
-  const skipRedditRemove = Boolean(options.skipRedditRemove);
-
-  const quickActionsOnlyMode = Boolean(options.quickActionsOnlyMode);
-
-
-
-  // Fetch autoCloseOnRemove setting early
-
-  let initialAutoCloseOnRemove = false;
-
-  try {
-
-    const stored = await ext.storage.sync.get([AUTO_CLOSE_KEY]);
-
-    initialAutoCloseOnRemove = Boolean(stored?.[AUTO_CLOSE_KEY]);
-
-  } catch (e) {
-
-    console.log("[ModBox] Error reading autoCloseOnRemove from storage:", e);
-
-  }
-
-
-
-  overlayState = {
-
-    loading: true,
-
-    target: cleanTarget,
-
-    resolved: null,
-
-    removalConfig: buildDefaultRemovalConfig(""),
-
-    reasons: [],
-
-    selectedReasonKeys: [],
-
-    sendMode: "reply",
-
-    inputValues: {},
-
-    validationErrors: {},
-
-    error: "",
-
-    status: "",
-
-    submitting: false,
-
-    reasonSearch: "",
-
-    compactMode: window.location.hostname === "old.reddit.com",
-
-    autoCloseOnRemove: initialAutoCloseOnRemove,
-
-    skipRedditRemove,
-
-    quickActionsOnlyMode,
-
-    targetCardExpanded: false,
-
-    previewMessage: "",
-
-    previewSubject: "",
-
-    previewLoading: false,
-
-    previewError: "",
-
-    previewRequestId: 0,
-
-    previewTimer: null,
-
-    dynamicBlocks: [],
-
-    fullname: cleanTarget,
-
-    removalNoteText: "",
-
-    removalNoteType: "none",
-
-    removalNoteTypes: ["none"],
-
-    removalNoteTypeLabels: {},
-
-    postFlairTemplates: [],
-
-    activeTab: quickActionsOnlyMode ? "quick_actions" : "kind_actions",
-
-    userFlairTemplates: [],
-
-    selectedUserFlairTemplateId: "",
-
-    banDurationOption: "7",
-
-    banCustomDays: "",
-
-    banMessage: "",
-
-    isUserAlreadyBanned: false,
-
-    banStatusLoading: false,
-
-    addBanUsernote: true,
-
-    banUsernoteText: "7DTB",
-
-    banUsernoteType: "none",
-
-    banUsernoteAutoValue: "7DTB",
-
-    quickActionsConfig: buildDefaultQuickActionsConfig(""),
-
-    quickActionsLoading: false,
-
-    quickActionsError: "",
-
-    quickActionsStatus: "",
-
-    playbooksConfig: buildDefaultPlaybooksConfig(""),
-
-    playbooksLoading: false,
-
-    playbooksError: "",
-
-    playbooksStatus: "",
-
-    keydownHandler: null,
-
-  };
-
-  const overlayRef = overlayState;
-
-
-
-  overlayState.keydownHandler = (event) => {
-
-    if (!overlayState) return;
-
-    if (event.key === "Escape") {
-
-      event.preventDefault();
-
-      closeOverlay();
-
-      return;
-
-    }
-
-    if (event.key === "Enter" && event.ctrlKey) {
-
-      const removeButton = document.getElementById("rrw-remove");
-
-      if (removeButton instanceof HTMLButtonElement && !removeButton.disabled) {
-
-        event.preventDefault();
-
-        removeButton.click();
-
-      }
-
-    }
-
-  };
-
-  document.addEventListener("keydown", overlayState.keydownHandler, true);
-
-  renderOverlay();
-
-
-
-  // Load removal config - use cached version immediately, fetch fresh in background
-
-  const resolvedSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));
-
-  if (resolvedSubreddit) {
-
-    // Try to get cached config (should be instant)
-
-    let cachedConfig = getInMemoryRemovalConfig(resolvedSubreddit);
-
-    
-
-    // If no cache, load fresh (potentially blocking on first open)
-
-    if (!cachedConfig) {
-
-      try {
-
-        cachedConfig = await loadRemovalConfigFromWiki(resolvedSubreddit);
-
-      } catch (error) {
-
-        const message = error instanceof Error ? error.message : String(error);
-
-        if (overlayState === overlayRef) {
-
-          overlayState.error = message;
-
-        }
-
-        cachedConfig = buildDefaultRemovalConfig(resolvedSubreddit);
-
-      }
-
-    }
-
-
-
-    // Update overlay with initial config (cached or fresh)
-
-    if (overlayState === overlayRef && cachedConfig) {
-
-      overlayRef.removalConfig = cachedConfig;
-
-      overlayRef.reasons = Array.isArray(cachedConfig.reasons) ? cachedConfig.reasons : [];
-
-      overlayState.loading = false;
-
-      renderOverlay();
-
-    }
-
-
-
-    // Fetch fresh config in background if cache exists (don't block UI)
-
-    if (cachedConfig) {
-
-      void (async () => {
-
-        try {
-
-          const freshConfig = await loadRemovalConfigFromWiki(resolvedSubreddit);
-
-          // Only update if overlay is still open and config actually changed
-
-          if (overlayState === overlayRef && freshConfig !== cachedConfig) {
-
-            overlayRef.removalConfig = freshConfig;
-
-            overlayRef.reasons = Array.isArray(freshConfig.reasons) ? freshConfig.reasons : [];
-
-            renderOverlay();
-
-          }
-
-        } catch (error) {
-
-          // Non-blocking background load failure - don't show error if we already have cache
-
-          console.warn("[ModBox] Background refresh of removal config failed:", error);
-
-        }
-
-      })();
-
-    }
-
-  } else {
-
-    // No subreddit - mark loading as complete
-
-    if (overlayState === overlayRef) {
-
-      overlayState.loading = false;
-
-      renderOverlay();
-
-    }
-
-  }
-
-}
 
 
 

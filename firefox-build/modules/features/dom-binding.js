@@ -482,6 +482,19 @@ function bindContainer(container) {
       inlineGroup.appendChild(profileButton);
     }
     inlineGroup.appendChild(modlogButton);
+
+    const quickActionsButton = document.createElement("button");
+    quickActionsButton.type = "button";
+    quickActionsButton.className = "rrw-quick-actions-pill";
+    quickActionsButton.textContent = "Q";
+    quickActionsButton.title = "Open quick actions panel";
+    quickActionsButton.dataset.rrwButtonTarget = target;
+    attachButtonClickHandlers(quickActionsButton, () => {
+      const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+      void openOverlay(btnTarget, { quickActionsOnlyMode: true, subreddit: itemSubreddit });
+    });
+    inlineGroup.appendChild(quickActionsButton);
+
     inlineGroup.appendChild(button);
 
     // Find the last flair/badge element after the author anchor to position pills after them
@@ -793,97 +806,7 @@ function bindOldRedditReplyFormPills() {
   if (String(window.location.hostname || "").toLowerCase() !== "old.reddit.com") return;
   if (!allowedLaunchSubredditsLoaded) return;
 
-  if (!oldRedditReplyPillEventsBound) {
-    oldRedditReplyPillEventsBound = true;
-    document.addEventListener("click", (event) => {
-      const target = event.target instanceof Element ? event.target : null;
-      const trigger = target?.closest(".rrw-qa-reply-pill");
-      if (!(trigger instanceof HTMLButtonElement)) {
-        return;
-      }
+  // Old QA reply pill button removed - now using the better Q pill on comments
 
-      event.preventDefault();
-      event.stopPropagation();
 
-      const replyForm = trigger.closest(".usertext-edit");
-      const formThingIdInput = replyForm instanceof HTMLElement
-        ? replyForm.querySelector('input[name="thing_id"]')
-        : null;
-      const formThingId = formThingIdInput instanceof HTMLInputElement
-        ? String(formThingIdInput.value || "").trim().toLowerCase()
-        : "";
-
-      const formThingContainer = replyForm instanceof HTMLElement
-        ? replyForm.closest(".thing.link, .thing.comment")
-        : null;
-
-      // Priority: formThingId -> container detection -> page URL
-      let targetValue = "";
-      if (/^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)) {
-        targetValue = formThingId;
-      } else if (formThingContainer) {
-        targetValue = pickTargetForContainer(formThingContainer);
-      } else {
-        targetValue = window.location.href;
-      }
-
-      let targetFullname = "";
-      try {
-        targetFullname = parseTargetToFullname(targetValue);
-      } catch (err) {
-        console.warn("[ModBox] QA button: could not parse target", err);
-        return;
-      }
-
-      // Determine the subreddit context from the form's container or page URL
-      const subredditFromContainer = formThingContainer && resolveContainerSubreddit(formThingContainer);
-      const subredditFromPath = parseSubredditFromPath(window.location.pathname);
-      const subreddit = normalizeSubreddit(subredditFromContainer || subredditFromPath || "");
-
-      void openOverlay(targetFullname, { quickActionsOnlyMode: true, subreddit });
-    }, true);
-  }
-
-  document.querySelectorAll(".usertext-edit").forEach((form) => {
-    if (!(form instanceof HTMLElement)) return;
-    if (form.dataset.rrwQaPillBound === "1") return;
-
-    const buttonsEl = form.querySelector(".usertext-buttons");
-    if (!buttonsEl) return;
-
-    const formThingIdInput = form.querySelector('input[name="thing_id"]');
-    const formThingId = formThingIdInput instanceof HTMLInputElement
-      ? String(formThingIdInput.value || "").trim().toLowerCase()
-      : "";
-
-    const thingContainer = form.closest(".thing.link, .thing.comment");
-    let fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)
-      ? formThingId
-      : (thingContainer ? pickTargetForContainer(thingContainer) : null);
-    if (!fullname) {
-      const postId = parsePostIdFromPath(window.location.pathname);
-      if (postId) {
-        fullname = `t3_${postId}`;
-      }
-    }
-    if (!fullname) return;
-
-    const subreddit = normalizeSubreddit(
-      (thingContainer && resolveContainerSubreddit(thingContainer)) ||
-      parseSubredditFromPath(window.location.pathname)
-    );
-    if (!isAllowedLaunchSubreddit(subreddit)) {
-      form.dataset.rrwQaPillBound = "1";
-      return;
-    }
-
-    form.dataset.rrwQaPillBound = "1";
-
-    const pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = "rrw-qa-reply-pill";
-    pill.textContent = "QA";
-    pill.title = "Open ModBox Quick Actions for this item";
-    buttonsEl.appendChild(pill);
-  });
 }

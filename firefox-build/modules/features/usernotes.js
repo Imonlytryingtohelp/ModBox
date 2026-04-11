@@ -115,6 +115,17 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
     
     const nativeTime = Number(note.created_at || 0) * 1000; // Convert from seconds to ms
     const nativeText = String(note.note || "").trim();
+    const nativeCreatedBy = String(note.created_by || "unknown").toLowerCase();
+    const isToolboxTransferBot = nativeCreatedBy === "toolboxnotesxfer";
+    
+    // For toolboxnotesxfer bot, strip the ", added by {author}" suffix to get the original text
+    let textToCompare = nativeText;
+    if (isToolboxTransferBot) {
+      const addedByMatch = nativeText.match(/^(.+?),\s*added by\s+\S+$/);
+      if (addedByMatch) {
+        textToCompare = addedByMatch[1].trim();
+      }
+    }
     
     // Check for duplicates in Toolbox notes within the window
     let isDuplicate = false;
@@ -122,13 +133,23 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
       const toolboxTime = Number(toolboxNote.time || Date.now());
       const timeDiff = Math.abs(nativeTime - toolboxTime);
       
-      if (timeDiff <= dedupeWindow && isNoteTextSimilar(nativeText, toolboxNote.note || "")) {
+      // For notes from toolboxnotesxfer bot, compare the stripped text exactly
+      // For regular native notes, use the normal similar text check
+      const textMatches = isToolboxTransferBot 
+        ? String(toolboxNote.note || "").trim() === textToCompare
+        : isNoteTextSimilar(nativeText, toolboxNote.note || "");
+      
+      // Use a larger time window for toolboxnotesxfer since the bot takes time to transfer
+      const effectiveDedupeWindow = isToolboxTransferBot ? 300000 : dedupeWindow; // 5 minutes for bot, 1 minute for others
+      
+      if (timeDiff <= effectiveDedupeWindow && textMatches) {
         isDuplicate = true;
         break;
       }
     }
     
     if (isDuplicate) {
+      console.log(`[ModBox] Filtered duplicate native note from ${nativeCreatedBy}: "${nativeText.slice(0, 50)}..."`);
       return; // Skip this native note (duplicate)
     }
     
@@ -973,6 +994,7 @@ function renderUsernotesEditor() {
       const noteText = String(note.note || "");
       const noteType = String(note.type || "none");
       const noteLink = String(note.link || "").trim();
+      const noteMod = String(note.mod || "");
       const noteSource = String(note.source || "Modbox");
       const sourceBadgeHtml = `<span class="rrw-note-source-badge">${escapeHtml(noteSource)}</span>`;
       const dateText = Number(note.time) ? new Date(Number(note.time)).toLocaleString() : "unknown date";
@@ -983,7 +1005,7 @@ function renderUsernotesEditor() {
         <article class="rrw-usernote-row">
           <div class="rrw-usernote-header-row">
             <div class="rrw-usernote-meta-and-types">
-              <div class="rrw-usernote-meta">${escapeHtml(dateText)}</div>
+              <div class="rrw-usernote-meta">${noteMod ? `u/${escapeHtml(noteMod)} &middot; ` : ""}${escapeHtml(dateText)}</div>
               <div class="rrw-usernote-type-wrap">${renderNoteTypeBadge(noteType, "rrw-note-type-pill", typeMeta)}${sourceBadgeHtml}</div>
             </div>
             ${deleteButtonHtml}

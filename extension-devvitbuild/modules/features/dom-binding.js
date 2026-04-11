@@ -482,6 +482,19 @@ function bindContainer(container) {
       inlineGroup.appendChild(profileButton);
     }
     inlineGroup.appendChild(modlogButton);
+
+    const quickActionsButton = document.createElement("button");
+    quickActionsButton.type = "button";
+    quickActionsButton.className = "rrw-quick-actions-pill";
+    quickActionsButton.textContent = "Q";
+    quickActionsButton.title = "Open quick actions panel";
+    quickActionsButton.dataset.rrwButtonTarget = target;
+    attachButtonClickHandlers(quickActionsButton, () => {
+      const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+      void openOverlay(btnTarget);
+    });
+    inlineGroup.appendChild(quickActionsButton);
+
     inlineGroup.appendChild(button);
 
     // Find the last flair/badge element after the author anchor to position pills after them

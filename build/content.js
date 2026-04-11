@@ -11187,7 +11187,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn,
 
-    .rrw-profile-btn {
+    .rrw-profile-btn,
+
+    .rrw-quick-actions-pill {
 
       display: inline-flex;
 
@@ -11290,6 +11292,22 @@ function injectStyles() {
 
 
     .rrw-modlog-btn {
+
+      margin: 0;
+
+      min-width: 18px;
+
+      justify-content: center;
+
+      font-weight: 700;
+
+      letter-spacing: 0.01em;
+
+    }
+
+
+
+    .rrw-quick-actions-pill {
 
       margin: 0;
 
@@ -11461,7 +11479,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn:hover,
 
-    .rrw-profile-btn:hover {
+    .rrw-profile-btn:hover,
+
+    .rrw-quick-actions-pill:hover {
 
       background: linear-gradient(180deg, #204a7d 0%, #153861 100%);
 
@@ -11487,7 +11507,9 @@ function injectStyles() {
 
     .rrw-comment-nuke-btn:focus-visible,
 
-    .rrw-profile-btn:focus-visible {
+    .rrw-profile-btn:focus-visible,
+
+    .rrw-quick-actions-pill:focus-visible {
 
       outline: 2px solid #79a9ef;
 
@@ -11527,7 +11549,9 @@ function injectStyles() {
 
     html[data-rrw-theme="light"] .rrw-comment-nuke-btn,
 
-    html[data-rrw-theme="light"] .rrw-profile-btn {
+    html[data-rrw-theme="light"] .rrw-profile-btn,
+
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill {
 
       border: 1px solid #c5d9f1;
 
@@ -11547,7 +11571,9 @@ function injectStyles() {
 
     html[data-rrw-theme="light"] .rrw-modlog-btn:hover,
 
-    html[data-rrw-theme="light"] .rrw-profile-btn:hover {
+    html[data-rrw-theme="light"] .rrw-profile-btn:hover,
+
+    html[data-rrw-theme="light"] .rrw-quick-actions-pill:hover {
 
       background: linear-gradient(180deg, #d8e8ff 0%, #c8dcff 100%);
 
@@ -11602,88 +11628,6 @@ function injectStyles() {
       background: linear-gradient(180deg, #ffe8e8 0%, #ffd8d8 100%) !important;
 
       color: #9a4a4a !important;
-
-    }
-
-
-
-    .rrw-qa-reply-pill {
-
-      display: inline-block;
-
-      padding: 3px 10px;
-
-      border: 1px solid #355a91;
-
-      border-radius: 4px;
-
-      background: linear-gradient(180deg, #173a63 0%, #102a4a 100%);
-
-      color: #d8e9ff;
-
-      font-size: 11px;
-
-      font-weight: 600;
-
-      line-height: 1.4;
-
-      cursor: pointer;
-
-      vertical-align: middle;
-
-      margin-left: 8px;
-
-      font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-
-      white-space: nowrap;
-
-      flex-shrink: 0;
-
-    }
-
-
-
-    .rrw-qa-reply-pill:hover {
-
-      background: linear-gradient(180deg, #1e487a 0%, #143560 100%);
-
-      color: #eef4ff;
-
-      border-color: #6699cc;
-
-    }
-
-
-
-    .rrw-qa-reply-pill:focus-visible {
-
-      outline: 2px solid #79a9ef;
-
-      outline-offset: 1px;
-
-    }
-
-
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill {
-
-      border-color: #747c8e;
-
-      background: linear-gradient(180deg, #f0f2f5 0%, #e9ecf1 100%);
-
-      color: #2f5178;
-
-    }
-
-
-
-    html[data-rrw-theme="light"] .rrw-qa-reply-pill:hover {
-
-      background: linear-gradient(180deg, #e9ecf1 0%, #dfe5ed 100%);
-
-      color: #1a3a5c;
-
-      border-color: #5a6b8f;
 
     }
 
@@ -13505,11 +13449,11 @@ function injectStyles() {
 
     .rrw-quick-actions-grid {
 
-      display: grid;
+      display: grid !important;
 
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(3, 1fr);
 
-      gap: 2px;
+      gap: 6px;
 
       width: 100%;
 
@@ -13599,17 +13543,17 @@ function injectStyles() {
 
       text-align: center !important;
 
-      min-height: 40px !important;
+      min-height: 50px !important;
 
-      padding: 5px 8px !important;
+      padding: 6px 4px !important;
 
       white-space: normal !important;
 
-      line-height: 1.3 !important;
+      line-height: 1.2 !important;
 
       flex-wrap: wrap !important;
 
-      font-size: 0.75rem !important;
+      font-size: 0.7rem !important;
 
       margin: 0 !important;
 
@@ -27903,6 +27847,32 @@ function bindContainer(container) {
 
     inlineGroup.appendChild(modlogButton);
 
+
+
+    const quickActionsButton = document.createElement("button");
+
+    quickActionsButton.type = "button";
+
+    quickActionsButton.className = "rrw-quick-actions-pill";
+
+    quickActionsButton.textContent = "Q";
+
+    quickActionsButton.title = "Open quick actions panel";
+
+    quickActionsButton.dataset.rrwButtonTarget = target;
+
+    attachButtonClickHandlers(quickActionsButton, () => {
+
+      const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+
+      void openOverlay(btnTarget, { quickActionsOnlyMode: true, subreddit: itemSubreddit });
+
+    });
+
+    inlineGroup.appendChild(quickActionsButton);
+
+
+
     inlineGroup.appendChild(button);
 
 
@@ -28525,191 +28495,11 @@ function bindOldRedditReplyFormPills() {
 
 
 
-  if (!oldRedditReplyPillEventsBound) {
+  // Old QA reply pill button removed - now using the better Q pill on comments
 
-    oldRedditReplyPillEventsBound = true;
 
-    document.addEventListener("click", (event) => {
 
-      const target = event.target instanceof Element ? event.target : null;
 
-      const trigger = target?.closest(".rrw-qa-reply-pill");
-
-      if (!(trigger instanceof HTMLButtonElement)) {
-
-        return;
-
-      }
-
-
-
-      event.preventDefault();
-
-      event.stopPropagation();
-
-
-
-      const replyForm = trigger.closest(".usertext-edit");
-
-      const formThingIdInput = replyForm instanceof HTMLElement
-
-        ? replyForm.querySelector('input[name="thing_id"]')
-
-        : null;
-
-      const formThingId = formThingIdInput instanceof HTMLInputElement
-
-        ? String(formThingIdInput.value || "").trim().toLowerCase()
-
-        : "";
-
-
-
-      const formThingContainer = replyForm instanceof HTMLElement
-
-        ? replyForm.closest(".thing.link, .thing.comment")
-
-        : null;
-
-
-
-      // Priority: formThingId -> container detection -> page URL
-
-      let targetValue = "";
-
-      if (/^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)) {
-
-        targetValue = formThingId;
-
-      } else if (formThingContainer) {
-
-        targetValue = pickTargetForContainer(formThingContainer);
-
-      } else {
-
-        targetValue = window.location.href;
-
-      }
-
-
-
-      let targetFullname = "";
-
-      try {
-
-        targetFullname = parseTargetToFullname(targetValue);
-
-      } catch (err) {
-
-        console.warn("[ModBox] QA button: could not parse target", err);
-
-        return;
-
-      }
-
-
-
-      // Determine the subreddit context from the form's container or page URL
-
-      const subredditFromContainer = formThingContainer && resolveContainerSubreddit(formThingContainer);
-
-      const subredditFromPath = parseSubredditFromPath(window.location.pathname);
-
-      const subreddit = normalizeSubreddit(subredditFromContainer || subredditFromPath || "");
-
-
-
-      void openOverlay(targetFullname, { quickActionsOnlyMode: true, subreddit });
-
-    }, true);
-
-  }
-
-
-
-  document.querySelectorAll(".usertext-edit").forEach((form) => {
-
-    if (!(form instanceof HTMLElement)) return;
-
-    if (form.dataset.rrwQaPillBound === "1") return;
-
-
-
-    const buttonsEl = form.querySelector(".usertext-buttons");
-
-    if (!buttonsEl) return;
-
-
-
-    const formThingIdInput = form.querySelector('input[name="thing_id"]');
-
-    const formThingId = formThingIdInput instanceof HTMLInputElement
-
-      ? String(formThingIdInput.value || "").trim().toLowerCase()
-
-      : "";
-
-
-
-    const thingContainer = form.closest(".thing.link, .thing.comment");
-
-    let fullname = /^t[13]_[a-z0-9]{5,10}$/i.test(formThingId)
-
-      ? formThingId
-
-      : (thingContainer ? pickTargetForContainer(thingContainer) : null);
-
-    if (!fullname) {
-
-      const postId = parsePostIdFromPath(window.location.pathname);
-
-      if (postId) {
-
-        fullname = `t3_${postId}`;
-
-      }
-
-    }
-
-    if (!fullname) return;
-
-
-
-    const subreddit = normalizeSubreddit(
-
-      (thingContainer && resolveContainerSubreddit(thingContainer)) ||
-
-      parseSubredditFromPath(window.location.pathname)
-
-    );
-
-    if (!isAllowedLaunchSubreddit(subreddit)) {
-
-      form.dataset.rrwQaPillBound = "1";
-
-      return;
-
-    }
-
-
-
-    form.dataset.rrwQaPillBound = "1";
-
-
-
-    const pill = document.createElement("button");
-
-    pill.type = "button";
-
-    pill.className = "rrw-qa-reply-pill";
-
-    pill.textContent = "QA";
-
-    pill.title = "Open ModBox Quick Actions for this item";
-
-    buttonsEl.appendChild(pill);
-
-  });
 
 }
 
@@ -29135,295 +28925,7 @@ function applyActionBorderToElement(fullname, actionType) {
 
 
 
-async function openOverlay(target, options = {}) {
 
-  const cleanTarget = String(target || "").trim();
-
-  if (!cleanTarget) {
-
-    console.warn("[ModBox] openOverlay called with empty target");
-
-    return;
-
-  }
-
-
-
-  const skipRedditRemove = Boolean(options.skipRedditRemove);
-
-  const quickActionsOnlyMode = Boolean(options.quickActionsOnlyMode);
-
-
-
-  // Fetch autoCloseOnRemove setting early
-
-  let initialAutoCloseOnRemove = false;
-
-  try {
-
-    const stored = await ext.storage.sync.get([AUTO_CLOSE_KEY]);
-
-    initialAutoCloseOnRemove = Boolean(stored?.[AUTO_CLOSE_KEY]);
-
-  } catch (e) {
-
-    console.log("[ModBox] Error reading autoCloseOnRemove from storage:", e);
-
-  }
-
-
-
-  overlayState = {
-
-    loading: true,
-
-    target: cleanTarget,
-
-    resolved: null,
-
-    removalConfig: buildDefaultRemovalConfig(""),
-
-    reasons: [],
-
-    selectedReasonKeys: [],
-
-    sendMode: "reply",
-
-    inputValues: {},
-
-    validationErrors: {},
-
-    error: "",
-
-    status: "",
-
-    submitting: false,
-
-    reasonSearch: "",
-
-    compactMode: window.location.hostname === "old.reddit.com",
-
-    autoCloseOnRemove: initialAutoCloseOnRemove,
-
-    skipRedditRemove,
-
-    quickActionsOnlyMode,
-
-    targetCardExpanded: false,
-
-    previewMessage: "",
-
-    previewSubject: "",
-
-    previewLoading: false,
-
-    previewError: "",
-
-    previewRequestId: 0,
-
-    previewTimer: null,
-
-    dynamicBlocks: [],
-
-    fullname: cleanTarget,
-
-    removalNoteText: "",
-
-    removalNoteType: "none",
-
-    removalNoteTypes: ["none"],
-
-    removalNoteTypeLabels: {},
-
-    postFlairTemplates: [],
-
-    activeTab: quickActionsOnlyMode ? "quick_actions" : "kind_actions",
-
-    userFlairTemplates: [],
-
-    selectedUserFlairTemplateId: "",
-
-    banDurationOption: "7",
-
-    banCustomDays: "",
-
-    banMessage: "",
-
-    isUserAlreadyBanned: false,
-
-    banStatusLoading: false,
-
-    addBanUsernote: true,
-
-    banUsernoteText: "7DTB",
-
-    banUsernoteType: "none",
-
-    banUsernoteAutoValue: "7DTB",
-
-    quickActionsConfig: buildDefaultQuickActionsConfig(""),
-
-    quickActionsLoading: false,
-
-    quickActionsError: "",
-
-    quickActionsStatus: "",
-
-    playbooksConfig: buildDefaultPlaybooksConfig(""),
-
-    playbooksLoading: false,
-
-    playbooksError: "",
-
-    playbooksStatus: "",
-
-    keydownHandler: null,
-
-  };
-
-  const overlayRef = overlayState;
-
-
-
-  overlayState.keydownHandler = (event) => {
-
-    if (!overlayState) return;
-
-    if (event.key === "Escape") {
-
-      event.preventDefault();
-
-      closeOverlay();
-
-      return;
-
-    }
-
-    if (event.key === "Enter" && event.ctrlKey) {
-
-      const removeButton = document.getElementById("rrw-remove");
-
-      if (removeButton instanceof HTMLButtonElement && !removeButton.disabled) {
-
-        event.preventDefault();
-
-        removeButton.click();
-
-      }
-
-    }
-
-  };
-
-  document.addEventListener("keydown", overlayState.keydownHandler, true);
-
-  renderOverlay();
-
-
-
-  // Load removal config - use cached version immediately, fetch fresh in background
-
-  const resolvedSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));
-
-  if (resolvedSubreddit) {
-
-    // Try to get cached config (should be instant)
-
-    let cachedConfig = getInMemoryRemovalConfig(resolvedSubreddit);
-
-    
-
-    // If no cache, load fresh (potentially blocking on first open)
-
-    if (!cachedConfig) {
-
-      try {
-
-        cachedConfig = await loadRemovalConfigFromWiki(resolvedSubreddit);
-
-      } catch (error) {
-
-        const message = error instanceof Error ? error.message : String(error);
-
-        if (overlayState === overlayRef) {
-
-          overlayState.error = message;
-
-        }
-
-        cachedConfig = buildDefaultRemovalConfig(resolvedSubreddit);
-
-      }
-
-    }
-
-
-
-    // Update overlay with initial config (cached or fresh)
-
-    if (overlayState === overlayRef && cachedConfig) {
-
-      overlayRef.removalConfig = cachedConfig;
-
-      overlayRef.reasons = Array.isArray(cachedConfig.reasons) ? cachedConfig.reasons : [];
-
-      overlayState.loading = false;
-
-      renderOverlay();
-
-    }
-
-
-
-    // Fetch fresh config in background if cache exists (don't block UI)
-
-    if (cachedConfig) {
-
-      void (async () => {
-
-        try {
-
-          const freshConfig = await loadRemovalConfigFromWiki(resolvedSubreddit);
-
-          // Only update if overlay is still open and config actually changed
-
-          if (overlayState === overlayRef && freshConfig !== cachedConfig) {
-
-            overlayRef.removalConfig = freshConfig;
-
-            overlayRef.reasons = Array.isArray(freshConfig.reasons) ? freshConfig.reasons : [];
-
-            renderOverlay();
-
-          }
-
-        } catch (error) {
-
-          // Non-blocking background load failure - don't show error if we already have cache
-
-          console.warn("[ModBox] Background refresh of removal config failed:", error);
-
-        }
-
-      })();
-
-    }
-
-  } else {
-
-    // No subreddit - mark loading as complete
-
-    if (overlayState === overlayRef) {
-
-      overlayState.loading = false;
-
-      renderOverlay();
-
-    }
-
-  }
-
-}
 
 
 
