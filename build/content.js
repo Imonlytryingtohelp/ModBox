@@ -7171,6 +7171,28 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
 
     const nativeText = String(note.note || "").trim();
 
+    const nativeCreatedBy = String(note.created_by || "unknown").toLowerCase();
+
+    const isToolboxTransferBot = nativeCreatedBy === "toolboxnotesxfer";
+
+    
+
+    // For toolboxnotesxfer bot, strip the ", added by {author}" suffix to get the original text
+
+    let textToCompare = nativeText;
+
+    if (isToolboxTransferBot) {
+
+      const addedByMatch = nativeText.match(/^(.+?),\s*added by\s+\S+$/);
+
+      if (addedByMatch) {
+
+        textToCompare = addedByMatch[1].trim();
+
+      }
+
+    }
+
     
 
     // Check for duplicates in Toolbox notes within the window
@@ -7185,7 +7207,25 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
 
       
 
-      if (timeDiff <= dedupeWindow && isNoteTextSimilar(nativeText, toolboxNote.note || "")) {
+      // For notes from toolboxnotesxfer bot, compare the stripped text exactly
+
+      // For regular native notes, use the normal similar text check
+
+      const textMatches = isToolboxTransferBot 
+
+        ? String(toolboxNote.note || "").trim() === textToCompare
+
+        : isNoteTextSimilar(nativeText, toolboxNote.note || "");
+
+      
+
+      // Use a larger time window for toolboxnotesxfer since the bot takes time to transfer
+
+      const effectiveDedupeWindow = isToolboxTransferBot ? 300000 : dedupeWindow; // 5 minutes for bot, 1 minute for others
+
+      
+
+      if (timeDiff <= effectiveDedupeWindow && textMatches) {
 
         isDuplicate = true;
 
@@ -7198,6 +7238,8 @@ function deduplicateToolboxAndNativeNotes(toolboxNotes, nativeNotes, dedupeWindo
     
 
     if (isDuplicate) {
+
+      console.log(`[ModBox] Filtered duplicate native note from ${nativeCreatedBy}: "${nativeText.slice(0, 50)}..."`);
 
       return; // Skip this native note (duplicate)
 
@@ -11968,6 +12010,74 @@ function injectStyles() {
       display: flex;
 
       justify-content: flex-end;
+
+    }
+
+
+
+    .rrw-btn-trash {
+
+      appearance: none;
+
+      -webkit-appearance: none;
+
+      background: none;
+
+      border: none;
+
+      color: var(--rrw-muted);
+
+      cursor: pointer;
+
+      font-size: 1.2rem;
+
+      line-height: 1;
+
+      padding: 4px 6px;
+
+      min-width: 28px;
+
+      min-height: 28px;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      border-radius: 4px;
+
+      transition: color 0.15s, background-color 0.15s;
+
+    }
+
+
+
+    .rrw-btn-trash:hover {
+
+      color: #ff6b6b;
+
+      background-color: rgba(255, 107, 107, 0.1);
+
+    }
+
+
+
+    .rrw-btn-trash:active {
+
+      color: #ff5252;
+
+      background-color: rgba(255, 107, 107, 0.2);
+
+    }
+
+
+
+    .rrw-btn-trash:disabled {
+
+      opacity: 0.5;
+
+      cursor: not-allowed;
 
     }
 

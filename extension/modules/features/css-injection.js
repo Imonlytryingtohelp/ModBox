@@ -872,6 +872,40 @@ function injectStyles() {
       justify-content: flex-end;
     }
 
+    .rrw-btn-trash {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: none;
+      color: var(--rrw-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+      padding: 4px 6px;
+      min-width: 28px;
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.15s, background-color 0.15s;
+    }
+
+    .rrw-btn-trash:hover {
+      color: #ff6b6b;
+      background-color: rgba(255, 107, 107, 0.1);
+    }
+
+    .rrw-btn-trash:active {
+      color: #ff5252;
+      background-color: rgba(255, 107, 107, 0.2);
+    }
+
+    .rrw-btn-trash:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .rrw-usernote-include-link {
       display: inline-flex;
       align-items: center;
