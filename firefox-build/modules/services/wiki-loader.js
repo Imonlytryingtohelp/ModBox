@@ -511,6 +511,125 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
 }
 
 // ============================================================================
+// CANNED REPLIES CACHING & HELPERS
+// ============================================================================
+
+function getInMemoryCannedReplies(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryCannedRepliesCache) {
+    return null;
+  }
+  return inMemoryCannedRepliesCache.get(key) || null;
+}
+
+function setInMemoryCannedReplies(subreddit, config) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key) {
+    return;
+  }
+  if (!inMemoryCannedRepliesCache) {
+    inMemoryCannedRepliesCache = new Map();
+  }
+  inMemoryCannedRepliesCache.set(key, normalizeCannedRepliesDoc(config, subreddit));
+}
+
+function clearInMemoryCannedReplies(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryCannedRepliesCache) {
+    return;
+  }
+  inMemoryCannedRepliesCache.delete(key);
+}
+
+function normalizeCannedRepliesDoc(doc, subreddit) {
+  if (!doc || typeof doc !== "object") {
+    return buildDefaultCannedRepliesConfig(subreddit);
+  }
+
+  const replies = Array.isArray(doc.replies) ? doc.replies : [];
+  const normalized = Array.isArray(doc) ? doc : replies;
+
+  return {
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    replies: normalized
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        name: String(item.name || item.Name || "").trim(),
+        content: String(item.content || item.Content || "").trim(),
+      }))
+      .filter((item) => item.name && item.content),
+  };
+}
+
+function buildDefaultCannedRepliesConfig(subreddit) {
+  return {
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    replies: [],
+  };
+}
+
+async function loadCannedRepliesFromWiki(subreddit) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to load canned replies");
+  }
+
+  const cached = getInMemoryCannedReplies(cleanSubreddit);
+  if (cached) {
+    return cached;
+  }
+
+  let wikiPayload;
+  const wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
+  try {
+    wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+      return buildDefaultCannedRepliesConfig(cleanSubreddit);
+    }
+    throw error;
+  }
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+  if (!raw) {
+    return buildDefaultCannedRepliesConfig(cleanSubreddit);
+  }
+
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch (e) {
+    throw new Error("Canned replies wiki page is not valid JSON");
+  }
+
+  const normalized = normalizeCannedRepliesDoc(doc, cleanSubreddit);
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  return normalized;
+}
+
+async function saveCannedRepliesToWiki(subreddit, config, reason) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to save canned replies");
+  }
+
+  const normalized = normalizeCannedRepliesDoc(config, cleanSubreddit);
+  const payload = JSON.stringify(normalized, null, 2);
+  const params = new URLSearchParams();
+  params.set("content", payload);
+  params.set("page", CANNED_REPLIES_WIKI_PAGE);
+  params.set("reason", String(reason || "updated canned replies via ModBox"));
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  return normalized;
+}
+
+// ============================================================================
 // PLAYBOOKS NORMALIZATION & HELPERS
 // ============================================================================
 

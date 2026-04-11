@@ -31,6 +31,7 @@ const THEME_MODE_KEY = "themeMode";
 const LAST_SEND_MODE_KEY = "lastSendMode";
 const COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY = "commentNukeIgnoreDistinguished";
 const EXTENSION_SETTINGS_WIKI_PAGE_KEY = "extensionSettingsWikiPage";
+const CANNED_REPLIES_WIKI_URL_KEY = "cannedRepliesWikiUrl";
 
 // ============================================================================
 // WIKI PAGE REFERENCES & SCHEMAS
@@ -41,6 +42,8 @@ const QUICK_ACTIONS_WIKI_PAGE = "modbox/quickactions";
 const QUICK_ACTIONS_WIKI_SCHEMA = "ModBox/quick-actions/v1";
 const PLAYBOOKS_WIKI_PAGE = "modbox/playbooks";
 const PLAYBOOKS_WIKI_SCHEMA = "ModBox/playbooks/v1";
+const CANNED_REPLIES_WIKI_PAGE = "modbox/cannedreplies";
+const CANNED_REPLIES_WIKI_SCHEMA = "ModBox/canned-replies/v1";
 const TOOLBOX_WIKI_PAGE = "toolbox";
 const EXTENSION_SETTINGS_WIKI_SCHEMA = "ModBox/extension-settings/v1";
 const DEFAULT_EXTENSION_SETTINGS_WIKI_PAGE = "modbox/extensionsettings";

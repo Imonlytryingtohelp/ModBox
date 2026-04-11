@@ -511,6 +511,272 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
 }
 
 // ============================================================================
+// CANNED REPLIES CACHING & HELPERS
+// ============================================================================
+
+let inMemoryCannedRepliesCache = null;
+
+function getInMemoryCannedReplies(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryCannedRepliesCache) {
+    return null;
+  }
+  return inMemoryCannedRepliesCache.get(key) || null;
+}
+
+function setInMemoryCannedReplies(subreddit, config) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key) {
+    return;
+  }
+  if (!inMemoryCannedRepliesCache) {
+    inMemoryCannedRepliesCache = new Map();
+  }
+  inMemoryCannedRepliesCache.set(key, normalizeCannedRepliesDoc(config, subreddit));
+}
+
+function clearInMemoryCannedReplies(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryCannedRepliesCache) {
+    return;
+  }
+  inMemoryCannedRepliesCache.delete(key);
+}
+
+function normalizeCannedRepliesDoc(doc, subreddit) {
+  if (!doc || typeof doc !== "object") {
+    return buildDefaultCannedRepliesConfig(subreddit);
+  }
+
+  const replies = Array.isArray(doc.replies) ? doc.replies : [];
+  const normalized = Array.isArray(doc) ? doc : replies;
+
+  return {
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    replies: normalized
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        name: String(item.name || item.Name || "").trim(),
+        content: String(item.content || item.Content || "").trim(),
+      }))
+      .filter((item) => item.name && item.content),
+  };
+}
+
+function buildDefaultCannedRepliesConfig(subreddit) {
+  return {
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    replies: [],
+  };
+}
+
+// Simple YAML parser for canned replies array format
+// Handles: - Name: string
+//          Content: multiline string
+function parseSimpleYaml(yamlText) {
+  const lines = String(yamlText || "").split(/\r?\n/);
+  const items = [];
+  let currentItem = null;
+  let contentLines = [];
+  let inContent = false;
+  let baseIndent = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Start of new item
+    if (trimmed.startsWith("- ")) {
+      // Save previous item
+      if (currentItem) {
+        currentItem.Content = contentLines.join("\n").trim();
+        items.push(currentItem);
+      }
+      
+      // Parse "- Name: value"
+      const match = trimmed.match(/^-\s*Name:\s*(.+)$/i);
+      if (match) {
+        currentItem = { Name: match[1].trim() };
+        contentLines = [];
+        inContent = false;
+        baseIndent = null;
+      }
+    } else if (trimmed.startsWith("Name:") && !inContent) {
+      // Alternative format without dash on same line
+      const match = trimmed.match(/^Name:\s*(.+)$/i);
+      if (match) {
+        if (currentItem) {
+          currentItem.Content = contentLines.join("\n").trim();
+          items.push(currentItem);
+        }
+        currentItem = { Name: match[1].trim() };
+        contentLines = [];
+        inContent = false;
+        baseIndent = null;
+      }
+    } else if ((trimmed.startsWith("Content:") || trimmed.startsWith("Content: |")) && currentItem) {
+      // Start of content section
+      inContent = true;
+      const match = trimmed.match(/^Content:\s*(?:\|\s*)?(.*)$/i);
+      if (match && match[1]) {
+        contentLines = [match[1]];
+      } else {
+        contentLines = [];
+      }
+      baseIndent = null;
+    } else if (inContent && currentItem && (trimmed === "" || !trimmed.startsWith("-"))) {
+      // Content line (indented or empty)
+      if (trimmed) {
+        // If this is the first content line, detect base indentation
+        if (baseIndent === null && line.length > trimmed.length) {
+          baseIndent = line.length - trimmed.length;
+        }
+        
+        // Remove base indentation from the line
+        if (baseIndent && line.startsWith(" ".repeat(baseIndent))) {
+          contentLines.push(line.slice(baseIndent));
+        } else {
+          contentLines.push(trimmed);
+        }
+      } else if (contentLines.length > 0) {
+        // Preserve empty lines within content
+        contentLines.push("");
+      }
+    } else if (!trimmed && contentLines.length === 0 && currentItem) {
+      // Empty line before content - might be separator
+      continue;
+    }
+  }
+
+  // Save last item
+  if (currentItem) {
+    currentItem.Content = contentLines.join("\n").trim();
+    items.push(currentItem);
+  }
+
+  return items;
+}
+
+async function loadCannedRepliesFromWiki(subreddit) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to load canned replies");
+  }
+
+  const cached = getInMemoryCannedReplies(cleanSubreddit);
+  if (cached) {
+    return cached;
+  }
+
+  let wikiPayload;
+  let wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
+  
+  // Try to get wikiUrl from chrome storage
+  try {
+    const data = await new Promise(resolve => {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.get([CANNED_REPLIES_WIKI_URL_KEY, 'wikiUrl'], resolve);
+      } else {
+        resolve({});
+      }
+    });
+    
+    // Check both ModBox and original CannedReplys storage keys
+    const configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
+    if (configuredUrl) {
+      let path = String(configuredUrl).trim();
+      
+      // Handle full URLs
+      if (path.startsWith('http')) {
+        path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+      }
+      
+      // Ensure leading slash
+      if (!path.startsWith('/')) {
+        path = '/' + path;
+      }
+      
+      // Remove trailing slash
+      path = path.replace(/\/$/, '');
+      
+      wikiPath = path + '.json?raw_json=1';
+      console.log("[ModBox] Using configured canned replies URL:", wikiPath);
+    }
+  } catch (err) {
+    console.log("[ModBox] Could not read canned replies URL from storage:", err);
+  }
+  
+  console.log("[ModBox] Loading canned replies from:", wikiPath);
+  
+  try {
+    wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+      return buildDefaultCannedRepliesConfig(cleanSubreddit);
+    }
+    throw error;
+  }
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+  if (!raw) {
+    return buildDefaultCannedRepliesConfig(cleanSubreddit);
+  }
+
+  let doc;
+  try {
+    // Try JSON first
+    doc = JSON.parse(raw);
+  } catch (jsonError) {
+    // If JSON parse fails, try YAML format
+    try {
+      const yamlArray = parseSimpleYaml(raw);
+      if (yamlArray && yamlArray.length > 0) {
+        // Convert YAML array to our schema
+        doc = {
+          schema: CANNED_REPLIES_WIKI_SCHEMA,
+          version: 1,
+          subreddit: cleanSubreddit,
+          replies: yamlArray.map(item => ({
+            name: item.Name || "",
+            content: item.Content || ""
+          }))
+        };
+      } else {
+        throw new Error("No canned replies found in YAML format");
+      }
+    } catch (yamlError) {
+      throw new Error("Canned replies wiki page is neither valid JSON nor YAML");
+    }
+  }
+
+  const normalized = normalizeCannedRepliesDoc(doc, cleanSubreddit);
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  return normalized;
+}
+
+async function saveCannedRepliesToWiki(subreddit, config, reason) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to save canned replies");
+  }
+
+  const normalized = normalizeCannedRepliesDoc(config, cleanSubreddit);
+  const payload = JSON.stringify(normalized, null, 2);
+  const params = new URLSearchParams();
+  params.set("content", payload);
+  params.set("page", CANNED_REPLIES_WIKI_PAGE);
+  params.set("reason", String(reason || "updated canned replies via ModBox"));
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  return normalized;
+}
+
+// ============================================================================
 // PLAYBOOKS NORMALIZATION & HELPERS
 // ============================================================================
 

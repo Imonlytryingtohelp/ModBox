@@ -846,6 +846,20 @@ function renderRemovalConfigEditor() {
 
         <section class="rrw-preview-panel rrw-config-section">
           <div class="rrw-preview-panel__header">
+            <h3>Canned Replies (optional)</h3>
+          </div>
+          <p class="rrw-muted">Configure a wiki page with pre-written responses. Use <code>pagepath</code> for this subreddit or <code>r/SubName/pagepath</code> for any subreddit you moderate.</p>
+          <div class="rrw-config-grid">
+            <label class="rrw-field">
+              <span>Canned replies wiki page</span>
+              <input type="text" data-ext-setting="canned_replies_wiki_url" value="${escapeHtml(extensionSettings.canned_replies_wiki_url || "")}" placeholder="modbox/canned_replies or r/SubName/pagepath" />
+              <small class="rrw-muted rrw-config-help">Wiki page URL for storing canned reply templates (YAML format)</small>
+            </label>
+          </div>
+        </section>
+
+        <section class="rrw-preview-panel rrw-config-section">
+          <div class="rrw-preview-panel__header">
             <h3>Wiki backup (optional)</h3>
           </div>
           <p class="rrw-muted">Backup or restore settings to/from a subreddit wiki. Use <code>pagepath</code> for this subreddit or <code>r/SubName/pagepath</code> for any subreddit you moderate.</p>
@@ -996,6 +1010,8 @@ function renderRemovalConfigEditor() {
         removalConfigEditorState.extensionSettings.queue_bar_fixed_subreddit = clean || null;
       } else if (key === "queue_bar_link_host") {
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
+      } else if (key === "canned_replies_wiki_url") {
+        removalConfigEditorState.extensionSettings.canned_replies_wiki_url = String(event.target.value || "").trim();
       }
     };
     element.addEventListener("input", applySetting);
@@ -1073,6 +1089,7 @@ function renderRemovalConfigEditor() {
           typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false,
         comment_nuke_ignore_distinguished:
           typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false,
+        canned_replies_wiki_url: String(s.canned_replies_wiki_url || "").trim(),
       };
       await setExtensionSettingsWikiPagePreference(rawPage);
       removalConfigEditorState.wikiBackupStatus = `Restored from wiki/${targetPage} on r/${targetSub}. Click Save settings to apply.`;
@@ -1733,6 +1750,7 @@ function renderRemovalConfigEditor() {
         const openInNewTab = typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false;
         const themeMode = normalizeThemeMode(s.theme_mode, "auto");
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
+        const cannedRepliesWikiUrl = String(s.canned_replies_wiki_url || "").trim() || "";
 
         await ext.storage.sync.set({
           [AUTO_CLOSE_KEY]: autoClose,
@@ -1745,6 +1763,7 @@ function renderRemovalConfigEditor() {
           [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: openInNewTab,
           [THEME_MODE_KEY]: themeMode,
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
+          [CANNED_REPLIES_WIKI_URL_KEY]: cannedRepliesWikiUrl,
         });
 
         // Clear the cache so getPanelSettingsCached will fetch fresh settings

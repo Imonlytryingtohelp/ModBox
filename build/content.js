@@ -69,6 +69,8 @@ const COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY = "commentNukeIgnoreDistinguished";
 
 const EXTENSION_SETTINGS_WIKI_PAGE_KEY = "extensionSettingsWikiPage";
 
+const CANNED_REPLIES_WIKI_URL_KEY = "cannedRepliesWikiUrl";
+
 
 
 // ============================================================================
@@ -88,6 +90,10 @@ const QUICK_ACTIONS_WIKI_SCHEMA = "ModBox/quick-actions/v1";
 const PLAYBOOKS_WIKI_PAGE = "modbox/playbooks";
 
 const PLAYBOOKS_WIKI_SCHEMA = "ModBox/playbooks/v1";
+
+const CANNED_REPLIES_WIKI_PAGE = "modbox/cannedreplies";
+
+const CANNED_REPLIES_WIKI_SCHEMA = "ModBox/canned-replies/v1";
 
 const TOOLBOX_WIKI_PAGE = "toolbox";
 
@@ -645,6 +651,8 @@ async function getApiBaseUrl() {
 
     THEME_MODE_KEY,
 
+    CANNED_REPLIES_WIKI_URL_KEY,
+
   ]);
 
 
@@ -698,6 +706,8 @@ async function getApiBaseUrl() {
       typeof stored?.[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
 
     themeMode: normalizeThemeMode(stored?.[THEME_MODE_KEY], "auto"),
+
+    cannedRepliesWikiUrl: String(stored?.[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
 
   };
 
@@ -5710,6 +5720,538 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
   await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
 
   setInMemoryQuickActions(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+// ============================================================================
+
+// CANNED REPLIES CACHING & HELPERS
+
+// ============================================================================
+
+
+
+let inMemoryCannedRepliesCache = null;
+
+
+
+function getInMemoryCannedReplies(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryCannedRepliesCache) {
+
+    return null;
+
+  }
+
+  return inMemoryCannedRepliesCache.get(key) || null;
+
+}
+
+
+
+function setInMemoryCannedReplies(subreddit, config) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key) {
+
+    return;
+
+  }
+
+  if (!inMemoryCannedRepliesCache) {
+
+    inMemoryCannedRepliesCache = new Map();
+
+  }
+
+  inMemoryCannedRepliesCache.set(key, normalizeCannedRepliesDoc(config, subreddit));
+
+}
+
+
+
+function clearInMemoryCannedReplies(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryCannedRepliesCache) {
+
+    return;
+
+  }
+
+  inMemoryCannedRepliesCache.delete(key);
+
+}
+
+
+
+function normalizeCannedRepliesDoc(doc, subreddit) {
+
+  if (!doc || typeof doc !== "object") {
+
+    return buildDefaultCannedRepliesConfig(subreddit);
+
+  }
+
+
+
+  const replies = Array.isArray(doc.replies) ? doc.replies : [];
+
+  const normalized = Array.isArray(doc) ? doc : replies;
+
+
+
+  return {
+
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+
+    version: 1,
+
+    subreddit: normalizeSubreddit(subreddit),
+
+    replies: normalized
+
+      .filter((item) => item && typeof item === "object")
+
+      .map((item) => ({
+
+        name: String(item.name || item.Name || "").trim(),
+
+        content: String(item.content || item.Content || "").trim(),
+
+      }))
+
+      .filter((item) => item.name && item.content),
+
+  };
+
+}
+
+
+
+function buildDefaultCannedRepliesConfig(subreddit) {
+
+  return {
+
+    schema: CANNED_REPLIES_WIKI_SCHEMA,
+
+    version: 1,
+
+    subreddit: normalizeSubreddit(subreddit),
+
+    replies: [],
+
+  };
+
+}
+
+
+
+// Simple YAML parser for canned replies array format
+
+// Handles: - Name: string
+
+//          Content: multiline string
+
+function parseSimpleYaml(yamlText) {
+
+  const lines = String(yamlText || "").split(/\r?\n/);
+
+  const items = [];
+
+  let currentItem = null;
+
+  let contentLines = [];
+
+  let inContent = false;
+
+  let baseIndent = null;
+
+
+
+  for (let i = 0; i < lines.length; i++) {
+
+    const line = lines[i];
+
+    const trimmed = line.trim();
+
+
+
+    // Start of new item
+
+    if (trimmed.startsWith("- ")) {
+
+      // Save previous item
+
+      if (currentItem) {
+
+        currentItem.Content = contentLines.join("\n").trim();
+
+        items.push(currentItem);
+
+      }
+
+      
+
+      // Parse "- Name: value"
+
+      const match = trimmed.match(/^-\s*Name:\s*(.+)$/i);
+
+      if (match) {
+
+        currentItem = { Name: match[1].trim() };
+
+        contentLines = [];
+
+        inContent = false;
+
+        baseIndent = null;
+
+      }
+
+    } else if (trimmed.startsWith("Name:") && !inContent) {
+
+      // Alternative format without dash on same line
+
+      const match = trimmed.match(/^Name:\s*(.+)$/i);
+
+      if (match) {
+
+        if (currentItem) {
+
+          currentItem.Content = contentLines.join("\n").trim();
+
+          items.push(currentItem);
+
+        }
+
+        currentItem = { Name: match[1].trim() };
+
+        contentLines = [];
+
+        inContent = false;
+
+        baseIndent = null;
+
+      }
+
+    } else if ((trimmed.startsWith("Content:") || trimmed.startsWith("Content: |")) && currentItem) {
+
+      // Start of content section
+
+      inContent = true;
+
+      const match = trimmed.match(/^Content:\s*(?:\|\s*)?(.*)$/i);
+
+      if (match && match[1]) {
+
+        contentLines = [match[1]];
+
+      } else {
+
+        contentLines = [];
+
+      }
+
+      baseIndent = null;
+
+    } else if (inContent && currentItem && (trimmed === "" || !trimmed.startsWith("-"))) {
+
+      // Content line (indented or empty)
+
+      if (trimmed) {
+
+        // If this is the first content line, detect base indentation
+
+        if (baseIndent === null && line.length > trimmed.length) {
+
+          baseIndent = line.length - trimmed.length;
+
+        }
+
+        
+
+        // Remove base indentation from the line
+
+        if (baseIndent && line.startsWith(" ".repeat(baseIndent))) {
+
+          contentLines.push(line.slice(baseIndent));
+
+        } else {
+
+          contentLines.push(trimmed);
+
+        }
+
+      } else if (contentLines.length > 0) {
+
+        // Preserve empty lines within content
+
+        contentLines.push("");
+
+      }
+
+    } else if (!trimmed && contentLines.length === 0 && currentItem) {
+
+      // Empty line before content - might be separator
+
+      continue;
+
+    }
+
+  }
+
+
+
+  // Save last item
+
+  if (currentItem) {
+
+    currentItem.Content = contentLines.join("\n").trim();
+
+    items.push(currentItem);
+
+  }
+
+
+
+  return items;
+
+}
+
+
+
+async function loadCannedRepliesFromWiki(subreddit) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    throw new Error("Subreddit is required to load canned replies");
+
+  }
+
+
+
+  const cached = getInMemoryCannedReplies(cleanSubreddit);
+
+  if (cached) {
+
+    return cached;
+
+  }
+
+
+
+  let wikiPayload;
+
+  let wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
+
+  
+
+  // Try to get wikiUrl from chrome storage
+
+  try {
+
+    const data = await new Promise(resolve => {
+
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+
+        chrome.storage.sync.get([CANNED_REPLIES_WIKI_URL_KEY, 'wikiUrl'], resolve);
+
+      } else {
+
+        resolve({});
+
+      }
+
+    });
+
+    
+
+    // Check both ModBox and original CannedReplys storage keys
+
+    const configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
+
+    if (configuredUrl) {
+
+      let path = String(configuredUrl).trim();
+
+      
+
+      // Handle full URLs
+
+      if (path.startsWith('http')) {
+
+        path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+
+      }
+
+      
+
+      // Ensure leading slash
+
+      if (!path.startsWith('/')) {
+
+        path = '/' + path;
+
+      }
+
+      
+
+      // Remove trailing slash
+
+      path = path.replace(/\/$/, '');
+
+      
+
+      wikiPath = path + '.json?raw_json=1';
+
+      console.log("[ModBox] Using configured canned replies URL:", wikiPath);
+
+    }
+
+  } catch (err) {
+
+    console.log("[ModBox] Could not read canned replies URL from storage:", err);
+
+  }
+
+  
+
+  console.log("[ModBox] Loading canned replies from:", wikiPath);
+
+  
+
+  try {
+
+    wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+
+  } catch (error) {
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+
+      return buildDefaultCannedRepliesConfig(cleanSubreddit);
+
+    }
+
+    throw error;
+
+  }
+
+
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+
+  if (!raw) {
+
+    return buildDefaultCannedRepliesConfig(cleanSubreddit);
+
+  }
+
+
+
+  let doc;
+
+  try {
+
+    // Try JSON first
+
+    doc = JSON.parse(raw);
+
+  } catch (jsonError) {
+
+    // If JSON parse fails, try YAML format
+
+    try {
+
+      const yamlArray = parseSimpleYaml(raw);
+
+      if (yamlArray && yamlArray.length > 0) {
+
+        // Convert YAML array to our schema
+
+        doc = {
+
+          schema: CANNED_REPLIES_WIKI_SCHEMA,
+
+          version: 1,
+
+          subreddit: cleanSubreddit,
+
+          replies: yamlArray.map(item => ({
+
+            name: item.Name || "",
+
+            content: item.Content || ""
+
+          }))
+
+        };
+
+      } else {
+
+        throw new Error("No canned replies found in YAML format");
+
+      }
+
+    } catch (yamlError) {
+
+      throw new Error("Canned replies wiki page is neither valid JSON nor YAML");
+
+    }
+
+  }
+
+
+
+  const normalized = normalizeCannedRepliesDoc(doc, cleanSubreddit);
+
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+async function saveCannedRepliesToWiki(subreddit, config, reason) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    throw new Error("Subreddit is required to save canned replies");
+
+  }
+
+
+
+  const normalized = normalizeCannedRepliesDoc(config, cleanSubreddit);
+
+  const payload = JSON.stringify(normalized, null, 2);
+
+  const params = new URLSearchParams();
+
+  params.set("content", payload);
+
+  params.set("page", CANNED_REPLIES_WIKI_PAGE);
+
+  params.set("reason", String(reason || "updated canned replies via ModBox"));
+
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+
+  setInMemoryCannedReplies(cleanSubreddit, normalized);
 
   return normalized;
 
@@ -12104,6 +12646,158 @@ function injectStyles() {
       margin: 0;
 
       width: auto;
+
+    }
+
+
+
+    /* Canned Replies Button */
+
+    .rrw-canned-reply-btn {
+
+      font-size: 16px !important;
+
+    }
+
+
+
+    .rrw-canned-reply-btn::before,
+
+    .rrw-canned-reply-btn::after {
+
+      content: "" !important;
+
+      display: none !important;
+
+      visibility: hidden !important;
+
+    }
+
+
+
+    .rrw-canned-reply-btn span::before,
+
+    .rrw-canned-reply-btn span::after {
+
+      content: "" !important;
+
+      display: none !important;
+
+      visibility: hidden !important;
+
+    }
+
+
+
+    /* Canned Replies Dropdown */
+
+    .rrw-canned-replies-dropdown {
+
+      position: fixed !important;
+
+      background: white;
+
+      border: 1px solid #999;
+
+      border-radius: 4px;
+
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+      font-family: sans-serif;
+
+      min-width: 180px;
+
+      z-index: 10001 !important;
+
+      overflow: visible !important;
+
+    }
+
+
+
+    .rrw-canned-header {
+
+      display: block;
+
+      padding: 8px 10px;
+
+      background: #0079d3;
+
+      color: white;
+
+      border-radius: 3px 3px 0 0;
+
+      font-size: 12px;
+
+      font-weight: bold;
+
+      margin: 0;
+
+    }
+
+
+
+    .rrw-canned-list {
+
+      list-style: none !important;
+
+      padding: 0 !important;
+
+      margin: 0 !important;
+
+      max-height: 300px;
+
+      overflow-y: auto;
+
+      display: block !important;
+
+    }
+
+
+
+    .rrw-canned-item {
+
+      display: block !important;
+
+      width: 100% !important;
+
+      padding: 8px 10px !important;
+
+      margin: 0 !important;
+
+      border: 0 !important;
+
+      border-bottom: 1px solid #eee !important;
+
+      background: transparent !important;
+
+      text-align: left;
+
+      cursor: pointer;
+
+      font-size: 12px;
+
+      color: #333;
+
+      font-weight: normal !important;
+
+      border-radius: 0 !important;
+
+    }
+
+
+
+    .rrw-canned-item:hover {
+
+      background: #f0f0f0 !important;
+
+    }
+
+
+
+    .rrw-canned-item:last-child {
+
+      border-bottom: 0 !important;
 
     }
 
@@ -19243,6 +19937,8 @@ async function openRemovalConfigEditor(context) {
 
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
 
+      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
+
     ]).catch(() => ({})),
 
     Promise.resolve(null), // getExtensionSettingsWikiPagePreference stub
@@ -19296,6 +19992,10 @@ async function openRemovalConfigEditor(context) {
       queue_bar_use_old_reddit: typeof stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] === "boolean" ? stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] : false,
 
       queue_bar_open_in_new_tab: typeof stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
+
+      comment_nuke_ignore_distinguished: typeof stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] === "boolean" ? stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] : false,
+
+      canned_replies_wiki_url: String(stored[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
 
     },
 
@@ -21639,6 +22339,34 @@ function renderRemovalConfigEditor() {
 
           <div class="rrw-preview-panel__header">
 
+            <h3>Canned Replies (optional)</h3>
+
+          </div>
+
+          <p class="rrw-muted">Configure a wiki page with pre-written responses. Use <code>pagepath</code> for this subreddit or <code>r/SubName/pagepath</code> for any subreddit you moderate.</p>
+
+          <div class="rrw-config-grid">
+
+            <label class="rrw-field">
+
+              <span>Canned replies wiki page</span>
+
+              <input type="text" data-ext-setting="canned_replies_wiki_url" value="${escapeHtml(extensionSettings.canned_replies_wiki_url || "")}" placeholder="modbox/canned_replies or r/SubName/pagepath" />
+
+              <small class="rrw-muted rrw-config-help">Wiki page URL for storing canned reply templates (YAML format)</small>
+
+            </label>
+
+          </div>
+
+        </section>
+
+
+
+        <section class="rrw-preview-panel rrw-config-section">
+
+          <div class="rrw-preview-panel__header">
+
             <h3>Wiki backup (optional)</h3>
 
           </div>
@@ -21939,6 +22667,10 @@ function renderRemovalConfigEditor() {
 
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
 
+      } else if (key === "canned_replies_wiki_url") {
+
+        removalConfigEditorState.extensionSettings.canned_replies_wiki_url = String(event.target.value || "").trim();
+
       }
 
     };
@@ -22092,6 +22824,8 @@ function renderRemovalConfigEditor() {
         comment_nuke_ignore_distinguished:
 
           typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false,
+
+        canned_replies_wiki_url: String(s.canned_replies_wiki_url || "").trim(),
 
       };
 
@@ -23413,6 +24147,8 @@ function renderRemovalConfigEditor() {
 
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
 
+        const cannedRepliesWikiUrl = String(s.canned_replies_wiki_url || "").trim() || "";
+
 
 
         await ext.storage.sync.set({
@@ -23436,6 +24172,8 @@ function renderRemovalConfigEditor() {
           [THEME_MODE_KEY]: themeMode,
 
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
+
+          [CANNED_REPLIES_WIKI_URL_KEY]: cannedRepliesWikiUrl,
 
         });
 
@@ -28733,6 +29471,210 @@ function clearPreviewTimer() {
 
 
 
+function findReplyTextarea() {
+
+  // Try to find comment reply textarea
+
+  const commentReplyForm = document.querySelector(".usertext-edit textarea, .comment .textarea");
+
+  if (commentReplyForm instanceof HTMLTextAreaElement) {
+
+    return commentReplyForm;
+
+  }
+
+
+
+  // Try to find modmail reply textarea
+
+  const modmailReplyForm = document.querySelector(".modmail textarea, .modmail-compose textarea, [data-testid='modmail-reply'] textarea");
+
+  if (modmailReplyForm instanceof HTMLTextAreaElement) {
+
+    return modmailReplyForm;
+
+  }
+
+
+
+  // Try generic textarea in focused or recently interacted element
+
+  const activeElement = document.activeElement;
+
+  if (activeElement instanceof HTMLTextAreaElement) {
+
+    return activeElement;
+
+  }
+
+
+
+  // Fallback: find any visible textarea (not in the overlay)
+
+  const allTextareas = document.querySelectorAll("textarea");
+
+  for (const textarea of allTextareas) {
+
+    if (textarea.offsetHeight > 0 && textarea.offsetWidth > 0) {
+
+      // Skip if it's inside the overlay
+
+      const overlayRoot = document.getElementById(OVERLAY_ROOT_ID);
+
+      if (overlayRoot && overlayRoot.contains(textarea)) {
+
+        continue;
+
+      }
+
+      return textarea;
+
+    }
+
+  }
+
+
+
+  return null;
+
+}
+
+
+
+function showCannedRepliesDropdown() {
+
+  if (!overlayState || !overlayState.cannedRepliesConfig) {
+
+    return;
+
+  }
+
+
+
+  const replies = overlayState.cannedRepliesConfig?.replies || [];
+
+  if (replies.length === 0) {
+
+    showToast("No canned replies available", "error");
+
+    return;
+
+  }
+
+
+
+  // Create dropdown container
+
+  const dropdown = document.createElement("div");
+
+  dropdown.className = "rrw-canned-replies-dropdown";
+
+  dropdown.innerHTML = `
+
+    <div class="rrw-canned-header">Canned Replies</div>
+
+    <div class="rrw-canned-list">
+
+      ${replies.map((reply) => `
+
+        <button type="button" class="rrw-canned-item" data-canned-reply-name="${escapeHtml(reply.name)}" title="${escapeHtml(reply.content.slice(0, 240))}">
+
+          ${escapeHtml(reply.name)}
+
+        </button>
+
+      `).join("")}
+
+    </div>
+
+  `;
+
+
+
+  // Position at mouse cursor or center
+
+  dropdown.style.position = "fixed";
+
+  dropdown.style.top = (window.innerHeight / 2 - 100) + "px";
+
+  dropdown.style.left = (window.innerWidth / 2 - 100) + "px";
+
+  dropdown.style.zIndex = "10001";
+
+
+
+  const root = ensureOverlayRoot();
+
+  root.appendChild(dropdown);
+
+
+
+  // Attach handlers
+
+  dropdown.querySelectorAll("[data-canned-reply-name]").forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      const replyName = String(e.currentTarget.getAttribute("data-canned-reply-name") || "").trim();
+
+      const reply = replies.find((item) => String(item.name || "").trim() === replyName);
+
+      if (reply && reply.content) {
+
+        const textarea = findReplyTextarea();
+
+        if (textarea) {
+
+          const currentValue = textarea.value || "";
+
+          const newValue = currentValue ? `${currentValue}\n\n${reply.content}` : reply.content;
+
+          textarea.value = newValue;
+
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+          textarea.dispatchEvent(new Event("change", { bubbles: true }));
+
+          textarea.focus();
+
+          showToast(`✓ Inserted: ${replyName}`, "success");
+
+          dropdown.remove();
+
+        } else {
+
+          showToast("Reply box not found", "error");
+
+        }
+
+      }
+
+    });
+
+  });
+
+
+
+  // Close on click outside
+
+  setTimeout(() => {
+
+    document.addEventListener("click", (e) => {
+
+      if (!dropdown.contains(e.target)) {
+
+        dropdown.remove();
+
+      }
+
+    }, { once: true });
+
+  }, 0);
+
+}
+
+
+
 function closeOverlay() {
 
   clearPreviewTimer();
@@ -29058,6 +30000,14 @@ function renderOverlay() {
     playbooksError,
 
     playbooksStatus,
+
+    cannedRepliesConfig,
+
+    cannedRepliesLoading,
+
+    cannedRepliesError,
+
+    cannedRepliesStatus,
 
     quickActionsOnlyMode,
 
@@ -29758,6 +30708,10 @@ function renderOverlay() {
             </div>
 
           ` : ""}
+
+
+
+
 
 
 
@@ -30769,11 +31723,97 @@ function renderOverlay() {
 
 
 
+  root.querySelectorAll("[data-canned-reply-name]").forEach((buttonEl) => {
+
+    buttonEl.addEventListener("click", (event) => {
+
+      console.log("[ModBox][CR] Canned reply button clicked");
+
+      const replyName = String(event.currentTarget.getAttribute("data-canned-reply-name") || "").trim();
+
+      if (!replyName) {
+
+        showToast("Canned reply name not found", "error");
+
+        return;
+
+      }
+
+
+
+      const subreddit = normalizeSubreddit(overlayState?.resolved?.subreddit || "");
+
+      const cannedReplies = (overlayState?.cannedRepliesConfig?.replies || []);
+
+      const reply = cannedReplies.find((item) => String(item.name || "").trim() === replyName);
+
+      if (!reply || !reply.content) {
+
+        showToast("Canned reply content not found", "error");
+
+        return;
+
+      }
+
+
+
+      // Find the reply textarea
+
+      const replyTextarea = findReplyTextarea();
+
+      if (!replyTextarea) {
+
+        showToast("Reply box not found. Please focus on a reply form first.", "error");
+
+        return;
+
+      }
+
+
+
+      // Insert the canned reply content
+
+      const currentValue = replyTextarea.value || "";
+
+      const newValue = currentValue ? `${currentValue}\n\n${reply.content}` : reply.content;
+
+      replyTextarea.value = newValue;
+
+      
+
+      // Trigger input event to notify any listeners
+
+      replyTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+      replyTextarea.dispatchEvent(new Event("change", { bubbles: true }));
+
+      
+
+      // Focus the textarea
+
+      replyTextarea.focus();
+
+      
+
+      // Close the overlay for better UX
+
+      closeOverlay();
+
+      
+
+      showToast(`✓ Canned reply inserted: ${replyName}`, "success");
+
+    });
+
+  });
+
+
+
   root.querySelectorAll("[data-input-key]").forEach((inputEl) => {
 
     const updateValue = (event) => {
 
-      const key = event.target.getAttribute("data-input-key");
+      const key = event.currentTarget.getAttribute("data-input-key");
 
       if (!key) {
 
@@ -33375,6 +34415,14 @@ async function openOverlay(target, options = {}) {
 
     playbooksStatus: "",
 
+    cannedRepliesConfig: buildDefaultCannedRepliesConfig(""),
+
+    cannedRepliesLoading: false,
+
+    cannedRepliesError: "",
+
+    cannedRepliesStatus: "",
+
     keydownHandler: null,
 
   };
@@ -33551,6 +34599,8 @@ async function openOverlay(target, options = {}) {
 
     let playbooksPromise = Promise.resolve(null);
 
+    let cannedRepliesPromise = Promise.resolve(null);
+
     if (resolvedSubreddit) {
 
       console.log("[ModBox] openOverlay: Starting quick actions and playbooks load for subreddit:", resolvedSubreddit);
@@ -33636,6 +34686,50 @@ async function openOverlay(target, options = {}) {
           if (overlayState !== overlayRef) return;
 
           overlayRef.playbooksLoading = false;
+
+          renderOverlay();
+
+        });
+
+
+
+      overlayState.cannedRepliesLoading = true;
+
+      overlayState.cannedRepliesError = "";
+
+      console.log("[ModBox] openOverlay: Calling loadCannedRepliesFromWiki");
+
+      cannedRepliesPromise = loadCannedRepliesFromWiki(resolvedSubreddit)
+
+        .then((cannedRepliesConfig) => {
+
+          console.log("[ModBox] openOverlay: cannedRepliesConfig received:", cannedRepliesConfig);
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.cannedRepliesConfig = normalizeCannedRepliesDoc(cannedRepliesConfig, resolvedSubreddit);
+
+          console.log("[ModBox] openOverlay: cannedRepliesConfig set:", overlayRef.cannedRepliesConfig);
+
+        })
+
+        .catch((cannedRepliesError) => {
+
+          console.log("[ModBox] openOverlay: Canned replies error:", cannedRepliesError);
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.cannedRepliesError = cannedRepliesError instanceof Error ? cannedRepliesError.message : String(cannedRepliesError);
+
+          overlayRef.cannedRepliesConfig = buildDefaultCannedRepliesConfig(resolvedSubreddit);
+
+        })
+
+        .finally(() => {
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.cannedRepliesLoading = false;
 
           renderOverlay();
 
@@ -33862,6 +34956,388 @@ async function openOverlay(target, options = {}) {
     schedulePreview();
 
   }
+
+}
+
+// ------------------------------------------------------------------------------
+// canned-replies-injector.js
+// ------------------------------------------------------------------------------
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Canned Replies Injector Module
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Injects canned reply buttons next to Reddit reply forms and manages the dropdown UI.
+
+// Replicates the exact behavior of the original CannedReplys extension.
+
+// Dependencies: constants.js, state.js, utilities.js, wiki-loader.js
+
+
+
+let cannedRepliesDropdown = null;
+
+let cannedRepliesConfig = null;
+
+let cannedRepliesLoadPromise = null;
+
+
+
+function initCannedRepliesInjector() {
+
+  console.log("[ModBox] Initializing canned replies injector");
+
+  
+
+  // Initial injection  
+
+  injectButtons();
+
+  
+
+  // Watch for new reply boxes (exactly like original extension)
+
+  const observer = new MutationObserver(injectButtons);
+
+  observer.observe(document.body, { childList: true, subtree: true });
+
+}
+
+
+
+async function loadCannedRepliesIfNeeded() {
+
+  // If already loaded or loading, return the promise
+
+  if (cannedRepliesConfig) {
+
+    console.log("[ModBox] Using cached canned replies:", cannedRepliesConfig);
+
+    return cannedRepliesConfig;
+
+  }
+
+  
+
+  if (cannedRepliesLoadPromise) {
+
+    return cannedRepliesLoadPromise;
+
+  }
+
+  
+
+  // Load from wiki
+
+  cannedRepliesLoadPromise = (async () => {
+
+    try {
+
+      const subreddit = parseSubredditFromPath(window.location.pathname);
+
+      console.log("[ModBox] Canned replies: parsed subreddit =", subreddit);
+
+      
+
+      if (!subreddit) {
+
+        console.warn("[ModBox] No subreddit found on page");
+
+        cannedRepliesConfig = buildDefaultCannedRepliesConfig("");
+
+        return cannedRepliesConfig;
+
+      }
+
+      
+
+      console.log("[ModBox] Loading canned replies from wiki for subreddit:", subreddit);
+
+      const config = await loadCannedRepliesFromWiki(subreddit);
+
+      console.log("[ModBox] Wiki returned config:", config);
+
+      
+
+      cannedRepliesConfig = normalizeCannedRepliesDoc(config, subreddit);
+
+      console.log("[ModBox] Normalized canned replies config:", cannedRepliesConfig);
+
+      
+
+      return cannedRepliesConfig;
+
+    } catch (err) {
+
+      console.error("[ModBox] Error loading canned replies:", err);
+
+      const subreddit = parseSubredditFromPath(window.location.pathname);
+
+      cannedRepliesConfig = buildDefaultCannedRepliesConfig(subreddit || "");
+
+      return cannedRepliesConfig;
+
+    }
+
+  })();
+
+  
+
+  return cannedRepliesLoadPromise;
+
+}
+
+
+
+// Inject button next to all reply boxes (exactly like original extension)
+
+function injectButtons() {
+
+  document.querySelectorAll('form.usertext').forEach(form => {
+
+    if (form.querySelector('.rrw-canned-reply-btn')) return;
+
+    
+
+    const btn = document.createElement('button');
+
+    // Use Unicode escape sequence for emoji to avoid encoding issues
+
+    btn.textContent = '\uD83D\uDCAC'; // ðŸ’¬
+
+    btn.className = 'rrw-canned-reply-btn';
+
+    btn.style.marginLeft = '6px';
+
+    btn.type = 'button'; // Prevent form submission
+
+    
+
+    btn.onclick = (e) => {
+
+      e.preventDefault();
+
+      e.stopPropagation();
+
+      openGui(form, btn);
+
+    };
+
+    
+
+    const footer = form.querySelector('.usertext-buttons');
+
+    if (footer) footer.appendChild(btn);
+
+  });
+
+}
+
+
+
+// Open GUI as modal popup (matching ModBox overlay style)
+
+async function openGui(form, anchorBtn) {
+
+  const config = await loadCannedRepliesIfNeeded();
+
+  const responses = config?.replies || [];
+
+  
+
+  if (!responses.length) {
+
+    alert('No canned replies found. Check your wiki config.');
+
+    return;
+
+  }
+
+  
+
+  closeGui();
+
+  
+
+  // Ensure overlay root exists
+
+  const overlayRoot = ensureOverlayRoot();
+
+  
+
+  // Create backdrop
+
+  const backdrop = document.createElement('div');
+
+  backdrop.className = 'rrw-overlay-backdrop';
+
+  backdrop.id = 'cannedRepliesBackdrop';
+
+  backdrop.onclick = (e) => {
+
+    if (e.target === backdrop) closeGui();
+
+  };
+
+  
+
+  // Create modal
+
+  const modal = document.createElement('div');
+
+  modal.className = 'rrw-overlay-modal';
+
+  modal.id = 'cannedRepliesModal';
+
+  
+
+  // Create header
+
+  const header = document.createElement('div');
+
+  header.className = 'rrw-overlay-header';
+
+  const title = document.createElement('h2');
+
+  title.textContent = 'Canned Replies';
+
+  header.appendChild(title);
+
+  modal.appendChild(header);
+
+  
+
+  // Create grid container for buttons (same as rrw-quick-actions-grid)
+
+  const grid = document.createElement('div');
+
+  grid.className = 'rrw-quick-actions-grid';
+
+  grid.style.padding = '12px';
+
+  grid.style.overflowY = 'auto';
+
+  grid.style.maxHeight = 'calc(100vh - 120px)';
+
+  
+
+  // Add reply buttons to grid
+
+  responses.forEach(resp => {
+
+    const btn = document.createElement('button');
+
+    btn.className = 'rrw-quick-action-btn rrw-btn rrw-btn-secondary';
+
+    btn.type = 'button';
+
+    btn.textContent = resp.name;
+
+    btn.title = resp.content;
+
+    
+
+    btn.onclick = (e) => {
+
+      e.preventDefault();
+
+      e.stopPropagation();
+
+      onSelectReply(form, resp);
+
+    };
+
+    
+
+    grid.appendChild(btn);
+
+  });
+
+  
+
+  modal.appendChild(grid);
+
+  
+
+  // Add to overlay root
+
+  overlayRoot.appendChild(backdrop);
+
+  overlayRoot.appendChild(modal);
+
+  
+
+  console.log("[ModBox] Opened canned replies modal with", responses.length, "replies in 3-column grid");
+
+  
+
+  // Close on click outside modal
+
+  setTimeout(() => {
+
+    document.addEventListener('mousedown', (e) => {
+
+      if (!modal.contains(e.target) && !anchorBtn.contains(e.target)) {
+
+        closeGui();
+
+      }
+
+    }, { once: true });
+
+  }, 0);
+
+}
+
+
+
+function closeGui() {
+
+  const modal = document.getElementById('cannedRepliesModal');
+
+  const backdrop = document.getElementById('cannedRepliesBackdrop');
+
+  if (modal) modal.remove();
+
+  if (backdrop) backdrop.remove();
+
+}
+
+
+
+function clickAway(e) {
+
+  const modal = document.getElementById('cannedRepliesModal');
+
+  if (modal && !modal.contains(e.target)) closeGui();
+
+}
+
+
+
+// On reply select
+
+function onSelectReply(form, resp) {
+
+  const textarea = form.querySelector('textarea');
+
+  if (!textarea) return;
+
+  
+
+  // Always just fill the text - no auto-submit by default
+
+  textarea.value = resp.content;
+
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+  textarea.dispatchEvent(new Event('change', { bubbles: true }));
+
+  textarea.focus();
+
+  closeGui();
 
 }
 
@@ -40156,6 +41632,10 @@ function start() {
   void loadCommentNukeIgnoreDistinguishedPreference();
 
   void loadContextPopupPosition();
+
+  // Initialize canned replies injector to add buttons to reply forms
+
+  void initCannedRepliesInjector();
 
   // Prioritize queue bar on page reload: initialize immediately so counts and links
 

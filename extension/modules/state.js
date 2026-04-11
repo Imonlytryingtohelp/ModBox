@@ -223,6 +223,7 @@ async function getApiBaseUrl() {
     QUEUE_BAR_FIXED_SUBREDDIT_KEY,
     CONTEXT_POPUP_ENABLED_KEY,
     THEME_MODE_KEY,
+    CANNED_REPLIES_WIKI_URL_KEY,
   ]);
 
   const scope = String(stored?.buttonVisibilityScope || "configured_plus_mod");
@@ -250,5 +251,6 @@ async function getApiBaseUrl() {
     contextPopupEnabled:
       typeof stored?.[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
     themeMode: normalizeThemeMode(stored?.[THEME_MODE_KEY], "auto"),
+    cannedRepliesWikiUrl: String(stored?.[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
   };
 }

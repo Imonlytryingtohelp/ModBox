@@ -111,6 +111,41 @@ function clearPreviewTimer() {
   }
 }
 
+function findReplyTextarea() {
+  // Try to find comment reply textarea
+  const commentReplyForm = document.querySelector(".usertext-edit textarea, .comment .textarea");
+  if (commentReplyForm instanceof HTMLTextAreaElement) {
+    return commentReplyForm;
+  }
+
+  // Try to find modmail reply textarea
+  const modmailReplyForm = document.querySelector(".modmail textarea, .modmail-compose textarea, [data-testid='modmail-reply'] textarea");
+  if (modmailReplyForm instanceof HTMLTextAreaElement) {
+    return modmailReplyForm;
+  }
+
+  // Try generic textarea in focused or recently interacted element
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLTextAreaElement) {
+    return activeElement;
+  }
+
+  // Fallback: find any visible textarea (not in the overlay)
+  const allTextareas = document.querySelectorAll("textarea");
+  for (const textarea of allTextareas) {
+    if (textarea.offsetHeight > 0 && textarea.offsetWidth > 0) {
+      // Skip if it's inside the overlay
+      const overlayRoot = document.getElementById(OVERLAY_ROOT_ID);
+      if (overlayRoot && overlayRoot.contains(textarea)) {
+        continue;
+      }
+      return textarea;
+    }
+  }
+
+  return null;
+}
+
 function closeOverlay() {
   clearPreviewTimer();
   if (overlayState?.keydownHandler) {
@@ -274,6 +309,10 @@ function renderOverlay() {
     playbooksLoading,
     playbooksError,
     playbooksStatus,
+    cannedRepliesConfig,
+    cannedRepliesLoading,
+    cannedRepliesError,
+    cannedRepliesStatus,
     quickActionsOnlyMode,
   } = overlayState;
 
@@ -382,8 +421,8 @@ function renderOverlay() {
   const canAct = Boolean(resolved?.isActionable || isFullname(target));
   const actionsTabLabel = thingType === "submission" ? "Post Actions" : "Comment Actions";
   const overlayTab = quickActionsOnlyMode
-    ? (["quick_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
-    : (["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
+    ? (["quick_actions", "playbooks", "canned_replies"].includes(activeTab) ? activeTab : "quick_actions")
+    : (["kind_actions", "quick_actions", "playbooks", "user_actions", "canned_replies"].includes(activeTab) ? activeTab : "kind_actions");
   const canRunUserActions = canAct && Boolean(resolved?.author);
   const effectiveBanDays = banDurationOption === "custom"
     ? Number.parseInt(String(banCustomDays || ""), 10)
@@ -488,6 +527,11 @@ function renderOverlay() {
               class="rrw-tab-btn ${overlayTab === "playbooks" ? "rrw-tab-btn--active" : ""}"
               data-overlay-tab="playbooks"
             >Playbooks</button>
+            <button
+              type="button"
+              class="rrw-tab-btn ${overlayTab === "canned_replies" ? "rrw-tab-btn--active" : ""}"
+              data-overlay-tab="canned_replies"
+            >Canned Replies</button>
             ${!quickActionsOnlyMode ? `<button
               type="button"
               class="rrw-tab-btn ${overlayTab === "user_actions" ? "rrw-tab-btn--active" : ""}"
@@ -617,6 +661,32 @@ function renderOverlay() {
                       title="${escapeHtml(`${(Array.isArray(playbook.steps) ? playbook.steps.length : 0)} step${(Array.isArray(playbook.steps) ? playbook.steps.length : 0) === 1 ? "" : "s"}${playbook.confirm ? " \u00B7 confirmation required" : ""}`)}"
                       ${submitting || !canAct ? "disabled" : ""}
                     >${escapeHtml(playbook.title)}</button>
+                  `).join("")}
+              </div>
+            </section>
+
+            <div class="rrw-footer-links rrw-footer-links--solo">
+            </div>
+          ` : ""}
+
+          ${overlayTab === "canned_replies" ? `
+            <section class="rrw-user-actions-panel">
+              <h3>Canned Replies</h3>
+              <p class="rrw-muted">Insert pre-written replies into the reply form.</p>
+              ${cannedRepliesLoading ? `<p class="rrw-muted">Loading canned replies...</p>` : ""}
+              ${cannedRepliesError ? `<div class="rrw-error">${escapeHtml(cannedRepliesError)}</div>` : ""}
+              ${cannedRepliesStatus ? `<div class="rrw-success">${escapeHtml(cannedRepliesStatus)}</div>` : ""}
+              <div class="rrw-actions rrw-actions--inline rrw-quick-actions-grid">
+                ${cannedRepliesConfig?.replies?.length === 0
+                  ? `<p class="rrw-muted">No canned replies available.</p>`
+                  : (cannedRepliesConfig?.replies || []).map((reply) => `
+                    <button
+                      type="button"
+                      class="rrw-btn rrw-btn-secondary rrw-quick-action-btn"
+                      data-canned-reply-name="${escapeHtml(reply.name)}"
+                      title="${escapeHtml(reply.content.slice(0, 240))}"
+                      ${submitting || !canAct ? "disabled" : ""}
+                    >${escapeHtml(reply.name)}</button>
                   `).join("")}
               </div>
             </section>
@@ -1129,9 +1199,52 @@ function renderOverlay() {
     });
   });
 
+  root.querySelectorAll("[data-canned-reply-name]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", (event) => {
+      console.log("[ModBox][CR] Canned reply button clicked");
+      const replyName = String(event.currentTarget.getAttribute("data-canned-reply-name") || "").trim();
+      if (!replyName) {
+        showToast("Canned reply name not found", "error");
+        return;
+      }
+
+      const subreddit = normalizeSubreddit(overlayState?.resolved?.subreddit || "");
+      const cannedReplies = (overlayState?.cannedRepliesConfig?.replies || []);
+      const reply = cannedReplies.find((item) => String(item.name || "").trim() === replyName);
+      if (!reply || !reply.content) {
+        showToast("Canned reply content not found", "error");
+        return;
+      }
+
+      // Find the reply textarea
+      const replyTextarea = findReplyTextarea();
+      if (!replyTextarea) {
+        showToast("Reply box not found. Please focus on a reply form first.", "error");
+        return;
+      }
+
+      // Insert the canned reply content
+      const currentValue = replyTextarea.value || "";
+      const newValue = currentValue ? `${currentValue}\n\n${reply.content}` : reply.content;
+      replyTextarea.value = newValue;
+      
+      // Trigger input event to notify any listeners
+      replyTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+      replyTextarea.dispatchEvent(new Event("change", { bubbles: true }));
+      
+      // Focus the textarea
+      replyTextarea.focus();
+      
+      // Close the overlay for better UX
+      closeOverlay();
+      
+      showToast(`✓ Canned reply inserted: ${replyName}`, "success");
+    });
+  });
+
   root.querySelectorAll("[data-input-key]").forEach((inputEl) => {
     const updateValue = (event) => {
-      const key = event.target.getAttribute("data-input-key");
+      const key = event.currentTarget.getAttribute("data-input-key");
       if (!key) {
         return;
       }
@@ -2432,6 +2545,10 @@ async function openOverlay(target, options = {}) {
     playbooksLoading: false,
     playbooksError: "",
     playbooksStatus: "",
+    cannedRepliesConfig: buildDefaultCannedRepliesConfig(""),
+    cannedRepliesLoading: false,
+    cannedRepliesError: "",
+    cannedRepliesStatus: "",
     keydownHandler: null,
   };
   const overlayRef = overlayState;
@@ -2520,6 +2637,7 @@ async function openOverlay(target, options = {}) {
     let postFlairTemplatesPromise = Promise.resolve([]);
     let quickActionsPromise = Promise.resolve(null);
     let playbooksPromise = Promise.resolve(null);
+    let cannedRepliesPromise = Promise.resolve(null);
     if (resolvedSubreddit) {
       console.log("[ModBox] openOverlay: Starting quick actions and playbooks load for subreddit:", resolvedSubreddit);
       overlayState.quickActionsLoading = true;
@@ -2563,6 +2681,28 @@ async function openOverlay(target, options = {}) {
         .finally(() => {
           if (overlayState !== overlayRef) return;
           overlayRef.playbooksLoading = false;
+          renderOverlay();
+        });
+
+      overlayState.cannedRepliesLoading = true;
+      overlayState.cannedRepliesError = "";
+      console.log("[ModBox] openOverlay: Calling loadCannedRepliesFromWiki");
+      cannedRepliesPromise = loadCannedRepliesFromWiki(resolvedSubreddit)
+        .then((cannedRepliesConfig) => {
+          console.log("[ModBox] openOverlay: cannedRepliesConfig received:", cannedRepliesConfig);
+          if (overlayState !== overlayRef) return;
+          overlayRef.cannedRepliesConfig = normalizeCannedRepliesDoc(cannedRepliesConfig, resolvedSubreddit);
+          console.log("[ModBox] openOverlay: cannedRepliesConfig set:", overlayRef.cannedRepliesConfig);
+        })
+        .catch((cannedRepliesError) => {
+          console.log("[ModBox] openOverlay: Canned replies error:", cannedRepliesError);
+          if (overlayState !== overlayRef) return;
+          overlayRef.cannedRepliesError = cannedRepliesError instanceof Error ? cannedRepliesError.message : String(cannedRepliesError);
+          overlayRef.cannedRepliesConfig = buildDefaultCannedRepliesConfig(resolvedSubreddit);
+        })
+        .finally(() => {
+          if (overlayState !== overlayRef) return;
+          overlayRef.cannedRepliesLoading = false;
           renderOverlay();
         });
     }
