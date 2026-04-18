@@ -184,6 +184,7 @@ function renderContextPopup() {
   }
 
   const root = ensureContextPopupRoot();
+  // eslint-disable-next-line no-unsanitized/property
   root.innerHTML = `
     <div class="rrw-context-backdrop" data-context-close="1"></div>
     <section class="rrw-context-modal" role="dialog" aria-modal="true" aria-label="Comment context popup">

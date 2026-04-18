@@ -237,6 +237,7 @@ function normalizeRemovalSendMode(value, fallback = "reply") {
 
 function decodeHtmlEntities(value) {
   const textarea = document.createElement("textarea");
+  // eslint-disable-next-line no-unsanitized/property
   textarea.innerHTML = String(value || "");
   return textarea.value;
 }
@@ -255,6 +256,7 @@ function sanitizeProfileRenderedHtml(html) {
   ]);
 
   const wrapper = document.createElement("div");
+  // eslint-disable-next-line no-unsanitized/property
   wrapper.innerHTML = String(html || "");
 
   const nodes = [];

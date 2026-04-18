@@ -21,7 +21,6 @@
                              "https://oauth.reddit.com/*"
                          ],
     "background":  {
-                       "service_worker":  "background.js",
                        "scripts":  [
                                        "background.js"
                                    ]
@@ -64,9 +63,9 @@
                                       "gecko":  {
                                                     "id":  "modbox@slfhstd.uk",
                                                     "strict_min_version":  "128.0",
-                                                    "data_collection_permissions":  [
-                                                                                        "website_activity"
-                                                                                    ]
+                                                    "data_collection_permissions":  {
+                                                                                        "website_activity":  false
+                                                                                    }
                                                 }
                                   }
 }

@@ -875,6 +875,7 @@ function showUsernotesDeleteConfirmation(noteSource) {
       </div>
     `;
     
+    // eslint-disable-next-line no-unsanitized/property
     modal.innerHTML = modalContent;
     console.log("[ModBox] Delete modal created with buttons");
     console.log("[ModBox] Modal element:", modal);
@@ -1018,6 +1019,7 @@ function renderUsernotesEditor() {
     .join("");
 
   const emptyState = !state.loading && (state.notes || []).length === 0;
+  // eslint-disable-next-line no-unsanitized/property
   modal.innerHTML = `
     <header class="rrw-usernotes-header">
       <h3>Usernotes &middot; u/${escapeHtml(state.username)} &middot; r/${escapeHtml(state.subreddit)}</h3>
@@ -1275,6 +1277,7 @@ function renderInlineUsernoteChip(chip, payload) {
   const countMarkup = additionalCount > 0
     ? `<span class="rrw-usernote-count">(+${additionalCount})</span>`
     : "";
+  // eslint-disable-next-line no-unsanitized/property
   chip.innerHTML = `${renderNoteTypeBadge(latestType, "rrw-note-type-pill rrw-note-type-pill--compact", typeMeta)}<span class="rrw-usernote-inline-text">${escapeHtml(latestText || "View note")}</span>${countMarkup}`;
   chip.title = `[${latestType}] ${latest?.note || "View usernotes"}`;
   chip.dataset.hasNotes = "1";

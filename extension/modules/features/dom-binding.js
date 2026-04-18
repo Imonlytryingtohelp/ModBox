@@ -391,7 +391,7 @@ function bindContainer(container) {
     })()
     : null;
 
-  const commentNukeButton = /^t1_[a-z0-9]{5,10}$/i.test(target)
+  const commentNukeButton = /^t1_[a-z0-9]{5,10}$/i.test(target) && commentNukeButtonEnabled
     ? (() => {
       const buttonEl = document.createElement("button");
       buttonEl.type = "button";
@@ -472,7 +472,7 @@ function bindContainer(container) {
     if (commentNukeButton) {
       inlineGroup.appendChild(commentNukeButton);
     }
-    if (username) {
+    if (username && historyButtonEnabled) {
       inlineGroup.appendChild(historyButton);
     }
     if (contextButton) {
@@ -779,7 +779,9 @@ function bindModmailParticipantPills() {
     });
 
     pillGroup.appendChild(usernotesChip);
-    pillGroup.appendChild(historyButton);
+    if (historyButtonEnabled) {
+      pillGroup.appendChild(historyButton);
+    }
     pillGroup.appendChild(profileButton);
 
     insertAfter.insertAdjacentElement("afterend", pillGroup);

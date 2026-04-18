@@ -121,6 +121,28 @@ async function loadCommentNukeIgnoreDistinguishedPreference() {
   }
 }
 
+async function loadHistoryButtonPreference() {
+  try {
+    const stored = await ext.storage.sync.get([HISTORY_BUTTON_ENABLED_KEY]);
+    historyButtonEnabled = typeof stored?.[HISTORY_BUTTON_ENABLED_KEY] === "boolean"
+      ? stored[HISTORY_BUTTON_ENABLED_KEY]
+      : false;
+  } catch {
+    historyButtonEnabled = false;
+  }
+}
+
+async function loadCommentNukeButtonPreference() {
+  try {
+    const stored = await ext.storage.sync.get([COMMENT_NUKE_BUTTON_ENABLED_KEY]);
+    commentNukeButtonEnabled = typeof stored?.[COMMENT_NUKE_BUTTON_ENABLED_KEY] === "boolean"
+      ? stored[COMMENT_NUKE_BUTTON_ENABLED_KEY]
+      : false;
+  } catch {
+    commentNukeButtonEnabled = false;
+  }
+}
+
 async function ensureAllowedLaunchSubredditsLoaded() {
   if (allowedLaunchSubredditsLoaded) {
     return;

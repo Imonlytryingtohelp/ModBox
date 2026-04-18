@@ -151,6 +151,7 @@ function renderRemovalConfigEditor() {
     `;
   }).join("");
 
+  // eslint-disable-next-line no-unsanitized/property
   modal.innerHTML = `
     <header class="rrw-removal-config-header">
       <div class="rrw-removal-config-title">

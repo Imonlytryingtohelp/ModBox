@@ -1,8 +1,8 @@
 ﻿# ModBox
 
-A lightweight, Reddit-native browser extension that brings Toolbox-style moderation tools directly into Reddit, without requiring a separate web app.
+A lightweight, Reddit-native browser extension that brings Toolbox-style moderation tools directly into Reddit.
 
-**Current release:** `1.0.0`
+**Current release:** `1.3.1`
 
 ---
 
@@ -118,29 +118,20 @@ However, ModBox also offers:
 
 ## Installation
 
-### Chrome / Chromium / Edge
+### Chrome
 
-1. Download or clone this repository
-2. Open `chrome://extensions` (or `edge://extensions`)
-3. Enable **Developer mode** (top right)
-4. Click **Load unpacked**
-5. Select the `extension` folder
-6. Open any Reddit page and verify ModBox controls appear on posts/comments
+1. Download the latest .zip file from the [release page](https://github.com/Imonlytryingtohelp/ModBox/releases)
+2. Extract the zip file. 
+3. Open `chrome://extensions` (or `edge://extensions`)
+4. Enable **Developer mode** (top right)
+5. Click **Load unpacked**
+6. Select the folder you extracted earlier.
+7. Open any Reddit page and verify ModBox controls appear on posts/comments in sub's you moderate.
 
-
-### Pre-built Extension
-
-Pre-built versions are available in the `build/` folder:
-- `manifest.json` - Extension manifest
-- `content.js` - Bundled content script
-- `background.js` - Background service worker
-- `assets/` - Icons and logo
-
----
 
 ## Quick Start
 
-1. **Navigate to Reddit** (www.reddit.com, old.reddit.com, or mod.reddit.com/r/yoursubreddit)
+1. **Navigate to Reddit** (www.reddit.com, old.reddit.com, or mod.reddit.com/r/yoursubreddit) *Works best on old.reddit*
 2. **Open a moderated community** (one where you're a moderator)
 3. Look for **ModBox action buttons** in the post/comment area
 4. Click any button to open the moderation overlay
@@ -148,15 +139,11 @@ Pre-built versions are available in the `build/` folder:
 ### Common Workflows
 
 **Remove Content:**
-1. Click the **R** (remove) button on any post or comment
+1. Click the **Mod Actions** button on any post or comment
 2. Choose a removal reason from the dropdown
 3. Optionally set a **usernote** to record the action
 4. Click **Remove** → Post gets a **red border** ✓
 
-**Approve Content:**
-1. Click **Approve** on any modqueue item
-2. Instantly approves
-3. Item gets a **green border** ✓
 
 **Bulk Moderation (Queue):**
 1. Navigate to `/r/yoursubreddit/about/modqueue` (or unmoderated/reports)
@@ -164,6 +151,7 @@ Pre-built versions are available in the `build/` folder:
 3. Select items and click **Approve**, **Remove**, or **Spam** ✓
 
 **View User History:**
+1. Enable History Button in settings.
 1. Click **H** next to a username
 2. Popup shows account age, karma, top domains/subreddits
 
@@ -188,26 +176,15 @@ If these pages don't exist, ModBox works with basic remove/approve actions.
 
 ### Extension Settings
 
-1. Open ModQueue Box on any moderated subreddit
+1. Open ModQueue Box on any moderated subreddit (Bottom right)
 2. Click the **gear icon** (⚙) 
 3. Click "Extension Settings"
-4. Adjust:
-   - **Theme** - Auto, Light, Dark
-   - **Comment nuke** - Skip distinguished comments
-   - **Auto-close overlay** - Close after actions
+4. Make necessary changes 
 5. Save Changes
 
 ---
 
 ## Development
-
-### Project structure
-
-- **extension/** - Source modules and manifest (development)
-- **build/** - Pre-built extension (ready to load unpacked)
-- **scripts/** - Build & deployment helpers
-- **docs/** - Documentation
-- **CHANGELOG.md** - Full release history
 
 ### Debugging
 

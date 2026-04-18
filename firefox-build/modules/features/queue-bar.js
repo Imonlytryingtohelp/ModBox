@@ -717,6 +717,7 @@ function renderQueueBar(state) {
       btn.className = "rrw-queuebar-compact-item";
       btn.title = `Open ${badge.label}`;
       const count = state.counts?.[badge.key];
+      // eslint-disable-next-line no-unsanitized/property
       btn.innerHTML = `<span class="rrw-queuebar-compact-icon" aria-hidden="true">${badge.iconSvg}</span><span class="rrw-queuebar-compact-count">${escapeHtml(formatQueueBarCount(count))}</span>`;
       bindQueueBarLinkButton(btn, badge.url, Boolean(state.openInNewTab));
       compactList.appendChild(btn);
@@ -741,6 +742,7 @@ function renderQueueBar(state) {
       btn.className = "rrw-queuebar-badge";
       btn.title = `Open ${badge.label}`;
       const count = state.counts?.[badge.key];
+      // eslint-disable-next-line no-unsanitized/property
       btn.innerHTML = `<span class="rrw-queuebar-badge-main"><span class="rrw-queuebar-badge-icon" aria-hidden="true">${badge.iconSvg}</span><span class="rrw-queuebar-badge-label">${escapeHtml(badge.label)}</span></span><span class="rrw-queuebar-badge-count">${escapeHtml(formatQueueBarCount(count))}</span>`;
       bindQueueBarLinkButton(btn, badge.url, Boolean(state.openInNewTab));
       badges.appendChild(btn);

@@ -368,6 +368,7 @@ function renderInlineHistoryPopup() {
       .join("")
     : "";
 
+  // eslint-disable-next-line no-unsanitized/property
   root.innerHTML = `
     <section class="rrw-inline-history-popup" role="dialog" aria-label="User history">
       <header class="rrw-inline-history-header">

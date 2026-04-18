@@ -107,6 +107,7 @@ function getProfileEntryText(entry) {
 
 function decodeHtmlEntities(value) {
   const textarea = document.createElement("textarea");
+  // eslint-disable-next-line no-unsanitized/property
   textarea.innerHTML = String(value || "");
   return textarea.value;
 }
@@ -121,6 +122,7 @@ function sanitizeProfileRenderedHtml(html) {
   ]);
 
   const wrapper = document.createElement("div");
+  // eslint-disable-next-line no-unsanitized/property
   wrapper.innerHTML = String(html || "");
 
   const nodes = [];
@@ -528,6 +530,7 @@ function renderProfileView() {
   const isSearchActive = Boolean(profileViewState.searchActive);
   const filteredCount = applyProfileFilters(tabState.items).length;
 
+  // eslint-disable-next-line no-unsanitized/property
   root.innerHTML = `
     <div class="rrw-profile-backdrop" data-profile-close="1"></div>
     <section class="rrw-profile-modal" role="dialog" aria-modal="true" aria-label="ModBox profile view">

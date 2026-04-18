@@ -919,6 +919,82 @@ function injectStyles() {
       width: auto;
     }
 
+    /* Canned Replies Button */
+    .rrw-canned-reply-btn {
+      font-size: 16px !important;
+    }
+
+    .rrw-canned-reply-btn::before,
+    .rrw-canned-reply-btn::after {
+      content: "" !important;
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    .rrw-canned-reply-btn span::before,
+    .rrw-canned-reply-btn span::after {
+      content: "" !important;
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    /* Canned Replies Dropdown */
+    .rrw-canned-replies-dropdown {
+      position: fixed !important;
+      background: white;
+      border: 1px solid #999;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      font-family: sans-serif;
+      min-width: 180px;
+      z-index: 10001 !important;
+      overflow: visible !important;
+    }
+
+    .rrw-canned-header {
+      display: block;
+      padding: 8px 10px;
+      background: #0079d3;
+      color: white;
+      border-radius: 3px 3px 0 0;
+      font-size: 12px;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .rrw-canned-list {
+      list-style: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-height: 300px;
+      overflow-y: auto;
+      display: block !important;
+    }
+
+    .rrw-canned-item {
+      display: block !important;
+      width: 100% !important;
+      padding: 8px 10px !important;
+      margin: 0 !important;
+      border: 0 !important;
+      border-bottom: 1px solid #eee !important;
+      background: transparent !important;
+      text-align: left;
+      cursor: pointer;
+      font-size: 12px;
+      color: #333;
+      font-weight: normal !important;
+      border-radius: 0 !important;
+    }
+
+    .rrw-canned-item:hover {
+      background: #f0f0f0 !important;
+    }
+
+    .rrw-canned-item:last-child {
+      border-bottom: 0 !important;
+    }
+
     html[data-rrw-theme="light"] .rrw-usernotes-backdrop {
       background: rgba(215, 227, 245, 0.68);
     }

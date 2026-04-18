@@ -38,6 +38,8 @@ function start() {
   });
   void loadThemePreference();
   void loadCommentNukeIgnoreDistinguishedPreference();
+  void loadHistoryButtonPreference();
+  void loadCommentNukeButtonPreference();
   void loadContextPopupPosition();
   // Initialize canned replies injector to add buttons to reply forms
   void initCannedRepliesInjector();

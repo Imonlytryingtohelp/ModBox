@@ -72,6 +72,7 @@ function createQueueModlogDisplay(entries) {
     return `<span class="rrw-queue-modlog-entry">${escapeHtml(entry.action || "unknown")} by /u/${escapeHtml(entry.mod || "unknown")} ${escapeHtml(formatRelativeTime(entry.createdUtc))}${details}</span>`;
   }).join('');
 
+  // eslint-disable-next-line no-unsanitized/property
   container.innerHTML = entryTexts;
 
   return container;

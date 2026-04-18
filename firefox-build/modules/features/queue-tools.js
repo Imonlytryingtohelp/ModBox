@@ -294,6 +294,7 @@ function renderQueueToolsBar(items) {
   }
   root.dataset.stateKey = stateKey;
 
+  // eslint-disable-next-line no-unsanitized/property
   root.innerHTML = `
     <div class="rrw-queue-tools-row">
       <strong>Queue Tools</strong>

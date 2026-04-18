@@ -45,6 +45,10 @@ const INTERCEPT_NATIVE_REMOVE_KEY = "interceptNativeRemove";
 
 const CONTEXT_POPUP_ENABLED_KEY = "contextPopupEnabled";
 
+const HISTORY_BUTTON_ENABLED_KEY = "historyButtonEnabled";
+
+const COMMENT_NUKE_BUTTON_ENABLED_KEY = "commentNukeButtonEnabled";
+
 const QUEUE_BAR_ENABLED_KEY = "queueBarEnabled";
 
 const QUEUE_BAR_SCOPE_KEY = "queueBarScope";
@@ -266,6 +270,10 @@ let allowedLaunchSubredditsLoaded = false;
 let buttonVisibilityScope = "configured_plus_mod";
 
 let preferredRedditLinkHost = "extension_preference";
+
+let historyButtonEnabled = false;
+
+let commentNukeButtonEnabled = false;
 
 
 
@@ -7358,6 +7366,50 @@ async function loadCommentNukeIgnoreDistinguishedPreference() {
   } catch {
 
     commentNukeIgnoreDistinguished = false;
+
+  }
+
+}
+
+
+
+async function loadHistoryButtonPreference() {
+
+  try {
+
+    const stored = await ext.storage.sync.get([HISTORY_BUTTON_ENABLED_KEY]);
+
+    historyButtonEnabled = typeof stored?.[HISTORY_BUTTON_ENABLED_KEY] === "boolean"
+
+      ? stored[HISTORY_BUTTON_ENABLED_KEY]
+
+      : false;
+
+  } catch {
+
+    historyButtonEnabled = false;
+
+  }
+
+}
+
+
+
+async function loadCommentNukeButtonPreference() {
+
+  try {
+
+    const stored = await ext.storage.sync.get([COMMENT_NUKE_BUTTON_ENABLED_KEY]);
+
+    commentNukeButtonEnabled = typeof stored?.[COMMENT_NUKE_BUTTON_ENABLED_KEY] === "boolean"
+
+      ? stored[COMMENT_NUKE_BUTTON_ENABLED_KEY]
+
+      : false;
+
+  } catch {
+
+    commentNukeButtonEnabled = false;
 
   }
 
@@ -19883,6 +19935,10 @@ async function applyExtensionSettingsToRuntime(settings) {
 
   commentNukeIgnoreDistinguished = Boolean(settings.comment_nuke_ignore_distinguished);
 
+  historyButtonEnabled = typeof settings.history_button_enabled === "boolean" ? settings.history_button_enabled : false;
+
+  commentNukeButtonEnabled = typeof settings.comment_nuke_button_enabled === "boolean" ? settings.comment_nuke_button_enabled : false;
+
   currentThemeMode = normalizeThemeMode(settings.theme_mode, currentThemeMode);
 
   applyThemeToDocument();
@@ -19937,7 +19993,7 @@ async function openRemovalConfigEditor(context) {
 
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
 
-      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
+      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
 
     ]).catch(() => ({})),
 
@@ -19994,6 +20050,10 @@ async function openRemovalConfigEditor(context) {
       queue_bar_open_in_new_tab: typeof stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
 
       comment_nuke_ignore_distinguished: typeof stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] === "boolean" ? stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] : false,
+
+      history_button_enabled: typeof stored[HISTORY_BUTTON_ENABLED_KEY] === "boolean" ? stored[HISTORY_BUTTON_ENABLED_KEY] : false,
+
+      comment_nuke_button_enabled: typeof stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] === "boolean" ? stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] : false,
 
       canned_replies_wiki_url: String(stored[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
 
@@ -22241,6 +22301,22 @@ function renderRemovalConfigEditor() {
 
             </label>
 
+            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
+              <input type="checkbox" data-ext-setting="history_button_enabled" ${extensionSettings.history_button_enabled !== false ? "checked" : ""} />
+
+              <span>Show (H)istory button on comments</span>
+
+            </label>
+
+            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
+              <input type="checkbox" data-ext-setting="comment_nuke_button_enabled" ${extensionSettings.comment_nuke_button_enabled !== false ? "checked" : ""} />
+
+              <span>Show (R) Comment Nuke button on comments</span>
+
+            </label>
+
             <label class="rrw-field">
 
               <span>Theme mode</span>
@@ -22645,7 +22721,7 @@ function renderRemovalConfigEditor() {
 
       }
 
-      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished"].includes(key)) {
+      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
 
         removalConfigEditorState.extensionSettings[key] = Boolean(event.target.checked);
 
@@ -22824,6 +22900,10 @@ function renderRemovalConfigEditor() {
         comment_nuke_ignore_distinguished:
 
           typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false,
+
+        history_button_enabled: typeof s.history_button_enabled === "boolean" ? s.history_button_enabled : false,
+
+        comment_nuke_button_enabled: typeof s.comment_nuke_button_enabled === "boolean" ? s.comment_nuke_button_enabled : false,
 
         canned_replies_wiki_url: String(s.canned_replies_wiki_url || "").trim(),
 
@@ -24147,6 +24227,10 @@ function renderRemovalConfigEditor() {
 
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
 
+        const historyButtonEnabled = typeof s.history_button_enabled === "boolean" ? s.history_button_enabled : true;
+
+        const commentNukeButtonEnabled = typeof s.comment_nuke_button_enabled === "boolean" ? s.comment_nuke_button_enabled : true;
+
         const cannedRepliesWikiUrl = String(s.canned_replies_wiki_url || "").trim() || "";
 
 
@@ -24173,6 +24257,10 @@ function renderRemovalConfigEditor() {
 
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
 
+          [HISTORY_BUTTON_ENABLED_KEY]: historyButtonEnabled,
+
+          [COMMENT_NUKE_BUTTON_ENABLED_KEY]: commentNukeButtonEnabled,
+
           [CANNED_REPLIES_WIKI_URL_KEY]: cannedRepliesWikiUrl,
 
         });
@@ -24196,6 +24284,10 @@ function renderRemovalConfigEditor() {
           theme_mode: themeMode,
 
           comment_nuke_ignore_distinguished: ignoreDistinguished,
+
+          history_button_enabled: historyButtonEnabled,
+
+          comment_nuke_button_enabled: commentNukeButtonEnabled,
 
         });
 
@@ -28403,7 +28495,7 @@ function bindContainer(container) {
 
 
 
-  const commentNukeButton = /^t1_[a-z0-9]{5,10}$/i.test(target)
+  const commentNukeButton = /^t1_[a-z0-9]{5,10}$/i.test(target) && commentNukeButtonEnabled
 
     ? (() => {
 
@@ -28565,7 +28657,7 @@ function bindContainer(container) {
 
     }
 
-    if (username) {
+    if (username && historyButtonEnabled) {
 
       inlineGroup.appendChild(historyButton);
 
@@ -29179,7 +29271,11 @@ function bindModmailParticipantPills() {
 
     pillGroup.appendChild(usernotesChip);
 
-    pillGroup.appendChild(historyButton);
+    if (historyButtonEnabled) {
+
+      pillGroup.appendChild(historyButton);
+
+    }
 
     pillGroup.appendChild(profileButton);
 
@@ -41630,6 +41726,10 @@ function start() {
   void loadThemePreference();
 
   void loadCommentNukeIgnoreDistinguishedPreference();
+
+  void loadHistoryButtonPreference();
+
+  void loadCommentNukeButtonPreference();
 
   void loadContextPopupPosition();
 

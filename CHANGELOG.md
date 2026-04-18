@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.1 - Canned Replies & Documentation
+
+### Added
+
+- **Canned Replies feature** - Quick-access buttons for canned moderation responses next to reply forms (modmail, comments). Integrates with wiki configuration for customizable reply templates.
+- **Various Bug Fixes** ready for mod testing. 
+
 ## 1.2.2 - Fixes
 
 ### Fixed

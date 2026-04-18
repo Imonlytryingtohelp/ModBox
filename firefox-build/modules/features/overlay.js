@@ -146,6 +146,74 @@ function findReplyTextarea() {
   return null;
 }
 
+function showCannedRepliesDropdown() {
+  if (!overlayState || !overlayState.cannedRepliesConfig) {
+    return;
+  }
+
+  const replies = overlayState.cannedRepliesConfig?.replies || [];
+  if (replies.length === 0) {
+    showToast("No canned replies available", "error");
+    return;
+  }
+
+  // Create dropdown container
+  const dropdown = document.createElement("div");
+  dropdown.className = "rrw-canned-replies-dropdown";
+  // eslint-disable-next-line no-unsanitized/property
+  dropdown.innerHTML = `
+    <div class="rrw-canned-header">Canned Replies</div>
+    <div class="rrw-canned-list">
+      ${replies.map((reply) => `
+        <button type="button" class="rrw-canned-item" data-canned-reply-name="${escapeHtml(reply.name)}" title="${escapeHtml(reply.content.slice(0, 240))}">
+          ${escapeHtml(reply.name)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+
+  // Position at mouse cursor or center
+  dropdown.style.position = "fixed";
+  dropdown.style.top = (window.innerHeight / 2 - 100) + "px";
+  dropdown.style.left = (window.innerWidth / 2 - 100) + "px";
+  dropdown.style.zIndex = "10001";
+
+  const root = ensureOverlayRoot();
+  root.appendChild(dropdown);
+
+  // Attach handlers
+  dropdown.querySelectorAll("[data-canned-reply-name]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const replyName = String(e.currentTarget.getAttribute("data-canned-reply-name") || "").trim();
+      const reply = replies.find((item) => String(item.name || "").trim() === replyName);
+      if (reply && reply.content) {
+        const textarea = findReplyTextarea();
+        if (textarea) {
+          const currentValue = textarea.value || "";
+          const newValue = currentValue ? `${currentValue}\n\n${reply.content}` : reply.content;
+          textarea.value = newValue;
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          textarea.dispatchEvent(new Event("change", { bubbles: true }));
+          textarea.focus();
+          showToast(`✓ Inserted: ${replyName}`, "success");
+          dropdown.remove();
+        } else {
+          showToast("Reply box not found", "error");
+        }
+      }
+    });
+  });
+
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener("click", (e) => {
+      if (!dropdown.contains(e.target)) {
+        dropdown.remove();
+      }
+    }, { once: true });
+  }, 0);
+}
+
 function closeOverlay() {
   clearPreviewTimer();
   if (overlayState?.keydownHandler) {
@@ -421,8 +489,8 @@ function renderOverlay() {
   const canAct = Boolean(resolved?.isActionable || isFullname(target));
   const actionsTabLabel = thingType === "submission" ? "Post Actions" : "Comment Actions";
   const overlayTab = quickActionsOnlyMode
-    ? (["quick_actions", "playbooks", "canned_replies"].includes(activeTab) ? activeTab : "quick_actions")
-    : (["kind_actions", "quick_actions", "playbooks", "user_actions", "canned_replies"].includes(activeTab) ? activeTab : "kind_actions");
+    ? (["quick_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
+    : (["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
   const canRunUserActions = canAct && Boolean(resolved?.author);
   const effectiveBanDays = banDurationOption === "custom"
     ? Number.parseInt(String(banCustomDays || ""), 10)
@@ -480,6 +548,7 @@ function renderOverlay() {
     return appliesTo === "comments";
   });
 
+  // eslint-disable-next-line no-unsanitized/property
   root.innerHTML = `
     <div class="rrw-overlay-backdrop" data-overlay-close="1"></div>
     <section class="rrw-overlay-modal${compactMode ? " rrw-overlay-modal--compact" : ""}" role="dialog" aria-modal="true" aria-label="ModBox">
@@ -527,11 +596,6 @@ function renderOverlay() {
               class="rrw-tab-btn ${overlayTab === "playbooks" ? "rrw-tab-btn--active" : ""}"
               data-overlay-tab="playbooks"
             >Playbooks</button>
-            <button
-              type="button"
-              class="rrw-tab-btn ${overlayTab === "canned_replies" ? "rrw-tab-btn--active" : ""}"
-              data-overlay-tab="canned_replies"
-            >Canned Replies</button>
             ${!quickActionsOnlyMode ? `<button
               type="button"
               class="rrw-tab-btn ${overlayTab === "user_actions" ? "rrw-tab-btn--active" : ""}"
@@ -669,31 +733,7 @@ function renderOverlay() {
             </div>
           ` : ""}
 
-          ${overlayTab === "canned_replies" ? `
-            <section class="rrw-user-actions-panel">
-              <h3>Canned Replies</h3>
-              <p class="rrw-muted">Insert pre-written replies into the reply form.</p>
-              ${cannedRepliesLoading ? `<p class="rrw-muted">Loading canned replies...</p>` : ""}
-              ${cannedRepliesError ? `<div class="rrw-error">${escapeHtml(cannedRepliesError)}</div>` : ""}
-              ${cannedRepliesStatus ? `<div class="rrw-success">${escapeHtml(cannedRepliesStatus)}</div>` : ""}
-              <div class="rrw-actions rrw-actions--inline rrw-quick-actions-grid">
-                ${cannedRepliesConfig?.replies?.length === 0
-                  ? `<p class="rrw-muted">No canned replies available.</p>`
-                  : (cannedRepliesConfig?.replies || []).map((reply) => `
-                    <button
-                      type="button"
-                      class="rrw-btn rrw-btn-secondary rrw-quick-action-btn"
-                      data-canned-reply-name="${escapeHtml(reply.name)}"
-                      title="${escapeHtml(reply.content.slice(0, 240))}"
-                      ${submitting || !canAct ? "disabled" : ""}
-                    >${escapeHtml(reply.name)}</button>
-                  `).join("")}
-              </div>
-            </section>
 
-            <div class="rrw-footer-links rrw-footer-links--solo">
-            </div>
-          ` : ""}
 
           ${overlayTab === "user_actions" ? `
             <section class="rrw-user-actions-panel">

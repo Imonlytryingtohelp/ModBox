@@ -31,6 +31,8 @@ let allowedLaunchSubredditsLoaded = false;
 // Button visibility & preferences
 let buttonVisibilityScope = "configured_plus_mod";
 let preferredRedditLinkHost = "extension_preference";
+let historyButtonEnabled = false;
+let commentNukeButtonEnabled = false;
 
 // Queue bar state
 let queueBarRoot = null;

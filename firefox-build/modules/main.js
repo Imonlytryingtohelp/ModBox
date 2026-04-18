@@ -39,6 +39,8 @@ function start() {
   void loadThemePreference();
   void loadCommentNukeIgnoreDistinguishedPreference();
   void loadContextPopupPosition();
+  // Initialize canned replies injector to add buttons to reply forms
+  void initCannedRepliesInjector();
   // Prioritize queue bar on page reload: initialize immediately so counts and links
   // appear without waiting for idle time or timeout fallback.
   void initQueueBar();

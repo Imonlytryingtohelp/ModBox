@@ -298,12 +298,23 @@ async function redditFormRequest(path, params, options = null) {
   }
 
   console.log("[ModBox] Falling back to background message for:", path);
+  let convertedParams = {};
+  if (payload instanceof URLSearchParams) {
+    try {
+      convertedParams = Object.fromEntries(payload);
+    } catch {
+      // Fallback if entries() fails
+      for (const [key, value] of payload) {
+        convertedParams[key] = value;
+      }
+    }
+  } else if (typeof payload === 'object' && payload !== null) {
+    convertedParams = payload;
+  }
   const fallbackResult = await sendMessage({
     type: "REDDIT_FORM_REQUEST",
     path,
-    params: Object.fromEntries(
-      (payload instanceof URLSearchParams ? payload : new URLSearchParams(payload)).entries()
-    ),
+    params: convertedParams,
     preferredOrigins,
   });
 
@@ -333,12 +344,19 @@ async function redditFormRequestBackgroundOnly(path, params, preferredOrigins = 
     payload.set("api_type", "json");
   }
 
+  let convertedParams = {};
+  try {
+    convertedParams = Object.fromEntries(payload);
+  } catch {
+    // Fallback if entries() fails
+    for (const [key, value] of payload) {
+      convertedParams[key] = value;
+    }
+  }
   const fallbackResult = await sendMessage({
     type: "REDDIT_FORM_REQUEST",
     path,
-    params: Object.fromEntries(
-      (payload instanceof URLSearchParams ? payload : new URLSearchParams(payload)).entries()
-    ),
+    params: convertedParams,
     preferredOrigins: Array.isArray(preferredOrigins) && preferredOrigins.length
       ? preferredOrigins
       : [
