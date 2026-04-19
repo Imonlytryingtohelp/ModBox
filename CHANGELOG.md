@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.2 - Bug Fixes
+
+### Fixed
+
+- **Removal reason textarea HTML entity encoding** - Fixed quotes and special characters in removal reason descriptions being displayed as HTML entities (`&#39;`, `&quot;`) instead of actual characters after save and reload
+
 ## 1.3.1 - Canned Replies & Documentation
 
 ### Added

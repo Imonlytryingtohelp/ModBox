@@ -138,7 +138,7 @@ function renderRemovalConfigEditor() {
 
         <label class="rrw-field">
           <span>Toolbox-style body editor</span>
-          <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${escapeHtml(draft ?? blocksToToolboxBody(reason.blocks))}</textarea>
+          <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${draft ?? blocksToToolboxBody(reason.blocks)}</textarea>
         </label>
 
         <div class="rrw-preview-panel rrw-config-preview-panel">
@@ -187,11 +187,11 @@ function renderRemovalConfigEditor() {
           <div class="rrw-config-grid">
             <label class="rrw-field">
               <span>Header markdown</span>
-              <textarea rows="3" data-global-field="header_markdown">${escapeHtml(config.global_settings.header_markdown || "")}</textarea>
+              <textarea rows="3" data-global-field="header_markdown">${config.global_settings.header_markdown || ""}</textarea>
             </label>
             <label class="rrw-field">
               <span>Footer markdown</span>
-              <textarea rows="3" data-global-field="footer_markdown">${escapeHtml(config.global_settings.footer_markdown || "")}</textarea>
+              <textarea rows="3" data-global-field="footer_markdown">${config.global_settings.footer_markdown || ""}</textarea>
             </label>
           </div>
           <div class="rrw-config-grid">
@@ -307,7 +307,7 @@ function renderRemovalConfigEditor() {
                   </div>
                   <label class="rrw-field">
                     <span>Comment body (supports {author}, {subreddit}, {kind})</span>
-                    <textarea rows="5" data-qa-index="${index}" data-qa-field="body">${escapeHtml(action.body)}</textarea>
+                    <textarea rows="5" data-qa-index="${index}" data-qa-field="body">${action.body}</textarea>
                   </label>
                 </article>
               `).join("")
@@ -425,7 +425,7 @@ function renderRemovalConfigEditor() {
                         return `
                           <label class="rrw-field">
                             <span>${escapeHtml(label)}</span>
-                            <textarea rows="2" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}">${escapeHtml(value)}</textarea>
+                            <textarea rows="2" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}">${value}</textarea>
                           </label>
                         `;
                       }
@@ -526,7 +526,7 @@ function renderRemovalConfigEditor() {
                         ` : `
                           <label class="rrw-field">
                             <span>Text template (supports {author}, {subreddit}, {kind}, {permalink})</span>
-                            <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${escapeHtml(String(step.text_template || ""))}</textarea>
+                            <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${String(step.text_template || "")}</textarea>
                           </label>
                         `}
                         <div class="rrw-config-flag-row">
@@ -605,7 +605,7 @@ function renderRemovalConfigEditor() {
                         </div>
                         <label class="rrw-field">
                           <span>Text template (supports {author}, {subreddit}, {kind}, {permalink})</span>
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${escapeHtml(String(step.text_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${String(step.text_template || "")}</textarea>
                         </label>
                       ` : ""}
 
@@ -618,7 +618,7 @@ function renderRemovalConfigEditor() {
                         </div>
                         <label class="rrw-field">
                           <span>Ban message template (supports {author}, {subreddit}, {kind}, {permalink})</span>
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="ban_message_template">${escapeHtml(String(step.ban_message_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="ban_message_template">${String(step.ban_message_template || "")}</textarea>
                         </label>
                         <label class="rrw-field">
                           <span>Mod note (optional, visible only to mods in ban list — supports {author}, {subreddit}, {kind}, {permalink})</span>
@@ -665,7 +665,7 @@ function renderRemovalConfigEditor() {
                         </label>
                         <label class="rrw-field">
                           <span>Body template (supports {author}, {subreddit}, {kind}, {permalink})</span>
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="body_template">${escapeHtml(String(step.body_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="body_template">${String(step.body_template || "")}</textarea>
                         </label>
                         <div class="rrw-config-flag-row">
                           <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">

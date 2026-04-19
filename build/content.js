@@ -20983,7 +20983,7 @@ function renderRemovalConfigEditor() {
 
           <span>Toolbox-style body editor</span>
 
-          <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${escapeHtml(draft ?? blocksToToolboxBody(reason.blocks))}</textarea>
+          <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${draft ?? blocksToToolboxBody(reason.blocks)}</textarea>
 
         </label>
 
@@ -21079,7 +21079,7 @@ function renderRemovalConfigEditor() {
 
               <span>Header markdown</span>
 
-              <textarea rows="3" data-global-field="header_markdown">${escapeHtml(config.global_settings.header_markdown || "")}</textarea>
+              <textarea rows="3" data-global-field="header_markdown">${config.global_settings.header_markdown || ""}</textarea>
 
             </label>
 
@@ -21087,7 +21087,7 @@ function renderRemovalConfigEditor() {
 
               <span>Footer markdown</span>
 
-              <textarea rows="3" data-global-field="footer_markdown">${escapeHtml(config.global_settings.footer_markdown || "")}</textarea>
+              <textarea rows="3" data-global-field="footer_markdown">${config.global_settings.footer_markdown || ""}</textarea>
 
             </label>
 
@@ -21319,7 +21319,7 @@ function renderRemovalConfigEditor() {
 
                     <span>Comment body (supports {author}, {subreddit}, {kind})</span>
 
-                    <textarea rows="5" data-qa-index="${index}" data-qa-field="body">${escapeHtml(action.body)}</textarea>
+                    <textarea rows="5" data-qa-index="${index}" data-qa-field="body">${action.body}</textarea>
 
                   </label>
 
@@ -21555,7 +21555,7 @@ function renderRemovalConfigEditor() {
 
                             <span>${escapeHtml(label)}</span>
 
-                            <textarea rows="2" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}">${escapeHtml(value)}</textarea>
+                            <textarea rows="2" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}">${value}</textarea>
 
                           </label>
 
@@ -21757,7 +21757,7 @@ function renderRemovalConfigEditor() {
 
                             <span>Text template (supports {author}, {subreddit}, {kind}, {permalink})</span>
 
-                            <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${escapeHtml(String(step.text_template || ""))}</textarea>
+                            <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${String(step.text_template || "")}</textarea>
 
                           </label>
 
@@ -21915,7 +21915,7 @@ function renderRemovalConfigEditor() {
 
                           <span>Text template (supports {author}, {subreddit}, {kind}, {permalink})</span>
 
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${escapeHtml(String(step.text_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="text_template">${String(step.text_template || "")}</textarea>
 
                         </label>
 
@@ -21941,7 +21941,7 @@ function renderRemovalConfigEditor() {
 
                           <span>Ban message template (supports {author}, {subreddit}, {kind}, {permalink})</span>
 
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="ban_message_template">${escapeHtml(String(step.ban_message_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="ban_message_template">${String(step.ban_message_template || "")}</textarea>
 
                         </label>
 
@@ -22035,7 +22035,7 @@ function renderRemovalConfigEditor() {
 
                           <span>Body template (supports {author}, {subreddit}, {kind}, {permalink})</span>
 
-                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="body_template">${escapeHtml(String(step.body_template || ""))}</textarea>
+                          <textarea rows="3" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="body_template">${String(step.body_template || "")}</textarea>
 
                         </label>
 
