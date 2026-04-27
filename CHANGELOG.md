@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.4 - Usernotes & Canned Replies Improvements
+
+### Improved
+
+- **Canned Replies clipboard copy** - Changed behavior to copy reply text to clipboard instead of auto-filling reply textareas, with visual confirmation notification
+- **Canned Replies button placement** - Relocated canned replies button from individual reply forms to the ModBox Queue Bar header for quicker access
+- **Usernotes deletion workflow** - Removed confirmation modal when deleting notes for faster, more streamlined deletion
+
 ## 1.3.2 - Bug Fixes
 
 ### Fixed

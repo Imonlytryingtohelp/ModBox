@@ -663,6 +663,15 @@ function renderQueueBar(state) {
     })();
   });
 
+  const cannedRepliesBtn = document.createElement("button");
+  cannedRepliesBtn.type = "button";
+  cannedRepliesBtn.className = "rrw-queuebar-icon-btn";
+  cannedRepliesBtn.title = "Canned replies";
+  cannedRepliesBtn.textContent = "\uD83D\uDCAC";
+  cannedRepliesBtn.addEventListener("click", () => {
+    void openCannedRepliesModal();
+  });
+
   const collapseBtn = document.createElement("button");
   collapseBtn.type = "button";
   collapseBtn.className = "rrw-queuebar-icon-btn";
@@ -675,8 +684,11 @@ function renderQueueBar(state) {
   });
 
   if (!queueBarCollapsed) {
+    headerActions.appendChild(cannedRepliesBtn);
     headerActions.appendChild(settingsBtn);
     headerActions.appendChild(refreshBtn);
+  } else {
+    headerActions.appendChild(cannedRepliesBtn);
   }
   headerActions.appendChild(collapseBtn);
 

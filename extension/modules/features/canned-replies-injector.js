@@ -1,23 +1,16 @@
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // Canned Replies Injector Module
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// Injects canned reply buttons next to Reddit reply forms and manages the dropdown UI.
-// Replicates the exact behavior of the original CannedReplys extension.
+// Provides canned reply functionality accessible from the ModBox Queue Bar.
+// Copies selected replies to the clipboard for easy pasting.
 // Dependencies: constants.js, state.js, utilities.js, wiki-loader.js
 
-let cannedRepliesDropdown = null;
 let cannedRepliesConfig = null;
 let cannedRepliesLoadPromise = null;
 
 function initCannedRepliesInjector() {
   console.log("[ModBox] Initializing canned replies injector");
-  
-  // Initial injection  
-  injectButtons();
-  
-  // Watch for new reply boxes (exactly like original extension)
-  const observer = new MutationObserver(injectButtons);
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Injector is now accessed via queue bar button only
 }
 
 async function loadCannedRepliesIfNeeded() {
@@ -62,41 +55,22 @@ async function loadCannedRepliesIfNeeded() {
   return cannedRepliesLoadPromise;
 }
 
-// Inject button next to all reply boxes (exactly like original extension)
-function injectButtons() {
-  document.querySelectorAll('form.usertext').forEach(form => {
-    if (form.querySelector('.rrw-canned-reply-btn')) return;
-    
-    const btn = document.createElement('button');
-    // Use Unicode escape sequence for emoji to avoid encoding issues
-    btn.textContent = '\uD83D\uDCAC'; // 💬
-    btn.className = 'rrw-canned-reply-btn';
-    btn.style.marginLeft = '6px';
-    btn.type = 'button'; // Prevent form submission
-    
-    btn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      openGui(form, btn);
-    };
-    
-    const footer = form.querySelector('.usertext-buttons');
-    if (footer) footer.appendChild(btn);
-  });
-}
-
-// Open GUI as modal popup (matching ModBox overlay style)
-async function openGui(form, anchorBtn) {
+// Open GUI as modal popup from queue bar
+async function openCannedRepliesModal() {
+  console.log("[ModBox] openCannedRepliesModal called");
   const config = await loadCannedRepliesIfNeeded();
   const responses = config?.replies || [];
+  
+  console.log("[ModBox] Got responses:", responses.length);
   
   if (!responses.length) {
     alert('No canned replies found. Check your wiki config.');
     return;
   }
   
-  closeGui();
+  closeCannedRepliesModal();
   
+  console.log("[ModBox] Creating canned replies modal overlay");
   // Ensure overlay root exists
   const overlayRoot = ensureOverlayRoot();
   
@@ -105,7 +79,7 @@ async function openGui(form, anchorBtn) {
   backdrop.className = 'rrw-overlay-backdrop';
   backdrop.id = 'cannedRepliesBackdrop';
   backdrop.onclick = (e) => {
-    if (e.target === backdrop) closeGui();
+    if (e.target === backdrop) closeCannedRepliesModal();
   };
   
   // Create modal
@@ -121,7 +95,7 @@ async function openGui(form, anchorBtn) {
   header.appendChild(title);
   modal.appendChild(header);
   
-  // Create grid container for buttons (same as rrw-quick-actions-grid)
+  // Create grid container for buttons
   const grid = document.createElement('div');
   grid.className = 'rrw-quick-actions-grid';
   grid.style.padding = '12px';
@@ -139,7 +113,7 @@ async function openGui(form, anchorBtn) {
     btn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      onSelectReply(form, resp);
+      onSelectCannedReply(resp);
     };
     
     grid.appendChild(btn);
@@ -151,39 +125,84 @@ async function openGui(form, anchorBtn) {
   overlayRoot.appendChild(backdrop);
   overlayRoot.appendChild(modal);
   
-  console.log("[ModBox] Opened canned replies modal with", responses.length, "replies in 3-column grid");
+  console.log("[ModBox] Opened canned replies modal with", responses.length, "replies");
   
   // Close on click outside modal
   setTimeout(() => {
     document.addEventListener('mousedown', (e) => {
-      if (!modal.contains(e.target) && !anchorBtn.contains(e.target)) {
-        closeGui();
+      if (!modal.contains(e.target)) {
+        closeCannedRepliesModal();
       }
     }, { once: true });
   }, 0);
 }
 
-function closeGui() {
+function closeCannedRepliesModal() {
   const modal = document.getElementById('cannedRepliesModal');
   const backdrop = document.getElementById('cannedRepliesBackdrop');
   if (modal) modal.remove();
   if (backdrop) backdrop.remove();
 }
 
-function clickAway(e) {
-  const modal = document.getElementById('cannedRepliesModal');
-  if (modal && !modal.contains(e.target)) closeGui();
+// Show brief notification that text was copied
+function showCopyNotification() {
+  // Add animation keyframes if not already present
+  if (!document.getElementById('cannedRepliesCopyAnimation')) {
+    const style = document.createElement('style');
+    style.id = 'cannedRepliesCopyAnimation';
+    style.textContent = `
+      @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(-20px); }
+        10% { opacity: 1; transform: translateY(0); }
+        90% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-20px); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  const notification = document.createElement('div');
+  notification.textContent = 'Copied to clipboard!';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    margin-left: -100px;
+    width: 200px;
+    text-align: center;
+    background-color: #2e7d32;
+    color: white;
+    padding: 14px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    z-index: 999999;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    animation: fadeInOut 2s ease-in-out;
+    pointer-events: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  `;
+  
+  console.log("[ModBox] Showing copy notification");
+  document.documentElement.appendChild(notification);
+  
+  setTimeout(() => {
+    console.log("[ModBox] Removing copy notification");
+    notification.remove();
+  }, 2000);
 }
 
-// On reply select
-function onSelectReply(form, resp) {
-  const textarea = form.querySelector('textarea');
-  if (!textarea) return;
-  
-  // Always just fill the text - no auto-submit by default
-  textarea.value = resp.content;
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  textarea.dispatchEvent(new Event('change', { bubbles: true }));
-  textarea.focus();
-  closeGui();
+// On reply select - copy to clipboard
+function onSelectCannedReply(resp) {
+  navigator.clipboard.writeText(resp.content)
+    .then(() => {
+      console.log("[ModBox] Canned reply copied to clipboard:", resp.name);
+      showCopyNotification();
+      closeCannedRepliesModal();
+    })
+    .catch((err) => {
+      console.error("[ModBox] Failed to copy to clipboard:", err);
+      alert("Failed to copy to clipboard. Please try again.");
+      closeCannedRepliesModal();
+    });
 }

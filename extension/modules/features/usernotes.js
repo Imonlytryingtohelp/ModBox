@@ -1085,13 +1085,9 @@ function renderUsernotesEditor() {
       const noteSource = targetNote?.source || "Modbox";
       console.log("[ModBox] Target note:", targetNote, "source:", noteSource);
 
-      // Show delete confirmation with system selection
-      const shouldDelete = await showUsernotesDeleteConfirmation(noteSource);
-      console.log("[ModBox] Delete confirmation result:", shouldDelete);
-      if (shouldDelete === null) {
-        console.log("[ModBox] Delete cancelled by user");
-        return; // User cancelled
-      }
+      // Delete immediately without confirmation
+      // Determine which system(s) to delete from based on note source
+      let deleteFromSystem = noteSource === "reddit" ? "reddit" : noteSource === "Modbox" ? "Modbox" : null;
 
       try {
         usernotesEditorState.saving = true;
@@ -1099,13 +1095,13 @@ function renderUsernotesEditor() {
         usernotesEditorState.status = "";
         renderUsernotesEditor();
 
-        console.log("[ModBox] Calling deleteUsernoteViaBothSystems with noteId:", noteId, "source:", shouldDelete);
-        // Use dual-delete function for merged notes, pass source parameter
+        console.log("[ModBox] Calling deleteUsernoteViaBothSystems with noteId:", noteId, "source:", deleteFromSystem);
+        // Delete from appropriate system(s)
         const deleteResults = await deleteUsernoteViaBothSystems(
           usernotesEditorState.subreddit,
           usernotesEditorState.username,
           noteId,
-          shouldDelete, // null for both, "Modbox" for Toolbox only, "reddit" for native only
+          deleteFromSystem,
         );
         console.log("[ModBox] Delete results:", deleteResults);
 
@@ -1125,13 +1121,7 @@ function renderUsernotesEditor() {
           usernotesEditorState.noteTypeLabels = deleteResults.payload?.note_type_labels && typeof deleteResults.payload.note_type_labels === "object" ? deleteResults.payload.note_type_labels : {};
         }
 
-        // Show status about what was deleted
-        const deletedFrom = [];
-        if (deleteResults.toolbox.success) deletedFrom.push("Toolbox");
-        if (deleteResults.native.success) deletedFrom.push("native");
-        usernotesEditorState.status = deletedFrom.length > 0 
-          ? `Note deleted from: ${deletedFrom.join(", ")}.`
-          : "Note deleted.";
+        usernotesEditorState.status = "Note deleted.";
         console.log("[ModBox] Delete complete. Status:", usernotesEditorState.status);
 
         if (typeof usernotesEditorState.onUpdated === "function") {

@@ -9705,19 +9705,11 @@ function renderUsernotesEditor() {
 
 
 
-      // Show delete confirmation with system selection
+      // Delete immediately without confirmation
 
-      const shouldDelete = await showUsernotesDeleteConfirmation(noteSource);
+      // Determine which system(s) to delete from based on note source
 
-      console.log("[ModBox] Delete confirmation result:", shouldDelete);
-
-      if (shouldDelete === null) {
-
-        console.log("[ModBox] Delete cancelled by user");
-
-        return; // User cancelled
-
-      }
+      let deleteFromSystem = noteSource === "reddit" ? "reddit" : noteSource === "Modbox" ? "Modbox" : null;
 
 
 
@@ -9733,9 +9725,9 @@ function renderUsernotesEditor() {
 
 
 
-        console.log("[ModBox] Calling deleteUsernoteViaBothSystems with noteId:", noteId, "source:", shouldDelete);
+        console.log("[ModBox] Calling deleteUsernoteViaBothSystems with noteId:", noteId, "source:", deleteFromSystem);
 
-        // Use dual-delete function for merged notes, pass source parameter
+        // Delete from appropriate system(s)
 
         const deleteResults = await deleteUsernoteViaBothSystems(
 
@@ -9745,7 +9737,7 @@ function renderUsernotesEditor() {
 
           noteId,
 
-          shouldDelete, // null for both, "Modbox" for Toolbox only, "reddit" for native only
+          deleteFromSystem,
 
         );
 
@@ -9785,19 +9777,7 @@ function renderUsernotesEditor() {
 
 
 
-        // Show status about what was deleted
-
-        const deletedFrom = [];
-
-        if (deleteResults.toolbox.success) deletedFrom.push("Toolbox");
-
-        if (deleteResults.native.success) deletedFrom.push("native");
-
-        usernotesEditorState.status = deletedFrom.length > 0 
-
-          ? `Note deleted from: ${deletedFrom.join(", ")}.`
-
-          : "Note deleted.";
+        usernotesEditorState.status = "Note deleted.";
 
         console.log("[ModBox] Delete complete. Status:", usernotesEditorState.status);
 
@@ -25841,6 +25821,24 @@ function renderQueueBar(state) {
 
 
 
+  const cannedRepliesBtn = document.createElement("button");
+
+  cannedRepliesBtn.type = "button";
+
+  cannedRepliesBtn.className = "rrw-queuebar-icon-btn";
+
+  cannedRepliesBtn.title = "Canned replies";
+
+  cannedRepliesBtn.textContent = "\uD83D\uDCAC";
+
+  cannedRepliesBtn.addEventListener("click", () => {
+
+    void openCannedRepliesModal();
+
+  });
+
+
+
   const collapseBtn = document.createElement("button");
 
   collapseBtn.type = "button";
@@ -25865,9 +25863,15 @@ function renderQueueBar(state) {
 
   if (!queueBarCollapsed) {
 
+    headerActions.appendChild(cannedRepliesBtn);
+
     headerActions.appendChild(settingsBtn);
 
     headerActions.appendChild(refreshBtn);
+
+  } else {
+
+    headerActions.appendChild(cannedRepliesBtn);
 
   }
 
@@ -35065,15 +35069,13 @@ async function openOverlay(target, options = {}) {
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// Injects canned reply buttons next to Reddit reply forms and manages the dropdown UI.
+// Provides canned reply functionality accessible from the ModBox Queue Bar.
 
-// Replicates the exact behavior of the original CannedReplys extension.
+// Copies selected replies to the clipboard for easy pasting.
 
 // Dependencies: constants.js, state.js, utilities.js, wiki-loader.js
 
 
-
-let cannedRepliesDropdown = null;
 
 let cannedRepliesConfig = null;
 
@@ -35085,19 +35087,7 @@ function initCannedRepliesInjector() {
 
   console.log("[ModBox] Initializing canned replies injector");
 
-  
-
-  // Initial injection  
-
-  injectButtons();
-
-  
-
-  // Watch for new reply boxes (exactly like original extension)
-
-  const observer = new MutationObserver(injectButtons);
-
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Injector is now accessed via queue bar button only
 
 }
 
@@ -35187,59 +35177,19 @@ async function loadCannedRepliesIfNeeded() {
 
 
 
-// Inject button next to all reply boxes (exactly like original extension)
+// Open GUI as modal popup from queue bar
 
-function injectButtons() {
+async function openCannedRepliesModal() {
 
-  document.querySelectorAll('form.usertext').forEach(form => {
-
-    if (form.querySelector('.rrw-canned-reply-btn')) return;
-
-    
-
-    const btn = document.createElement('button');
-
-    // Use Unicode escape sequence for emoji to avoid encoding issues
-
-    btn.textContent = '\uD83D\uDCAC'; // ðŸ’¬
-
-    btn.className = 'rrw-canned-reply-btn';
-
-    btn.style.marginLeft = '6px';
-
-    btn.type = 'button'; // Prevent form submission
-
-    
-
-    btn.onclick = (e) => {
-
-      e.preventDefault();
-
-      e.stopPropagation();
-
-      openGui(form, btn);
-
-    };
-
-    
-
-    const footer = form.querySelector('.usertext-buttons');
-
-    if (footer) footer.appendChild(btn);
-
-  });
-
-}
-
-
-
-// Open GUI as modal popup (matching ModBox overlay style)
-
-async function openGui(form, anchorBtn) {
+  console.log("[ModBox] openCannedRepliesModal called");
 
   const config = await loadCannedRepliesIfNeeded();
 
   const responses = config?.replies || [];
+
+  
+
+  console.log("[ModBox] Got responses:", responses.length);
 
   
 
@@ -35253,9 +35203,11 @@ async function openGui(form, anchorBtn) {
 
   
 
-  closeGui();
+  closeCannedRepliesModal();
 
   
+
+  console.log("[ModBox] Creating canned replies modal overlay");
 
   // Ensure overlay root exists
 
@@ -35273,7 +35225,7 @@ async function openGui(form, anchorBtn) {
 
   backdrop.onclick = (e) => {
 
-    if (e.target === backdrop) closeGui();
+    if (e.target === backdrop) closeCannedRepliesModal();
 
   };
 
@@ -35305,7 +35257,7 @@ async function openGui(form, anchorBtn) {
 
   
 
-  // Create grid container for buttons (same as rrw-quick-actions-grid)
+  // Create grid container for buttons
 
   const grid = document.createElement('div');
 
@@ -35341,7 +35293,7 @@ async function openGui(form, anchorBtn) {
 
       e.stopPropagation();
 
-      onSelectReply(form, resp);
+      onSelectCannedReply(resp);
 
     };
 
@@ -35365,7 +35317,7 @@ async function openGui(form, anchorBtn) {
 
   
 
-  console.log("[ModBox] Opened canned replies modal with", responses.length, "replies in 3-column grid");
+  console.log("[ModBox] Opened canned replies modal with", responses.length, "replies");
 
   
 
@@ -35375,9 +35327,9 @@ async function openGui(form, anchorBtn) {
 
     document.addEventListener('mousedown', (e) => {
 
-      if (!modal.contains(e.target) && !anchorBtn.contains(e.target)) {
+      if (!modal.contains(e.target)) {
 
-        closeGui();
+        closeCannedRepliesModal();
 
       }
 
@@ -35389,7 +35341,7 @@ async function openGui(form, anchorBtn) {
 
 
 
-function closeGui() {
+function closeCannedRepliesModal() {
 
   const modal = document.getElementById('cannedRepliesModal');
 
@@ -35403,37 +35355,127 @@ function closeGui() {
 
 
 
-function clickAway(e) {
+// Show brief notification that text was copied
 
-  const modal = document.getElementById('cannedRepliesModal');
+function showCopyNotification() {
 
-  if (modal && !modal.contains(e.target)) closeGui();
+  // Add animation keyframes if not already present
+
+  if (!document.getElementById('cannedRepliesCopyAnimation')) {
+
+    const style = document.createElement('style');
+
+    style.id = 'cannedRepliesCopyAnimation';
+
+    style.textContent = `
+
+      @keyframes fadeInOut {
+
+        0% { opacity: 0; transform: translateY(-20px); }
+
+        10% { opacity: 1; transform: translateY(0); }
+
+        90% { opacity: 1; transform: translateY(0); }
+
+        100% { opacity: 0; transform: translateY(-20px); }
+
+      }
+
+    `;
+
+    document.head.appendChild(style);
+
+  }
+
+  
+
+  const notification = document.createElement('div');
+
+  notification.textContent = 'Copied to clipboard!';
+
+  notification.style.cssText = `
+
+    position: fixed;
+
+    top: 20px;
+
+    left: 50%;
+
+    margin-left: -100px;
+
+    width: 200px;
+
+    text-align: center;
+
+    background-color: #2e7d32;
+
+    color: white;
+
+    padding: 14px 24px;
+
+    border-radius: 6px;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    z-index: 999999;
+
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+
+    animation: fadeInOut 2s ease-in-out;
+
+    pointer-events: none;
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  `;
+
+  
+
+  console.log("[ModBox] Showing copy notification");
+
+  document.documentElement.appendChild(notification);
+
+  
+
+  setTimeout(() => {
+
+    console.log("[ModBox] Removing copy notification");
+
+    notification.remove();
+
+  }, 2000);
 
 }
 
 
 
-// On reply select
+// On reply select - copy to clipboard
 
-function onSelectReply(form, resp) {
+function onSelectCannedReply(resp) {
 
-  const textarea = form.querySelector('textarea');
+  navigator.clipboard.writeText(resp.content)
 
-  if (!textarea) return;
+    .then(() => {
 
-  
+      console.log("[ModBox] Canned reply copied to clipboard:", resp.name);
 
-  // Always just fill the text - no auto-submit by default
+      showCopyNotification();
 
-  textarea.value = resp.content;
+      closeCannedRepliesModal();
 
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    })
 
-  textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    .catch((err) => {
 
-  textarea.focus();
+      console.error("[ModBox] Failed to copy to clipboard:", err);
 
-  closeGui();
+      alert("Failed to copy to clipboard. Please try again.");
+
+      closeCannedRepliesModal();
+
+    });
 
 }
 
