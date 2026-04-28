@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.5 - Canned Replies Editor
+
+### Added
+
+- **Canned Replies editor GUI** - Edit button in canned replies modal opens a dedicated editor interface
+- **Add/remove/edit canned replies** - Full CRUD operations for managing canned replies directly in the GUI
+
 ## 1.3.4 - Usernotes & Canned Replies Improvements
 
 ### Improved

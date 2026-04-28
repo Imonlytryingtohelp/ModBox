@@ -6237,6 +6237,10 @@ async function saveCannedRepliesToWiki(subreddit, config, reason) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
+  console.log("[ModBox] saveCannedRepliesToWiki called with subreddit:", cleanSubreddit);
+
+  
+
   if (!cleanSubreddit) {
 
     throw new Error("Subreddit is required to save canned replies");
@@ -6247,19 +6251,137 @@ async function saveCannedRepliesToWiki(subreddit, config, reason) {
 
   const normalized = normalizeCannedRepliesDoc(config, cleanSubreddit);
 
+  console.log("[ModBox] Normalized config:", normalized);
+
+  
+
   const payload = JSON.stringify(normalized, null, 2);
+
+  console.log("[ModBox] Payload to save:", payload);
+
+  
+
+  // Try to get configured wiki URL
+
+  let wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`;
+
+  let wikiPageName = CANNED_REPLIES_WIKI_PAGE;
+
+  
+
+  try {
+
+    const data = await new Promise(resolve => {
+
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+
+        chrome.storage.sync.get([CANNED_REPLIES_WIKI_URL_KEY, 'wikiUrl'], resolve);
+
+      } else {
+
+        resolve({});
+
+      }
+
+    });
+
+    
+
+    const configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
+
+    if (configuredUrl) {
+
+      let path = String(configuredUrl).trim();
+
+      
+
+      // Handle full URLs
+
+      if (path.startsWith('http')) {
+
+        path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+
+      }
+
+      
+
+      // Ensure leading slash
+
+      if (!path.startsWith('/')) {
+
+        path = '/' + path;
+
+      }
+
+      
+
+      // Remove trailing .json and query strings
+
+      path = path.replace(/\.json(\?.*)?$/, '').replace(/\/$/, '');
+
+      
+
+      // Extract subreddit and page name from path
+
+      const match = path.match(/^\/r\/([^/]+)\/wiki\/(.+)$/i);
+
+      if (match) {
+
+        const configuredSubreddit = match[1];
+
+        wikiPageName = match[2];
+
+        wikiPath = `/r/${encodeURIComponent(configuredSubreddit)}/api/wiki/edit`;
+
+        console.log("[ModBox] Using configured wiki location:", wikiPath, "page:", wikiPageName);
+
+      }
+
+    }
+
+  } catch (err) {
+
+    console.log("[ModBox] Could not read configured wiki URL, using default:", err);
+
+  }
+
+  
 
   const params = new URLSearchParams();
 
   params.set("content", payload);
 
-  params.set("page", CANNED_REPLIES_WIKI_PAGE);
+  params.set("page", wikiPageName);
 
   params.set("reason", String(reason || "updated canned replies via ModBox"));
 
-  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+  
+
+  console.log("[ModBox] Wiki edit path:", wikiPath);
+
+  console.log("[ModBox] Wiki page name:", wikiPageName);
+
+  
+
+  try {
+
+    const result = await redditFormRequest(wikiPath, params);
+
+    console.log("[ModBox] Wiki edit result:", result);
+
+  } catch (err) {
+
+    console.error("[ModBox] Wiki edit failed:", err);
+
+    throw err;
+
+  }
+
+  
 
   setInMemoryCannedReplies(cleanSubreddit, normalized);
+
+  console.log("[ModBox] Updated in-memory cache for canned replies");
 
   return normalized;
 
@@ -35253,6 +35375,46 @@ async function openCannedRepliesModal() {
 
   header.appendChild(title);
 
+  
+
+  // Create header actions container
+
+  const headerActions = document.createElement('div');
+
+  headerActions.className = 'rrw-header-actions';
+
+  
+
+  // Add Edit button
+
+  const editBtn = document.createElement('button');
+
+  editBtn.className = 'rrw-btn rrw-btn-secondary';
+
+  editBtn.type = 'button';
+
+  editBtn.textContent = 'Edit';
+
+  editBtn.title = 'Edit canned replies';
+
+  editBtn.onclick = (e) => {
+
+    e.preventDefault();
+
+    e.stopPropagation();
+
+    closeCannedRepliesModal();
+
+    openCannedRepliesEditor();
+
+  };
+
+  headerActions.appendChild(editBtn);
+
+  header.appendChild(headerActions);
+
+  
+
   modal.appendChild(header);
 
   
@@ -35476,6 +35638,588 @@ function onSelectCannedReply(resp) {
       closeCannedRepliesModal();
 
     });
+
+}
+
+
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// CANNED REPLIES EDITOR
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+
+
+async function openCannedRepliesEditor() {
+
+  console.log("[ModBox] Opening canned replies editor");
+
+  const config = await loadCannedRepliesIfNeeded();
+
+  const replies = JSON.parse(JSON.stringify(config?.replies || [])); // Deep copy
+
+  
+
+  // Get current subreddit from page
+
+  const currentSubreddit = parseSubredditFromPath(window.location.pathname);
+
+  const subreddit = currentSubreddit || config?.subreddit || "";
+
+  console.log("[ModBox] Editor using subreddit:", subreddit);
+
+  
+
+  if (!subreddit) {
+
+    alert('Could not determine subreddit. Make sure you are on a subreddit page.');
+
+    return;
+
+  }
+
+  
+
+  closeCannedRepliesEditorModal();
+
+  
+
+  const overlayRoot = ensureOverlayRoot();
+
+  
+
+  // Create backdrop
+
+  const backdrop = document.createElement('div');
+
+  backdrop.className = 'rrw-overlay-backdrop';
+
+  backdrop.id = 'cannedRepliesEditorBackdrop';
+
+  backdrop.onclick = (e) => {
+
+    if (e.target === backdrop) closeCannedRepliesEditorModal();
+
+  };
+
+  
+
+  // Create modal
+
+  const modal = document.createElement('div');
+
+  modal.className = 'rrw-overlay-modal';
+
+  modal.id = 'cannedRepliesEditorModal';
+
+  modal.style.width = 'min(800px, calc(100vw - 32px))';
+
+  
+
+  // Create header
+
+  const header = document.createElement('div');
+
+  header.className = 'rrw-overlay-header';
+
+  const title = document.createElement('h2');
+
+  title.textContent = 'Edit Canned Replies';
+
+  header.appendChild(title);
+
+  modal.appendChild(header);
+
+  
+
+  // Create content area
+
+  const contentArea = document.createElement('div');
+
+  contentArea.style.padding = '12px 16px';
+
+  contentArea.style.overflowY = 'auto';
+
+  contentArea.style.maxHeight = 'calc(100vh - 180px)';
+
+  contentArea.style.borderBottom = '1px solid var(--rrw-soft-border)';
+
+  
+
+  // Create list of replies
+
+  const repliesList = document.createElement('div');
+
+  repliesList.id = 'cannedRepliesEditorList';
+
+  repliesList.style.marginBottom = '12px';
+
+  
+
+  replies.forEach((reply, idx) => {
+
+    const replyItem = createReplyEditorItem(reply, idx, replies, repliesList);
+
+    repliesList.appendChild(replyItem);
+
+  });
+
+  
+
+  contentArea.appendChild(repliesList);
+
+  
+
+  // Add new reply button
+
+  const addNewBtn = document.createElement('button');
+
+  addNewBtn.className = 'rrw-btn rrw-btn-secondary';
+
+  addNewBtn.style.marginBottom = '12px';
+
+  addNewBtn.textContent = '+ Add New Reply';
+
+  addNewBtn.onclick = () => {
+
+    replies.push({ name: '', content: '' });
+
+    const replyItem = createReplyEditorItem(replies[replies.length - 1], replies.length - 1, replies, repliesList);
+
+    repliesList.appendChild(replyItem);
+
+    // Focus the new item's name field
+
+    const nameInput = replyItem.querySelector('.reply-name-input');
+
+    if (nameInput) nameInput.focus();
+
+  };
+
+  contentArea.appendChild(addNewBtn);
+
+  
+
+  modal.appendChild(contentArea);
+
+  
+
+  // Create footer with buttons
+
+  const footer = document.createElement('div');
+
+  footer.style.display = 'flex';
+
+  footer.style.gap = '8px';
+
+  footer.style.justifyContent = 'flex-end';
+
+  footer.style.padding = '12px 16px';
+
+  
+
+  const cancelBtn = document.createElement('button');
+
+  cancelBtn.className = 'rrw-btn rrw-btn-secondary';
+
+  cancelBtn.textContent = 'Cancel';
+
+  cancelBtn.onclick = closeCannedRepliesEditorModal;
+
+  footer.appendChild(cancelBtn);
+
+  
+
+  const saveBtn = document.createElement('button');
+
+  saveBtn.className = 'rrw-btn rrw-btn-primary';
+
+  saveBtn.textContent = 'Save';
+
+  saveBtn.onclick = async () => {
+
+    saveBtn.disabled = true;
+
+    saveBtn.textContent = 'Saving...';
+
+    try {
+
+      console.log("[ModBox] Save button clicked");
+
+      console.log("[ModBox] Subreddit:", subreddit);
+
+      console.log("[ModBox] Replies to save:", replies);
+
+      
+
+      // Filter out empty replies
+
+      const nonEmptyReplies = replies.filter(r => {
+
+        const hasName = r.name && r.name.trim();
+
+        const hasContent = r.content && r.content.trim();
+
+        console.log(`[ModBox] Checking reply: name="${r.name}" (${hasName ? 'valid' : 'empty'}), content="${r.content ? r.content.substring(0, 20) + '...' : ''}" (${hasContent ? 'valid' : 'empty'})`);
+
+        return hasName && hasContent;
+
+      });
+
+      
+
+      console.log("[ModBox] Non-empty replies count:", nonEmptyReplies.length);
+
+      
+
+      // Update the config with modified replies
+
+      const newConfig = {
+
+        schema: config.schema,
+
+        version: config.version,
+
+        subreddit: subreddit,
+
+        replies: nonEmptyReplies
+
+      };
+
+      
+
+      console.log("[ModBox] Calling saveCannedRepliesToWiki with config:", JSON.stringify(newConfig, null, 2));
+
+      
+
+      await saveCannedRepliesToWiki(subreddit, newConfig, "Updated canned replies via ModBox Editor");
+
+      
+
+      // Clear caches so fresh data is loaded
+
+      cannedRepliesConfig = null;
+
+      cannedRepliesLoadPromise = null;
+
+      
+
+      console.log("[ModBox] Canned replies saved successfully");
+
+      showSaveNotification();
+
+      closeCannedRepliesEditorModal();
+
+    } catch (err) {
+
+      console.error("[ModBox] Failed to save canned replies:", err);
+
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      console.error("[ModBox] Error details:", errorMsg);
+
+      alert("Failed to save canned replies: " + errorMsg);
+
+      saveBtn.disabled = false;
+
+      saveBtn.textContent = 'Save';
+
+    }
+
+  };
+
+  footer.appendChild(saveBtn);
+
+  
+
+  modal.appendChild(footer);
+
+  
+
+  overlayRoot.appendChild(backdrop);
+
+  overlayRoot.appendChild(modal);
+
+  
+
+  console.log("[ModBox] Opened canned replies editor");
+
+}
+
+
+
+function createReplyEditorItem(reply, idx, repliesArray, container) {
+
+  const item = document.createElement('div');
+
+  item.className = 'reply-editor-item';
+
+  item.style.cssText = `
+
+    border: 1px solid var(--rrw-soft-border);
+
+    border-radius: 6px;
+
+    padding: 12px;
+
+    margin-bottom: 12px;
+
+    background: var(--rrw-subtle-bg);
+
+  `;
+
+  item.dataset.index = idx;
+
+  
+
+  // Name field
+
+  const nameLabel = document.createElement('label');
+
+  nameLabel.style.cssText = `
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-size: 0.9rem;
+
+    font-weight: 500;
+
+    color: var(--rrw-text);
+
+  `;
+
+  nameLabel.textContent = 'Reply Name:';
+
+  item.appendChild(nameLabel);
+
+  
+
+  const nameInput = document.createElement('input');
+
+  nameInput.className = 'reply-name-input';
+
+  nameInput.type = 'text';
+
+  nameInput.value = reply.name;
+
+  nameInput.placeholder = 'e.g., "You\'re Welcome"';
+
+  nameInput.style.cssText = `
+
+    width: 100%;
+
+    padding: 8px;
+
+    margin-bottom: 12px;
+
+    border: 1px solid var(--rrw-soft-border);
+
+    border-radius: 4px;
+
+    background: var(--rrw-modal-bg);
+
+    color: var(--rrw-text);
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+    box-sizing: border-box;
+
+  `;
+
+  nameInput.onchange = () => {
+
+    reply.name = nameInput.value;
+
+  };
+
+  nameInput.oninput = () => {
+
+    reply.name = nameInput.value;
+
+  };
+
+  item.appendChild(nameInput);
+
+  
+
+  // Content field
+
+  const contentLabel = document.createElement('label');
+
+  contentLabel.style.cssText = `
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-size: 0.9rem;
+
+    font-weight: 500;
+
+    color: var(--rrw-text);
+
+  `;
+
+  contentLabel.textContent = 'Reply Content:';
+
+  item.appendChild(contentLabel);
+
+  
+
+  const contentInput = document.createElement('textarea');
+
+  contentInput.className = 'reply-content-input';
+
+  contentInput.value = reply.content;
+
+  contentInput.placeholder = 'Enter the canned reply text';
+
+  contentInput.style.cssText = `
+
+    width: 100%;
+
+    padding: 8px;
+
+    margin-bottom: 12px;
+
+    border: 1px solid var(--rrw-soft-border);
+
+    border-radius: 4px;
+
+    background: var(--rrw-modal-bg);
+
+    color: var(--rrw-text);
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+    resize: vertical;
+
+    min-height: 80px;
+
+    box-sizing: border-box;
+
+  `;
+
+  contentInput.onchange = () => {
+
+    reply.content = contentInput.value;
+
+  };
+
+  contentInput.oninput = () => {
+
+    reply.content = contentInput.value;
+
+  };
+
+  item.appendChild(contentInput);
+
+  
+
+  // Delete button
+
+  const deleteBtn = document.createElement('button');
+
+  deleteBtn.className = 'rrw-btn rrw-btn-secondary';
+
+  deleteBtn.style.cssText = `
+
+    background-color: #d32f2f;
+
+    color: white;
+
+  `;
+
+  deleteBtn.textContent = 'Delete';
+
+  deleteBtn.onclick = () => {
+
+    repliesArray.splice(idx, 1);
+
+    item.remove();
+
+  };
+
+  item.appendChild(deleteBtn);
+
+  
+
+  return item;
+
+}
+
+
+
+function closeCannedRepliesEditorModal() {
+
+  const modal = document.getElementById('cannedRepliesEditorModal');
+
+  const backdrop = document.getElementById('cannedRepliesEditorBackdrop');
+
+  if (modal) modal.remove();
+
+  if (backdrop) backdrop.remove();
+
+}
+
+
+
+function showSaveNotification() {
+
+  const notification = document.createElement('div');
+
+  notification.textContent = 'Canned replies saved!';
+
+  notification.style.cssText = `
+
+    position: fixed;
+
+    top: 20px;
+
+    left: 50%;
+
+    margin-left: -100px;
+
+    width: 200px;
+
+    text-align: center;
+
+    background-color: #2e7d32;
+
+    color: white;
+
+    padding: 14px 24px;
+
+    border-radius: 6px;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    z-index: 999999;
+
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+
+    animation: fadeInOut 2s ease-in-out;
+
+    pointer-events: none;
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  `;
+
+  document.documentElement.appendChild(notification);
+
+  
+
+  setTimeout(() => {
+
+    notification.remove();
+
+  }, 2000);
 
 }
 
