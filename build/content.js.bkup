@@ -42457,23 +42457,9 @@ async function highlightModmailConversation(subreddit, conversationId, highlight
 
 // Handles specially formatted modbox:// protocol links for executing moderation actions.
 
-// Supports: modbox://ban?user=username&reason=message&note=usernote&durationDays=30&notetype=BAN
+// Supports: modbox://ban?user=username&reason=message&note=usernote
 
-// Parameters:
-
-//   - user (required): Username to ban
-
-//   - reason (optional): Ban message/reason
-
-//   - note (optional): User note to add (added to toolbox usernotes)
-
-//   - notetype (optional): Type of note to add (e.g., BAN, WARNING, etc. - toolbox note type)
-
-//   - durationDays (optional): Ban duration in days. Omit for permanent ban
-
-//   - subreddit (optional): Subreddit to ban from (auto-detected if not provided)
-
-// Dependencies: constants.js, utilities.js, services/reddit-api.js, features/usernotes.js
+// Dependencies: constants.js, utilities.js, services/reddit-api.js
 
 
 
@@ -42515,25 +42501,11 @@ function parseModboxLink(href) {
 
       const subreddit = String(params.subreddit || "").trim();
 
-      const durationDays = params.durationDays ? parseInt(params.durationDays, 10) : undefined;
-
-      const notetype = String(params.notetype || "").trim();
-
 
 
       if (!username) {
 
         return { error: "Missing 'user' parameter in modbox://ban link" };
-
-      }
-
-
-
-      // Validate durationDays if provided
-
-      if (params.durationDays && (isNaN(durationDays) || durationDays < 0)) {
-
-        return { error: "Invalid 'durationDays' parameter - must be a non-negative number" };
 
       }
 
@@ -42550,10 +42522,6 @@ function parseModboxLink(href) {
         note: note || "",
 
         subreddit: subreddit || null,
-
-        durationDays: durationDays,
-
-        notetype: notetype || null,
 
       };
 
@@ -42705,7 +42673,7 @@ async function executeModboxBanAction(params, subreddit) {
 
 
 
-  const banOptions = {
+  await banUserViaNativeSession({
 
     subreddit: cleanSubreddit,
 
@@ -42715,65 +42683,9 @@ async function executeModboxBanAction(params, subreddit) {
 
     note: params.note,
 
-  };
+    durationDays: undefined, // Permanent ban
 
-
-
-  // Add optional duration (if undefined, results in permanent ban)
-
-  if (params.durationDays !== undefined) {
-
-    banOptions.durationDays = params.durationDays;
-
-  }
-
-
-
-  // Add optional notetype
-
-  if (params.notetype) {
-
-    banOptions.notetype = params.notetype;
-
-  }
-
-
-
-  await banUserViaNativeSession(banOptions);
-
-
-
-  // Add toolbox usernote if note text is provided
-
-  if (params.note) {
-
-    try {
-
-      await addUsernoteViaReddit(
-
-        cleanSubreddit,
-
-        params.username,
-
-        params.note,
-
-        params.notetype || "none"
-
-      );
-
-      console.log("[ModBox Link Handler] Usernote added for", params.username);
-
-    } catch (err) {
-
-      const errorMsg = getSafeErrorMessage(err);
-
-      console.warn("[ModBox Link Handler] Failed to add usernote:", errorMsg);
-
-      // Don't throw - ban succeeded even if usernote failed
-
-    }
-
-  }
+  });
 
 }
 
@@ -42941,37 +42853,7 @@ function bindModboxLinkHandler() {
 
         await executeModboxBanAction(parsed, subreddit);
 
-        
-
-        // Build user feedback message
-
-        let toastMessage = `Banned u/${parsed.username} in r/${subreddit}`;
-
-        if (parsed.durationDays !== undefined) {
-
-          toastMessage += ` for ${parsed.durationDays} day${parsed.durationDays !== 1 ? 's' : ''}`;
-
-        } else {
-
-          toastMessage += " permanently";
-
-        }
-
-        if (parsed.notetype) {
-
-          toastMessage += ` (${parsed.notetype})`;
-
-        }
-
-        if (parsed.note) {
-
-          toastMessage += " + note";
-
-        }
-
-        
-
-        showModboxLinkToast(toastMessage);
+        showModboxLinkToast(`Banned u/${parsed.username} in r/${subreddit}`);
 
         console.log("[ModBox Link Handler] Ban action completed for", parsed.username);
 

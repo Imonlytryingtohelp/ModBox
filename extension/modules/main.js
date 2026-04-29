@@ -14,6 +14,8 @@ function start() {
   refreshPageTargetHints();
   bindNativeRemoveInterceptor();
   void loadNativeInterceptPreference();
+  initModboxLinkHandler();
+  initLinkGenerator();
 
   // Pointer-down guard: track when the user is mid-click so that full DOM
   // replacements in renderOverlay / renderRemovalConfigEditor / renderQueueBar

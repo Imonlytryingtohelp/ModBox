@@ -553,7 +553,8 @@ function renderOverlay() {
       <header class="rrw-overlay-header">
         <h2>${quickActionsOnlyMode ? "Quick Actions" : "ModBox"}</h2>
         <div class="rrw-header-actions">
-          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
+          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-link-generator" title="Generate ModBox ban links">🔗</button>
+          <button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
           <button type="button" class="rrw-refresh-btn" id="rrw-refresh-config" title="Refresh removal reasons">\u21BB</button>` : ""}
           <button type="button" class="rrw-close" data-overlay-close="1">Close</button>
         </div>
@@ -892,6 +893,13 @@ function renderOverlay() {
         config: overlayState.removalConfig || buildDefaultRemovalConfig(subreddit),
         flairTemplates: overlayState.postFlairTemplates || [],
       });
+    });
+  }
+
+  const linkGeneratorBtn = root.querySelector("#rrw-link-generator");
+  if (linkGeneratorBtn) {
+    linkGeneratorBtn.addEventListener("click", () => {
+      openLinkGenerator();
     });
   }
 

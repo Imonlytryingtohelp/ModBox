@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.4.0 - ModBox Links
+
+### Added
+
+- **ModBox Links** - New `modbox://` protocol links for executing moderation actions with a single click:
+  - Currently limited to one-click bans. 
+  - Ban users with `modbox://ban?user=username&reason=message&subreddit=subreddit`
+  - Set temporary ban durations with `durationDays` parameter (e.g., `durationDays=7` for 7-day ban, omit for permanent)
+  - Automatically add Toolbox usernotes with `note` and `notetype` parameters (e.g., `note=spam&notetype=Temp+Ban`)
+  - Auto-detect subreddit from current page or modmail thread, or explicitly set via `subreddit` parameter
+  - Toast notifications confirm action completion with ban duration and note type details
+
 ## 1.3.5 - Canned Replies Editor
 
 ### Added
