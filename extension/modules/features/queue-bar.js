@@ -101,6 +101,23 @@ function persistQueueBarCollapsedPreference() {
   }
 }
 
+async function loadQueueBarPositionPreference() {
+  try {
+    const settings = await getApiBaseUrl();
+    queueBarPosition = settings.queueBarPosition || "bottom_right";
+  } catch {
+    queueBarPosition = "bottom_right";
+  }
+}
+
+function persistQueueBarPositionPreference() {
+  try {
+    void ext.storage.sync.set({ [QUEUE_BAR_POSITION_KEY]: queueBarPosition });
+  } catch {
+    // Ignore storage errors for position preference.
+  }
+}
+
 // ──── Queue Bar DOM Management ────
 
 function ensureQueueBarRoot() {
@@ -570,6 +587,7 @@ function renderQueueBar(state) {
   }
 
   const root = ensureQueueBarRoot();
+  root.setAttribute("data-position", queueBarPosition || "bottom_right");
   root.replaceChildren();
 
   const shell = document.createElement("section");
@@ -981,6 +999,8 @@ async function initQueueBar() {
   console.log("[ModBox] initQueueBar starting...");
   await loadQueueBarCollapsedPreference();
   console.log("[ModBox] queueBarCollapsed loaded:", queueBarCollapsed);
+  await loadQueueBarPositionPreference();
+  console.log("[ModBox] queueBarPosition loaded:", queueBarPosition);
   await refreshQueueBar(true);
   console.log("[ModBox] refreshQueueBar completed");
   bindQueueBarPollingListeners();

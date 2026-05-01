@@ -79,9 +79,20 @@ function injectStyles() {
       pointer-events: auto;
       position: fixed;
       bottom: 10px;
-      right: 10px;
+      right: var(--rrw-queuebar-right, 10px);
+      left: var(--rrw-queuebar-left, auto);
       z-index: 2147483647;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    }
+
+    #rrw-queuebar-root[data-position="bottom_right"] {
+      --rrw-queuebar-right: 10px;
+      --rrw-queuebar-left: auto;
+    }
+
+    #rrw-queuebar-root[data-position="bottom_left"] {
+      --rrw-queuebar-right: auto;
+      --rrw-queuebar-left: 10px;
     }
 
     .rrw-queuebar {

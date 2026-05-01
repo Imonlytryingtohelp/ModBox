@@ -845,6 +845,13 @@ function renderRemovalConfigEditor() {
                 <option value="new_reddit" ${extensionSettings.queue_bar_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
               </select>
             </label>
+            <label class="rrw-field">
+              <span>Queue bar position</span>
+              <select data-ext-setting="queue_bar_position">
+                <option value="bottom_right" ${extensionSettings.queue_bar_position === "bottom_right" ? "selected" : ""}>Bottom right</option>
+                <option value="bottom_left" ${extensionSettings.queue_bar_position === "bottom_left" ? "selected" : ""}>Bottom left</option>
+              </select>
+            </label>
             <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
               <input type="checkbox" data-ext-setting="queue_bar_use_old_reddit" ${extensionSettings.queue_bar_use_old_reddit ? "checked" : ""} />
               <span>When using extension preference, open queue links on old.reddit.com</span>
@@ -1018,6 +1025,9 @@ function renderRemovalConfigEditor() {
         removalConfigEditorState.extensionSettings.queue_bar_fixed_subreddit = clean || null;
       } else if (key === "queue_bar_link_host") {
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
+      } else if (key === "queue_bar_position") {
+        const position = String(event.target.value || "").toLowerCase();
+        removalConfigEditorState.extensionSettings.queue_bar_position = ["bottom_left", "bottom_right"].includes(position) ? position : "bottom_right";
       } else if (key === "canned_replies_wiki_url") {
         removalConfigEditorState.extensionSettings.canned_replies_wiki_url = String(event.target.value || "").trim();
       }
@@ -1758,6 +1768,7 @@ function renderRemovalConfigEditor() {
         const linkHost = normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference");
         const useOldReddit = typeof s.queue_bar_use_old_reddit === "boolean" ? s.queue_bar_use_old_reddit : false;
         const openInNewTab = typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false;
+        const queuePosition = ["bottom_left", "bottom_right"].includes(String(s.queue_bar_position || "")) ? s.queue_bar_position : "bottom_right";
         const themeMode = normalizeThemeMode(s.theme_mode, "auto");
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
         const historyButtonEnabled = typeof s.history_button_enabled === "boolean" ? s.history_button_enabled : true;
@@ -1773,6 +1784,7 @@ function renderRemovalConfigEditor() {
           [QUEUE_BAR_LINK_HOST_KEY]: linkHost,
           [QUEUE_BAR_USE_OLD_REDDIT_KEY]: useOldReddit,
           [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: openInNewTab,
+          [QUEUE_BAR_POSITION_KEY]: queuePosition,
           [THEME_MODE_KEY]: themeMode,
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
           [HISTORY_BUTTON_ENABLED_KEY]: historyButtonEnabled,
@@ -1783,6 +1795,9 @@ function renderRemovalConfigEditor() {
         // Clear the cache so getPanelSettingsCached will fetch fresh settings
         panelSettingsPromise = null;
         clearQueueBarContextCache();
+
+        // Update runtime position variable
+        queueBarPosition = queuePosition;
 
         await applyExtensionSettingsToRuntime({
           intercept_native_remove: interceptNative,

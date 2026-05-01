@@ -39,6 +39,7 @@ let queueBarRoot = null;
 let queueBarPollTimer = null;
 let queueBarPollingListenersBound = false;
 let queueBarCollapsed = false;
+let queueBarPosition = "bottom_right";
 let queueBarContextCache = null;
 let queueBarContextFetchedAt = 0;
 let queueBarRefreshInFlight = false;
@@ -223,6 +224,7 @@ async function getApiBaseUrl() {
     QUEUE_BAR_USE_OLD_REDDIT_KEY,
     QUEUE_BAR_OPEN_IN_NEW_TAB_KEY,
     QUEUE_BAR_FIXED_SUBREDDIT_KEY,
+    QUEUE_BAR_POSITION_KEY,
     CONTEXT_POPUP_ENABLED_KEY,
     THEME_MODE_KEY,
     CANNED_REPLIES_WIKI_URL_KEY,
@@ -232,6 +234,7 @@ async function getApiBaseUrl() {
   const queueScope = String(stored?.[QUEUE_BAR_SCOPE_KEY] || "current_subreddit");
   const queueLinkHost = normalizeQueueBarLinkHost(stored?.[QUEUE_BAR_LINK_HOST_KEY], "extension_preference");
   const queueFixedSubreddit = normalizeSubreddit(String(stored?.[QUEUE_BAR_FIXED_SUBREDDIT_KEY] || ""));
+  const queuePosition = ["bottom_left", "bottom_right"].includes(String(stored?.[QUEUE_BAR_POSITION_KEY] || "")) ? stored[QUEUE_BAR_POSITION_KEY] : "bottom_right";
   return {
     autoCloseOnRemove: Boolean(stored?.[AUTO_CLOSE_KEY]),
     interceptNativeRemove:
@@ -250,6 +253,7 @@ async function getApiBaseUrl() {
     queueBarFixedSubreddit: queueFixedSubreddit || null,
     queueBarOpenInNewTab:
       typeof stored?.[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
+    queueBarPosition: queuePosition,
     contextPopupEnabled:
       typeof stored?.[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
     themeMode: normalizeThemeMode(stored?.[THEME_MODE_KEY], "auto"),

@@ -63,6 +63,8 @@ const QUEUE_BAR_FIXED_SUBREDDIT_KEY = "queueBarFixedSubreddit";
 
 const QUEUE_BAR_COLLAPSED_KEY = "queueBarCollapsed";
 
+const QUEUE_BAR_POSITION_KEY = "queueBarPosition";
+
 const CONTEXT_POPUP_POSITION_KEY = "contextPopupPosition";
 
 const THEME_MODE_KEY = "themeMode";
@@ -286,6 +288,8 @@ let queueBarPollTimer = null;
 let queueBarPollingListenersBound = false;
 
 let queueBarCollapsed = false;
+
+let queueBarPosition = "bottom_right";
 
 let queueBarContextCache = null;
 
@@ -655,6 +659,8 @@ async function getApiBaseUrl() {
 
     QUEUE_BAR_FIXED_SUBREDDIT_KEY,
 
+    QUEUE_BAR_POSITION_KEY,
+
     CONTEXT_POPUP_ENABLED_KEY,
 
     THEME_MODE_KEY,
@@ -672,6 +678,8 @@ async function getApiBaseUrl() {
   const queueLinkHost = normalizeQueueBarLinkHost(stored?.[QUEUE_BAR_LINK_HOST_KEY], "extension_preference");
 
   const queueFixedSubreddit = normalizeSubreddit(String(stored?.[QUEUE_BAR_FIXED_SUBREDDIT_KEY] || ""));
+
+  const queuePosition = ["bottom_left", "bottom_right"].includes(String(stored?.[QUEUE_BAR_POSITION_KEY] || "")) ? stored[QUEUE_BAR_POSITION_KEY] : "bottom_right";
 
   return {
 
@@ -708,6 +716,8 @@ async function getApiBaseUrl() {
     queueBarOpenInNewTab:
 
       typeof stored?.[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
+
+    queueBarPosition: queuePosition,
 
     contextPopupEnabled:
 
@@ -7201,6 +7211,8 @@ async function syncWikiExtensionSettingsToStorage(subreddit, wikiPage) {
 
     [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: normalizeRemovalBoolean(settings.queue_bar_open_in_new_tab, false),
 
+    [QUEUE_BAR_POSITION_KEY]: ["bottom_left", "bottom_right"].includes(String(settings.queue_bar_position || "")) ? settings.queue_bar_position : "bottom_right",
+
     [CONTEXT_POPUP_ENABLED_KEY]: Boolean(settings.context_popup_enabled),
 
     [THEME_MODE_KEY]: normalizeThemeMode(settings.theme_mode, "auto"),
@@ -11125,11 +11137,33 @@ function injectStyles() {
 
       bottom: 10px;
 
-      right: 10px;
+      right: var(--rrw-queuebar-right, 10px);
+
+      left: var(--rrw-queuebar-left, auto);
 
       z-index: 2147483647;
 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+    }
+
+
+
+    #rrw-queuebar-root[data-position="bottom_right"] {
+
+      --rrw-queuebar-right: 10px;
+
+      --rrw-queuebar-left: auto;
+
+    }
+
+
+
+    #rrw-queuebar-root[data-position="bottom_left"] {
+
+      --rrw-queuebar-right: auto;
+
+      --rrw-queuebar-left: 10px;
 
     }
 
@@ -22499,6 +22533,20 @@ function renderRemovalConfigEditor() {
 
             </label>
 
+            <label class="rrw-field">
+
+              <span>Queue bar position</span>
+
+              <select data-ext-setting="queue_bar_position">
+
+                <option value="bottom_right" ${extensionSettings.queue_bar_position === "bottom_right" ? "selected" : ""}>Bottom right</option>
+
+                <option value="bottom_left" ${extensionSettings.queue_bar_position === "bottom_left" ? "selected" : ""}>Bottom left</option>
+
+              </select>
+
+            </label>
+
             <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
               <input type="checkbox" data-ext-setting="queue_bar_use_old_reddit" ${extensionSettings.queue_bar_use_old_reddit ? "checked" : ""} />
@@ -22844,6 +22892,12 @@ function renderRemovalConfigEditor() {
       } else if (key === "queue_bar_link_host") {
 
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
+
+      } else if (key === "queue_bar_position") {
+
+        const position = String(event.target.value || "").toLowerCase();
+
+        removalConfigEditorState.extensionSettings.queue_bar_position = ["bottom_left", "bottom_right"].includes(position) ? position : "bottom_right";
 
       } else if (key === "canned_replies_wiki_url") {
 
@@ -24325,6 +24379,8 @@ function renderRemovalConfigEditor() {
 
         const openInNewTab = typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false;
 
+        const queuePosition = ["bottom_left", "bottom_right"].includes(String(s.queue_bar_position || "")) ? s.queue_bar_position : "bottom_right";
+
         const themeMode = normalizeThemeMode(s.theme_mode, "auto");
 
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
@@ -24355,6 +24411,8 @@ function renderRemovalConfigEditor() {
 
           [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: openInNewTab,
 
+          [QUEUE_BAR_POSITION_KEY]: queuePosition,
+
           [THEME_MODE_KEY]: themeMode,
 
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
@@ -24374,6 +24432,12 @@ function renderRemovalConfigEditor() {
         panelSettingsPromise = null;
 
         clearQueueBarContextCache();
+
+
+
+        // Update runtime position variable
+
+        queueBarPosition = queuePosition;
 
 
 
@@ -24812,6 +24876,40 @@ function persistQueueBarCollapsedPreference() {
   } catch {
 
     // Ignore storage errors for collapse preference.
+
+  }
+
+}
+
+
+
+async function loadQueueBarPositionPreference() {
+
+  try {
+
+    const settings = await getApiBaseUrl();
+
+    queueBarPosition = settings.queueBarPosition || "bottom_right";
+
+  } catch {
+
+    queueBarPosition = "bottom_right";
+
+  }
+
+}
+
+
+
+function persistQueueBarPositionPreference() {
+
+  try {
+
+    void ext.storage.sync.set({ [QUEUE_BAR_POSITION_KEY]: queueBarPosition });
+
+  } catch {
+
+    // Ignore storage errors for position preference.
 
   }
 
@@ -25757,6 +25855,8 @@ function renderQueueBar(state) {
 
   const root = ensureQueueBarRoot();
 
+  root.setAttribute("data-position", queueBarPosition || "bottom_right");
+
   root.replaceChildren();
 
 
@@ -26578,6 +26678,10 @@ async function initQueueBar() {
   await loadQueueBarCollapsedPreference();
 
   console.log("[ModBox] queueBarCollapsed loaded:", queueBarCollapsed);
+
+  await loadQueueBarPositionPreference();
+
+  console.log("[ModBox] queueBarPosition loaded:", queueBarPosition);
 
   await refreshQueueBar(true);
 
@@ -44313,6 +44417,8 @@ function start() {
 
           changes?.[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] ||
 
+          changes?.[QUEUE_BAR_POSITION_KEY] ||
+
           changes?.[CONTEXT_POPUP_ENABLED_KEY] ||
 
           changes?.[THEME_MODE_KEY] ||
@@ -44320,6 +44426,12 @@ function start() {
           changes?.buttonVisibilityScope
 
         ) {
+
+          if (changes?.[QUEUE_BAR_POSITION_KEY]) {
+
+            queueBarPosition = String(changes[QUEUE_BAR_POSITION_KEY].newValue || "bottom_right");
+
+          }
 
           panelSettingsPromise = null;
 

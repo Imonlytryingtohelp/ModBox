@@ -1243,6 +1243,7 @@ async function syncWikiExtensionSettingsToStorage(subreddit, wikiPage) {
     [QUEUE_BAR_LINK_HOST_KEY]: normalizeQueueBarLinkHost(settings.queue_bar_link_host, "extension_preference"),
     [QUEUE_BAR_USE_OLD_REDDIT_KEY]: normalizeRemovalBoolean(settings.queue_bar_use_old_reddit, false),
     [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: normalizeRemovalBoolean(settings.queue_bar_open_in_new_tab, false),
+    [QUEUE_BAR_POSITION_KEY]: ["bottom_left", "bottom_right"].includes(String(settings.queue_bar_position || "")) ? settings.queue_bar_position : "bottom_right",
     [CONTEXT_POPUP_ENABLED_KEY]: Boolean(settings.context_popup_enabled),
     [THEME_MODE_KEY]: normalizeThemeMode(settings.theme_mode, "auto"),
     [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: Boolean(settings.comment_nuke_ignore_distinguished),

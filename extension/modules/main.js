@@ -86,10 +86,14 @@ function start() {
           changes?.[QUEUE_BAR_LINK_HOST_KEY] ||
           changes?.[QUEUE_BAR_USE_OLD_REDDIT_KEY] ||
           changes?.[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] ||
+          changes?.[QUEUE_BAR_POSITION_KEY] ||
           changes?.[CONTEXT_POPUP_ENABLED_KEY] ||
           changes?.[THEME_MODE_KEY] ||
           changes?.buttonVisibilityScope
         ) {
+          if (changes?.[QUEUE_BAR_POSITION_KEY]) {
+            queueBarPosition = String(changes[QUEUE_BAR_POSITION_KEY].newValue || "bottom_right");
+          }
           panelSettingsPromise = null;
           clearQueueBarContextCache();
           allowedLaunchSubredditsLoaded = false;

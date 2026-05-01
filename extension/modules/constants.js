@@ -28,6 +28,7 @@ const QUEUE_BAR_USE_OLD_REDDIT_KEY = "queueBarUseOldReddit";
 const QUEUE_BAR_OPEN_IN_NEW_TAB_KEY = "queueBarOpenInNewTab";
 const QUEUE_BAR_FIXED_SUBREDDIT_KEY = "queueBarFixedSubreddit";
 const QUEUE_BAR_COLLAPSED_KEY = "queueBarCollapsed";
+const QUEUE_BAR_POSITION_KEY = "queueBarPosition";
 const CONTEXT_POPUP_POSITION_KEY = "contextPopupPosition";
 const THEME_MODE_KEY = "themeMode";
 const LAST_SEND_MODE_KEY = "lastSendMode";
