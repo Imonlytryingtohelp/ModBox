@@ -167,7 +167,7 @@ async function executeModboxBanAction(params, subreddit) {
 // User Feedback Toast
 // ────────────────────────────────────────────────────────────────────────────────────────────────
 
-function showModboxLinkToast(message, isError = false) {
+function showModboxLinkToast(message, isError = false, duration = 3000) {
   const toast = document.createElement("div");
   toast.className = `rrw-modbox-link-toast ${isError ? "error" : "success"}`;
   toast.textContent = message;
@@ -183,7 +183,7 @@ function showModboxLinkToast(message, isError = false) {
     font-size: 14px;
     z-index: 10000;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    animation: fadeInOut 3s ease-in-out;
+    animation: fadeInOut ${duration}ms ease-in-out;
   `;
 
   // Add animation styles if not already present
@@ -202,7 +202,32 @@ function showModboxLinkToast(message, isError = false) {
   }
 
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => toast.remove(), duration);
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────────
+// Link Display Text Generation
+// ────────────────────────────────────────────────────────────────────────────────────────────────
+
+function generateModboxLinkDisplayText(href) {
+  try {
+    const parsed = parseModboxLink(href);
+    if (parsed.error) {
+      return "[ModBox Link]";
+    }
+
+    if (parsed.action === "ban") {
+      let text = `[Ban] u/${parsed.username}`;
+      if (parsed.durationDays !== undefined) {
+        text += ` (${parsed.durationDays}d)`;
+      }
+      return text;
+    }
+
+    return "[ModBox Link]";
+  } catch (err) {
+    return "[ModBox Link]";
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -241,12 +266,15 @@ function bindModboxLinkHandler() {
         throw new Error("Could not determine subreddit (not on a moderated subreddit page or valid modmail)");
       }
 
+      // Show immediate toast that ban process has started
+      showModboxLinkToast(">>> Ban process started...", false, 2000);
+
       // Execute the action
       if (parsed.action === "ban") {
         await executeModboxBanAction(parsed, subreddit);
         
         // Build user feedback message
-        let toastMessage = `Banned u/${parsed.username} in r/${subreddit}`;
+        let toastMessage = `[SUCCESS] Banned u/${parsed.username} in r/${subreddit}`;
         if (parsed.durationDays !== undefined) {
           toastMessage += ` for ${parsed.durationDays} day${parsed.durationDays !== 1 ? 's' : ''}`;
         } else {
@@ -265,7 +293,7 @@ function bindModboxLinkHandler() {
     } catch (err) {
       const errorMsg = getSafeErrorMessage(err);
       console.error("[ModBox Link Handler] Action failed:", errorMsg);
-      showModboxLinkToast(`Ban failed: ${errorMsg}`, true);
+      showModboxLinkToast(`[ERROR] Ban failed: ${errorMsg}`, true);
     }
   }, true); // Use capture phase for early interception
 }
@@ -301,12 +329,13 @@ function linkifyModboxURLsInNode(node) {
       // Create link for match
       const link = document.createElement("a");
       link.href = match[0];
-      link.textContent = match[0];
+      link.title = match[0]; // Show full URL in tooltip
+      link.textContent = generateModboxLinkDisplayText(match[0]);
       link.style.cssText = `
         color: #0079d3;
         text-decoration: underline;
         cursor: pointer;
-        word-break: break-all;
+        font-weight: 500;
       `;
       fragment.appendChild(link);
 

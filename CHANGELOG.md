@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.4.2 - ModBox Links Updates & Bug Fixes
+
+- Further Z-index fixes to restore functionality on new/sh reddit. 
+- ModBox Links now display cleanly when using the extension. 
+- ModBox Links now display a toast notification when clicked. 
+
 ## 1.4.1 - Bug Fixes
 
 - Fixed Z-index issue causing incorrect element layering 

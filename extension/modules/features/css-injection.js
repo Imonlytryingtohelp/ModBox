@@ -12,6 +12,11 @@ function injectStyles() {
   console.log("[ModBox] Injecting ModBox CSS styles...");
   const style = document.createElement("style");
   style.id = "rrw-style";
+  
+  // Detect if we're on old.reddit - the z-index fix only applies here
+  const isOldReddit = String(window.location.hostname || "").toLowerCase() === "old.reddit.com";
+  const pillButtonZIndex = isOldReddit ? "auto" : "100";
+  
   style.textContent = `
     #rrw-overlay-root {
       --rrw-font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
@@ -488,14 +493,14 @@ function injectStyles() {
       text-decoration: none;
       font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
       position: relative;
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
       pointer-events: auto;
     }
 
     .rrw-launch-btn-inline {
       margin: 0;
       position: relative;
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
       pointer-events: auto;
     }
 
@@ -640,7 +645,7 @@ function injectStyles() {
       gap: 2px;
       align-items: center;
       position: relative;
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
       pointer-events: auto;
     }
 

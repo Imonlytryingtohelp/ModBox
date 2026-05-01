@@ -11039,6 +11039,16 @@ function injectStyles() {
 
   style.id = "rrw-style";
 
+  
+
+  // Detect if we're on old.reddit - the z-index fix only applies here
+
+  const isOldReddit = String(window.location.hostname || "").toLowerCase() === "old.reddit.com";
+
+  const pillButtonZIndex = isOldReddit ? "auto" : "100";
+
+  
+
   style.textContent = `
 
     #rrw-overlay-root {
@@ -11991,7 +12001,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
 
       pointer-events: auto;
 
@@ -12005,7 +12015,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
 
       pointer-events: auto;
 
@@ -12295,7 +12305,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: auto;
+      z-index: ${pillButtonZIndex};
 
       pointer-events: auto;
 
@@ -42929,7 +42939,7 @@ async function executeModboxBanAction(params, subreddit) {
 
 
 
-function showModboxLinkToast(message, isError = false) {
+function showModboxLinkToast(message, isError = false, duration = 3000) {
 
   const toast = document.createElement("div");
 
@@ -42961,7 +42971,7 @@ function showModboxLinkToast(message, isError = false) {
 
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 
-    animation: fadeInOut 3s ease-in-out;
+    animation: fadeInOut ${duration}ms ease-in-out;
 
   `;
 
@@ -42999,7 +43009,57 @@ function showModboxLinkToast(message, isError = false) {
 
   document.body.appendChild(toast);
 
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => toast.remove(), duration);
+
+}
+
+
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// Link Display Text Generation
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+
+function generateModboxLinkDisplayText(href) {
+
+  try {
+
+    const parsed = parseModboxLink(href);
+
+    if (parsed.error) {
+
+      return "[ModBox Link]";
+
+    }
+
+
+
+    if (parsed.action === "ban") {
+
+      let text = `[Ban] u/${parsed.username}`;
+
+      if (parsed.durationDays !== undefined) {
+
+        text += ` (${parsed.durationDays}d)`;
+
+      }
+
+      return text;
+
+    }
+
+
+
+    return "[ModBox Link]";
+
+  } catch (err) {
+
+    return "[ModBox Link]";
+
+  }
 
 }
 
@@ -43077,6 +43137,12 @@ function bindModboxLinkHandler() {
 
 
 
+      // Show immediate toast that ban process has started
+
+      showModboxLinkToast(">>> Ban process started...", false, 2000);
+
+
+
       // Execute the action
 
       if (parsed.action === "ban") {
@@ -43087,7 +43153,7 @@ function bindModboxLinkHandler() {
 
         // Build user feedback message
 
-        let toastMessage = `Banned u/${parsed.username} in r/${subreddit}`;
+        let toastMessage = `[SUCCESS] Banned u/${parsed.username} in r/${subreddit}`;
 
         if (parsed.durationDays !== undefined) {
 
@@ -43125,7 +43191,7 @@ function bindModboxLinkHandler() {
 
       console.error("[ModBox Link Handler] Action failed:", errorMsg);
 
-      showModboxLinkToast(`Ban failed: ${errorMsg}`, true);
+      showModboxLinkToast(`[ERROR] Ban failed: ${errorMsg}`, true);
 
     }
 
@@ -43197,7 +43263,9 @@ function linkifyModboxURLsInNode(node) {
 
       link.href = match[0];
 
-      link.textContent = match[0];
+      link.title = match[0]; // Show full URL in tooltip
+
+      link.textContent = generateModboxLinkDisplayText(match[0]);
 
       link.style.cssText = `
 
@@ -43207,7 +43275,7 @@ function linkifyModboxURLsInNode(node) {
 
         cursor: pointer;
 
-        word-break: break-all;
+        font-weight: 500;
 
       `;
 
