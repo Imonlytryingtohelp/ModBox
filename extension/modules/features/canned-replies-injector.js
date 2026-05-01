@@ -27,16 +27,17 @@ async function loadCannedRepliesIfNeeded() {
   // Load from wiki
   cannedRepliesLoadPromise = (async () => {
     try {
-      const subreddit = parseSubredditFromPath(window.location.pathname);
+      // Try to get subreddit from current page
+      let subreddit = parseSubredditFromPath(window.location.pathname);
       console.log("[ModBox] Canned replies: parsed subreddit =", subreddit);
       
+      // If no subreddit on page (e.g., modmail), pass empty string
+      // loadCannedRepliesFromWiki will check for configured URL first
       if (!subreddit) {
-        console.warn("[ModBox] No subreddit found on page");
-        cannedRepliesConfig = buildDefaultCannedRepliesConfig("");
-        return cannedRepliesConfig;
+        subreddit = "";
       }
       
-      console.log("[ModBox] Loading canned replies from wiki for subreddit:", subreddit);
+      console.log("[ModBox] Loading canned replies from wiki");
       const config = await loadCannedRepliesFromWiki(subreddit);
       console.log("[ModBox] Wiki returned config:", config);
       

@@ -662,20 +662,10 @@ function parseSimpleYaml(yamlText) {
 }
 
 async function loadCannedRepliesFromWiki(subreddit) {
-  const cleanSubreddit = normalizeSubreddit(subreddit);
-  if (!cleanSubreddit) {
-    throw new Error("Subreddit is required to load canned replies");
-  }
-
-  const cached = getInMemoryCannedReplies(cleanSubreddit);
-  if (cached) {
-    return cached;
-  }
-
-  let wikiPayload;
-  let wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
+  // Try to get configured wikiUrl from storage first
+  let configuredUrl = null;
+  let wikiPath = null;
   
-  // Try to get wikiUrl from chrome storage
   try {
     const data = await new Promise(resolve => {
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
@@ -686,45 +676,71 @@ async function loadCannedRepliesFromWiki(subreddit) {
     });
     
     // Check both ModBox and original CannedReplys storage keys
-    const configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
-    if (configuredUrl) {
-      let path = String(configuredUrl).trim();
-      
-      // Handle full URLs
-      if (path.startsWith('http')) {
-        path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
-      }
-      
-      // Ensure leading slash
-      if (!path.startsWith('/')) {
-        path = '/' + path;
-      }
-      
-      // Remove trailing slash
-      path = path.replace(/\/$/, '');
-      
-      wikiPath = path + '.json?raw_json=1';
-      console.log("[ModBox] Using configured canned replies URL:", wikiPath);
-    }
+    configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
   } catch (err) {
     console.log("[ModBox] Could not read canned replies URL from storage:", err);
   }
   
+  // If configured URL exists, use it (subreddit parameter is optional in this case)
+  if (configuredUrl) {
+    let path = String(configuredUrl).trim();
+    
+    // Handle full URLs
+    if (path.startsWith('http')) {
+      path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+    }
+    
+    // Ensure leading slash
+    if (!path.startsWith('/')) {
+      path = '/' + path;
+    }
+    
+    // Remove trailing slash
+    path = path.replace(/\/$/, '');
+    
+    wikiPath = path + '.json?raw_json=1';
+    console.log("[ModBox] Using configured canned replies URL:", wikiPath);
+  } else {
+    // Otherwise, build from subreddit parameter
+    const cleanSubreddit = normalizeSubreddit(subreddit);
+    if (!cleanSubreddit) {
+      throw new Error("Subreddit is required to load canned replies");
+    }
+
+    const cached = getInMemoryCannedReplies(cleanSubreddit);
+    if (cached) {
+      return cached;
+    }
+
+    wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
+    subreddit = cleanSubreddit;
+  }
+  
   console.log("[ModBox] Loading canned replies from:", wikiPath);
   
+  // Try loading without OAuth first (allows public wiki pages on any subreddit)
+  // Then fall back to OAuth if needed (for private wikis on moderated subreddits)
+  let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+    try {
+      console.log("[ModBox] Attempting to load canned replies without OAuth");
+      wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: false });
+    } catch (noAuthError) {
+      console.log("[ModBox] Non-authenticated request failed, attempting with OAuth:", noAuthError);
+      // Try with OAuth if non-authenticated request fails
+      wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
-      return buildDefaultCannedRepliesConfig(cleanSubreddit);
+      return buildDefaultCannedRepliesConfig(String(subreddit || ""));
     }
     throw error;
   }
 
   const raw = String(wikiPayload?.data?.content_md || "").trim();
   if (!raw) {
-    return buildDefaultCannedRepliesConfig(cleanSubreddit);
+    return buildDefaultCannedRepliesConfig(String(subreddit || ""));
   }
 
   let doc;
@@ -740,7 +756,7 @@ async function loadCannedRepliesFromWiki(subreddit) {
         doc = {
           schema: CANNED_REPLIES_WIKI_SCHEMA,
           version: 1,
-          subreddit: cleanSubreddit,
+          subreddit: String(subreddit || ""),
           replies: yamlArray.map(item => ({
             name: item.Name || "",
             content: item.Content || ""
@@ -754,8 +770,10 @@ async function loadCannedRepliesFromWiki(subreddit) {
     }
   }
 
-  const normalized = normalizeCannedRepliesDoc(doc, cleanSubreddit);
-  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  const normalized = normalizeCannedRepliesDoc(doc, String(subreddit || ""));
+  if (subreddit) {
+    setInMemoryCannedReplies(subreddit, normalized);
+  }
   return normalized;
 }
 
