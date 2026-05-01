@@ -477,14 +477,14 @@ function injectStyles() {
       text-decoration: none;
       font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
       position: relative;
-      z-index: 100;
+      z-index: auto;
       pointer-events: auto;
     }
 
     .rrw-launch-btn-inline {
       margin: 0;
       position: relative;
-      z-index: 100;
+      z-index: auto;
       pointer-events: auto;
     }
 

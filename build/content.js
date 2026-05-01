@@ -11921,7 +11921,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: 100;
+      z-index: auto;
 
       pointer-events: auto;
 
@@ -11935,7 +11935,7 @@ function injectStyles() {
 
       position: relative;
 
-      z-index: 100;
+      z-index: auto;
 
       pointer-events: auto;
 

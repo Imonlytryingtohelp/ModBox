@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.4.1 - Bug Fixes
+
+-  Fixed Z-index issue causing inccorect element layering. 
+
 ## 1.4.0 - ModBox Links
 
 ### Added
