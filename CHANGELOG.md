@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## 1.4.1 - Bug Fixes
 
-- Fixed Z-index issue causing incorrect element layering (pill buttons now render behind
+- Fixed Z-index issue causing incorrect element layering 
 - Added Extension Settings option to position ModBox Queues Box at bottom-left or bottom-right 
 - Canned replies now fuction on non-moderated subreddits and non-subreddit pages. 
 
