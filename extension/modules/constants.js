@@ -35,6 +35,8 @@ const LAST_SEND_MODE_KEY = "lastSendMode";
 const COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY = "commentNukeIgnoreDistinguished";
 const EXTENSION_SETTINGS_WIKI_PAGE_KEY = "extensionSettingsWikiPage";
 const CANNED_REPLIES_WIKI_URL_KEY = "cannedRepliesWikiUrl";
+const UPDATE_CHECK_RESULT_KEY = "updateCheckResult";
+const UPDATE_SEEN_KEY = "updateSeen";
 
 // ============================================================================
 // WIKI PAGE REFERENCES & SCHEMAS
@@ -82,6 +84,7 @@ const QUEUE_COUNTS_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const REMOVAL_CONFIG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ALLOWED_LAUNCH_SUBREDDITS_CACHE_KEY = "allowedLaunchSubredditsCache";
 const ALLOWED_LAUNCH_SUBREDDITS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_CHECK_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 // ============================================================================
 // DOM SELECTORS & CONSTRAINTS

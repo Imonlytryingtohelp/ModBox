@@ -701,10 +701,20 @@ function renderQueueBar(state) {
     renderQueueBar(queueBarLastState || state);
   });
 
+  const aboutBtn = document.createElement("button");
+  aboutBtn.type = "button";
+  aboutBtn.className = "rrw-queuebar-icon-btn";
+  aboutBtn.title = "About ModBox";
+  aboutBtn.textContent = "\u24D8"; // ⓘ Info symbol
+  aboutBtn.addEventListener("click", () => {
+    void openAboutPage();
+  });
+
   if (!queueBarCollapsed) {
     headerActions.appendChild(cannedRepliesBtn);
     headerActions.appendChild(settingsBtn);
     headerActions.appendChild(refreshBtn);
+    headerActions.appendChild(aboutBtn);
   } else {
     headerActions.appendChild(cannedRepliesBtn);
   }
@@ -799,21 +809,47 @@ function renderQueueBar(state) {
 
     const footer = document.createElement("div");
     footer.className = "rrw-queuebar-footer";
-    if (state.loading) {
-      footer.textContent = "Loading queue counts...";
-    } else if (state.error) {
-      footer.textContent = state.error;
-      footer.setAttribute("data-error", "1");
-    } else if (Number.isFinite(state.updatedAt)) {
-      footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+    
+    // Add update badge if update is available
+    if (state.updateStatus?.isUpdateAvailable) {
+      queueBarHasUpdateBadge = true;
+      const updateBadge = document.createElement("button");
+      updateBadge.type = "button";
+      updateBadge.className = "rrw-queuebar-update-badge";
+      updateBadge.textContent = "Update available!";
+      updateBadge.title = "Click to view update details";
+      updateBadge.addEventListener("click", async (e) => {
+        e.preventDefault();
+        void openUpdatePopup(state.updateStatus);
+      });
+      footer.appendChild(updateBadge);
     } else {
-      footer.textContent = `Queue status for ${state.links?.scopeLabel || "configured subreddit"}`;
+      queueBarHasUpdateBadge = false;
+      // Normal footer content
+      if (state.loading) {
+        footer.textContent = "Loading queue counts...";
+      } else if (state.error) {
+        footer.textContent = state.error;
+        footer.setAttribute("data-error", "1");
+      } else if (Number.isFinite(state.updatedAt)) {
+        footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+      } else {
+        footer.textContent = `Queue status for ${state.links?.scopeLabel || "configured subreddit"}`;
+      }
     }
+    
     if (queueBarFreshFlash && !state.loading && !state.error) {
       queueBarFreshFlash = false;
       footer.setAttribute("data-rrw-fresh", "1");
     }
     shell.appendChild(footer);
+  }
+
+  // Update queue bar background color based on update status
+  if (state.updateStatus?.isUpdateAvailable) {
+    shell.setAttribute("data-has-update", "1");
+  } else {
+    shell.removeAttribute("data-has-update");
   }
 
   root.appendChild(shell);
@@ -840,6 +876,27 @@ async function refreshQueueBar(force = false) {
     const settings = await getPanelSettingsCached();
     const configuredScope = normalizeQueueBarScope(settings.queueBarScope, "current_subreddit");
 
+    // Check for updates (non-blocking)
+    if (!queueBarUpdateStatus || force) {
+      void (async () => {
+        try {
+          const updateStatus = await getUpdateStatus();
+          if (updateStatus?.isUpdateAvailable && !queueBarUpdateStatus?.isUpdateAvailable) {
+            queueBarUpdateStatus = updateStatus;
+            // Re-render queue bar to show update badge
+            if (queueBarLastState) {
+              renderQueueBar({
+                ...queueBarLastState,
+                updateStatus,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn("[ModBox] Update check failed:", error);
+        }
+      })();
+    }
+
     // Render initial state with loading indicator or previous data
     renderQueueBar({
       enabled: true,
@@ -853,6 +910,7 @@ async function refreshQueueBar(force = false) {
           ? queueBarLastState.openInNewTab
           : Boolean(settings.queueBarOpenInNewTab),
       error: "",
+      updateStatus: queueBarUpdateStatus,
     });
 
     const context = await getQueueBarContext(settings, force);
@@ -892,6 +950,7 @@ async function refreshQueueBar(force = false) {
         updatedAt: queueBarLastState?.updatedAt || null,
         openInNewTab: Boolean(settings.queueBarOpenInNewTab),
         error: "",
+        updateStatus: queueBarUpdateStatus,
       });
     }
 
@@ -910,6 +969,7 @@ async function refreshQueueBar(force = false) {
           updatedAt: Date.now(),
           openInNewTab: Boolean(settings.queueBarOpenInNewTab),
           error: "",
+          updateStatus: queueBarUpdateStatus,
         });
       } catch (error) {
         console.warn("[ModBox] Background queue fetch failed:", error);
@@ -925,6 +985,7 @@ async function refreshQueueBar(force = false) {
             updatedAt: null,
             openInNewTab: Boolean(settings.queueBarOpenInNewTab),
             error: `Queue bar: ${message}`,
+            updateStatus: queueBarUpdateStatus,
           });
         }
       }
@@ -943,6 +1004,7 @@ async function refreshQueueBar(force = false) {
           ? queueBarLastState.openInNewTab
           : false,
       error: `Queue bar: ${message}`,
+      updateStatus: queueBarUpdateStatus,
     });
   } finally {
     queueBarRefreshInFlight = false;
@@ -1001,6 +1063,13 @@ async function initQueueBar() {
   console.log("[ModBox] queueBarCollapsed loaded:", queueBarCollapsed);
   await loadQueueBarPositionPreference();
   console.log("[ModBox] queueBarPosition loaded:", queueBarPosition);
+  
+  // Initialize update checker
+  initializeUpdateChecker();
+  
+  // Load initial update status
+  queueBarUpdateStatus = await getUpdateStatus();
+  
   await refreshQueueBar(true);
   console.log("[ModBox] refreshQueueBar completed");
   bindQueueBarPollingListeners();

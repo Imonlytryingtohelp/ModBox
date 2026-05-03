@@ -77,6 +77,10 @@ const EXTENSION_SETTINGS_WIKI_PAGE_KEY = "extensionSettingsWikiPage";
 
 const CANNED_REPLIES_WIKI_URL_KEY = "cannedRepliesWikiUrl";
 
+const UPDATE_CHECK_RESULT_KEY = "updateCheckResult";
+
+const UPDATE_SEEN_KEY = "updateSeen";
+
 
 
 // ============================================================================
@@ -170,6 +174,8 @@ const REMOVAL_CONFIG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ALLOWED_LAUNCH_SUBREDDITS_CACHE_KEY = "allowedLaunchSubredditsCache";
 
 const ALLOWED_LAUNCH_SUBREDDITS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+const UPDATE_CHECK_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 
 
@@ -300,6 +306,10 @@ let queueBarRefreshInFlight = false;
 let queueBarFreshFlash = false;
 
 let queueBarLastState = null;
+
+let queueBarUpdateStatus = null; // Current update status
+
+let queueBarHasUpdateBadge = false; // Whether update badge is shown
 
 
 
@@ -11053,7 +11063,7 @@ function injectStyles() {
 
     #rrw-overlay-root {
 
-      --rrw-font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+      --rrw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
       --rrw-modal-bg: rgba(248, 251, 255, 0.98);
 
@@ -11115,7 +11125,7 @@ function injectStyles() {
 
     #rrw-overlay-root[data-rrw-theme="dark"] {
 
-      --rrw-font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+      --rrw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
       --rrw-modal-bg: rgba(12, 20, 34, 0.98);
 
@@ -11946,6 +11956,514 @@ function injectStyles() {
       0%, 60% { color: #0a8a2b; }
 
       100% { color: #617f9f; }
+
+    }
+
+
+
+    /* Update Badge & Orange Background */
+
+    .rrw-queuebar[data-has-update="1"] {
+
+      background: linear-gradient(160deg, rgba(255, 140, 56, 0.95), rgba(255, 110, 20, 0.92)) !important;
+
+      border-color: rgba(255, 100, 0, 0.6) !important;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queuebar[data-has-update="1"] {
+
+      background: linear-gradient(160deg, rgba(255, 140, 56, 0.95), rgba(255, 110, 20, 0.92)) !important;
+
+      border-color: rgba(255, 100, 0, 0.6) !important;
+
+      color: #fff !important;
+
+    }
+
+
+
+    .rrw-queuebar-update-badge {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 6px 12px;
+
+      margin: 0;
+
+      border: none;
+
+      border-radius: 4px;
+
+      background: rgba(255, 255, 255, 0.9);
+
+      color: #ff6600;
+
+      font-weight: 600;
+
+      font-size: 0.75rem;
+
+      letter-spacing: 0.02em;
+
+      cursor: pointer;
+
+      transition: all 0.2s ease;
+
+      white-space: nowrap;
+
+      box-shadow: 0 2px 6px rgba(255, 100, 0, 0.3);
+
+    }
+
+
+
+    .rrw-queuebar-update-badge:hover {
+
+      background: #fff;
+
+      color: #ff5500;
+
+      box-shadow: 0 3px 8px rgba(255, 100, 0, 0.4);
+
+      transform: translateY(-1px);
+
+    }
+
+
+
+    .rrw-queuebar-update-badge:active {
+
+      transform: translateY(0);
+
+      box-shadow: 0 1px 4px rgba(255, 100, 0, 0.3);
+
+    }
+
+
+
+    /* Update Popup Modal */
+
+    #rrw-update-popup-root {
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 2147483646;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      pointer-events: auto;
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+    }
+
+
+
+    .rrw-update-popup-backdrop {
+
+      position: fixed;
+
+      inset: 0;
+
+      background: rgba(0, 0, 0, 0.5);
+
+      backdrop-filter: blur(2px);
+
+      cursor: pointer;
+
+    }
+
+
+
+    .rrw-update-popup-container {
+
+      position: relative;
+
+      z-index: 1;
+
+      max-width: 500px;
+
+      width: 90%;
+
+      max-height: 85vh;
+
+      overflow-y: auto;
+
+    }
+
+
+
+    .rrw-update-popup {
+
+      background: var(--rrw-modal-bg, rgba(248, 251, 255, 0.98));
+
+      border: 1px solid var(--rrw-border, rgba(152, 175, 208, 0.68));
+
+      border-radius: 8px;
+
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+
+      font-family: var(--rrw-font-family);
+
+      color: var(--rrw-text);
+
+      overflow: hidden;
+
+      display: flex;
+
+      flex-direction: column;
+
+    }
+
+
+
+    .rrw-update-popup-header {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      padding: 20px 24px;
+
+      background: linear-gradient(135deg, rgba(23, 58, 99, 0.15), rgba(16, 42, 74, 0.1));
+
+      border-bottom: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+    }
+
+
+
+    .rrw-update-popup-title {
+
+      margin: 0;
+
+      font-size: 1.25rem;
+
+      font-weight: 700;
+
+      color: var(--rrw-link, #245eb8);
+
+      letter-spacing: -0.01em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-update-popup-close {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 32px;
+
+      height: 32px;
+
+      padding: 0;
+
+      margin: -4px;
+
+      border: none;
+
+      background: transparent;
+
+      color: var(--rrw-text);
+
+      font-size: 1.4rem;
+
+      font-family: var(--rrw-font-family);
+
+      cursor: pointer;
+
+      border-radius: 4px;
+
+      transition: all 0.2s ease;
+
+      flex-shrink: 0;
+
+    }
+
+
+
+    .rrw-update-popup-close:hover {
+
+      background: var(--rrw-close-bg, rgba(233, 242, 255, 0.95));
+
+      color: var(--rrw-link, #245eb8);
+
+    }
+
+
+
+    .rrw-update-popup-body {
+
+      padding: 24px;
+
+      overflow-y: auto;
+
+      flex: 1;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-update-popup-versions {
+
+      display: flex;
+
+      gap: 16px;
+
+      margin-bottom: 24px;
+
+      padding: 16px;
+
+      background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
+
+      border-radius: 8px;
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+    }
+
+
+
+    .rrw-update-popup-version {
+
+      display: flex;
+
+      flex-direction: column;
+
+      gap: 6px;
+
+      flex: 1;
+
+      text-align: center;
+
+    }
+
+
+
+    .rrw-update-popup-version-label {
+
+      font-size: 0.7rem;
+
+      font-weight: 600;
+
+      color: var(--rrw-muted, #5f7797);
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.06em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-update-popup-version-number {
+
+      font-size: 1.3rem;
+
+      font-weight: 700;
+
+      font-variant-numeric: tabular-nums;
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-update-popup-version-new {
+
+      color: var(--rrw-link, #245eb8);
+
+    }
+
+
+
+    .rrw-update-popup-changelog {
+
+      margin-bottom: 20px;
+
+    }
+
+
+
+    .rrw-update-popup-changelog-title {
+
+      margin: 0 0 10px 0;
+
+      font-size: 0.85rem;
+
+      font-weight: 700;
+
+      color: var(--rrw-text);
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.04em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-update-popup-changelog-text {
+
+      margin: 0;
+
+      padding: 14px;
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 6px;
+
+      font-size: 0.8rem;
+
+      line-height: 1.6;
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+      white-space: pre-wrap;
+
+      word-break: break-word;
+
+      max-height: 220px;
+
+      overflow-y: auto;
+
+    }
+
+
+
+    .rrw-update-popup-footer {
+
+      display: flex;
+
+      gap: 12px;
+
+      padding: 18px 24px;
+
+      background: var(--rrw-footer-bg-top, rgba(245, 250, 255, 0.98));
+
+      border-top: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      justify-content: flex-end;
+
+    }
+
+
+
+    .rrw-update-popup-download-btn,
+
+    .rrw-update-popup-later-btn {
+
+      padding: 10px 18px;
+
+      border: 1px solid #355a91;
+
+      border-radius: 5px;
+
+      font-size: 0.8rem;
+
+      font-weight: 700;
+
+      cursor: pointer;
+
+      transition: all 0.2s ease;
+
+      white-space: nowrap;
+
+      font-family: var(--rrw-font-family);
+
+      letter-spacing: 0.01em;
+
+    }
+
+
+
+    .rrw-update-popup-download-btn {
+
+      background: linear-gradient(180deg, #245eb8 0%, #1f4a94 100%);
+
+      color: #fff;
+
+      border-color: #1f4a94;
+
+    }
+
+
+
+    .rrw-update-popup-download-btn:hover {
+
+      background: linear-gradient(180deg, #2d70d1 0%, #2457ab 100%);
+
+      border-color: #1f4a94;
+
+      box-shadow: 0 4px 12px rgba(36, 94, 184, 0.25);
+
+    }
+
+
+
+    .rrw-update-popup-download-btn:active {
+
+      transform: translateY(1px);
+
+      box-shadow: 0 2px 6px rgba(36, 94, 184, 0.15);
+
+    }
+
+
+
+    .rrw-update-popup-later-btn {
+
+      background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
+
+      color: var(--rrw-text);
+
+      border-color: var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+    }
+
+
+
+    .rrw-update-popup-later-btn:hover {
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      border-color: var(--rrw-link, #245eb8);
+
+      color: var(--rrw-link, #245eb8);
 
     }
 
@@ -18200,6 +18718,524 @@ function injectStyles() {
     html[data-rrw-theme="light"] .rrw-queue-modlog-details {
 
       color: #5a7fa5;
+
+    }
+
+
+
+    /* About Page Modal */
+
+    #rrw-about-page-root {
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 2147483646;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      pointer-events: auto;
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+    }
+
+
+
+    .rrw-about-page-backdrop {
+
+      position: fixed;
+
+      inset: 0;
+
+      background: rgba(0, 0, 0, 0.5);
+
+      backdrop-filter: blur(2px);
+
+      cursor: pointer;
+
+    }
+
+
+
+    .rrw-about-page-container {
+
+      position: relative;
+
+      z-index: 1;
+
+      max-width: 580px;
+
+      width: 90%;
+
+      max-height: 85vh;
+
+      overflow-y: auto;
+
+    }
+
+
+
+    .rrw-about-page {
+
+      background: var(--rrw-modal-bg, rgba(248, 251, 255, 0.98));
+
+      border: 1px solid var(--rrw-border, rgba(152, 175, 208, 0.68));
+
+      border-radius: 10px;
+
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+
+      font-family: var(--rrw-font-family);
+
+      color: var(--rrw-text);
+
+      overflow: hidden;
+
+      display: flex;
+
+      flex-direction: column;
+
+    }
+
+
+
+    .rrw-about-page-header {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      padding: 22px 26px;
+
+      background: linear-gradient(135deg, rgba(36, 94, 184, 0.08), rgba(30, 70, 150, 0.05));
+
+      border-bottom: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+    }
+
+
+
+    .rrw-about-page-title {
+
+      margin: 0;
+
+      font-size: 1.28rem;
+
+      font-weight: 700;
+
+      color: var(--rrw-link, #245eb8);
+
+      letter-spacing: -0.01em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-close {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 32px;
+
+      height: 32px;
+
+      padding: 0;
+
+      margin: -4px;
+
+      border: none;
+
+      background: transparent;
+
+      color: var(--rrw-text);
+
+      font-size: 1.4rem;
+
+      font-family: var(--rrw-font-family);
+
+      cursor: pointer;
+
+      border-radius: 4px;
+
+      transition: all 0.2s ease;
+
+      flex-shrink: 0;
+
+    }
+
+
+
+    .rrw-about-page-close:hover {
+
+      background: var(--rrw-close-bg, rgba(233, 242, 255, 0.95));
+
+      color: var(--rrw-link, #245eb8);
+
+    }
+
+
+
+    .rrw-about-page-body {
+
+      padding: 26px;
+
+      overflow-y: auto;
+
+      flex: 1;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-version-section {
+
+      display: grid;
+
+      grid-template-columns: 1fr 1fr;
+
+      gap: 14px;
+
+      margin-bottom: 22px;
+
+    }
+
+
+
+    .rrw-about-page-version-card {
+
+      display: flex;
+
+      flex-direction: column;
+
+      gap: 8px;
+
+      padding: 18px;
+
+      background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 8px;
+
+      text-align: center;
+
+    }
+
+
+
+    .rrw-about-page-version-label {
+
+      font-size: 0.7rem;
+
+      font-weight: 700;
+
+      color: var(--rrw-muted, #5f7797);
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.06em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-version-number {
+
+      font-size: 1.35rem;
+
+      font-weight: 700;
+
+      font-variant-numeric: tabular-nums;
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-version-new {
+
+      color: var(--rrw-link, #245eb8);
+
+    }
+
+
+
+    .rrw-about-page-status {
+
+      display: flex;
+
+      flex-direction: column;
+
+      gap: 8px;
+
+      margin-bottom: 22px;
+
+      padding: 14px 16px;
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 8px;
+
+      text-align: center;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-update-available {
+
+      font-weight: 700;
+
+      color: var(--rrw-link, #245eb8);
+
+      font-size: 0.9rem;
+
+      letter-spacing: 0.01em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-up-to-date {
+
+      font-weight: 700;
+
+      color: #1a7f3f;
+
+      font-size: 0.9rem;
+
+      letter-spacing: 0.01em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-check-status {
+
+      font-size: 0.8rem;
+
+      min-height: 1.2em;
+
+      display: block;
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-check-status--error {
+
+      color: #8a2f3f;
+
+    }
+
+
+
+    .rrw-about-page-changelog {
+
+      margin-bottom: 20px;
+
+    }
+
+
+
+    .rrw-about-page-changelog-title {
+
+      margin: 0 0 10px 0;
+
+      font-size: 0.85rem;
+
+      font-weight: 700;
+
+      color: var(--rrw-text);
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.04em;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-changelog-text {
+
+      margin: 0;
+
+      padding: 16px;
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 6px;
+
+      font-size: 0.8rem;
+
+      line-height: 1.6;
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+      white-space: pre-wrap;
+
+      word-break: break-word;
+
+      max-height: 280px;
+
+      overflow-y: auto;
+
+    }
+
+
+
+    .rrw-about-page-footer {
+
+      display: flex;
+
+      gap: 12px;
+
+      padding: 20px 26px;
+
+      background: var(--rrw-footer-bg-top, rgba(245, 250, 255, 0.98));
+
+      border-top: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      justify-content: flex-end;
+
+    }
+
+
+
+    .rrw-about-page-check-btn,
+
+    .rrw-about-page-close-btn {
+
+      padding: 10px 18px;
+
+      border: 1px solid #355a91;
+
+      border-radius: 5px;
+
+      font-size: 0.8rem;
+
+      font-weight: 700;
+
+      cursor: pointer;
+
+      transition: all 0.2s ease;
+
+      white-space: nowrap;
+
+      background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
+
+      color: var(--rrw-text);
+
+      font-family: var(--rrw-font-family);
+
+      letter-spacing: 0.01em;
+
+    }
+
+
+
+    .rrw-about-page-check-btn {
+
+      background: linear-gradient(180deg, #245eb8 0%, #1f4a94 100%);
+
+      color: #fff;
+
+      border-color: #1f4a94;
+
+    }
+
+
+
+    .rrw-about-page-check-btn:hover:not(:disabled) {
+
+      background: linear-gradient(180deg, #2d70d1 0%, #2457ab 100%);
+
+      border-color: #1f4a94;
+
+      box-shadow: 0 4px 12px rgba(36, 94, 184, 0.25);
+
+    }
+
+
+
+    .rrw-about-page-check-btn:active:not(:disabled) {
+
+      transform: translateY(1px);
+
+      box-shadow: 0 2px 6px rgba(36, 94, 184, 0.15);
+
+    }
+
+
+
+    .rrw-about-page-check-btn:disabled {
+
+      opacity: 0.6;
+
+      cursor: not-allowed;
+
+    }
+
+
+
+    .rrw-about-page-close-btn {
+
+      background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
+
+      color: var(--rrw-text);
+
+      border-color: var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+    }
+
+
+
+    .rrw-about-page-close-btn:hover {
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      border-color: var(--rrw-link, #245eb8);
+
+      color: var(--rrw-link, #245eb8);
 
     }
 
@@ -26129,6 +27165,24 @@ function renderQueueBar(state) {
 
 
 
+  const aboutBtn = document.createElement("button");
+
+  aboutBtn.type = "button";
+
+  aboutBtn.className = "rrw-queuebar-icon-btn";
+
+  aboutBtn.title = "About ModBox";
+
+  aboutBtn.textContent = "\u24D8"; // â“˜ Info symbol
+
+  aboutBtn.addEventListener("click", () => {
+
+    void openAboutPage();
+
+  });
+
+
+
   if (!queueBarCollapsed) {
 
     headerActions.appendChild(cannedRepliesBtn);
@@ -26136,6 +27190,8 @@ function renderQueueBar(state) {
     headerActions.appendChild(settingsBtn);
 
     headerActions.appendChild(refreshBtn);
+
+    headerActions.appendChild(aboutBtn);
 
   } else {
 
@@ -26325,25 +27381,63 @@ function renderQueueBar(state) {
 
     footer.className = "rrw-queuebar-footer";
 
-    if (state.loading) {
+    
 
-      footer.textContent = "Loading queue counts...";
+    // Add update badge if update is available
 
-    } else if (state.error) {
+    if (state.updateStatus?.isUpdateAvailable) {
 
-      footer.textContent = state.error;
+      queueBarHasUpdateBadge = true;
 
-      footer.setAttribute("data-error", "1");
+      const updateBadge = document.createElement("button");
 
-    } else if (Number.isFinite(state.updatedAt)) {
+      updateBadge.type = "button";
 
-      footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+      updateBadge.className = "rrw-queuebar-update-badge";
+
+      updateBadge.textContent = "Update available!";
+
+      updateBadge.title = "Click to view update details";
+
+      updateBadge.addEventListener("click", async (e) => {
+
+        e.preventDefault();
+
+        void openUpdatePopup(state.updateStatus);
+
+      });
+
+      footer.appendChild(updateBadge);
 
     } else {
 
-      footer.textContent = `Queue status for ${state.links?.scopeLabel || "configured subreddit"}`;
+      queueBarHasUpdateBadge = false;
+
+      // Normal footer content
+
+      if (state.loading) {
+
+        footer.textContent = "Loading queue counts...";
+
+      } else if (state.error) {
+
+        footer.textContent = state.error;
+
+        footer.setAttribute("data-error", "1");
+
+      } else if (Number.isFinite(state.updatedAt)) {
+
+        footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+
+      } else {
+
+        footer.textContent = `Queue status for ${state.links?.scopeLabel || "configured subreddit"}`;
+
+      }
 
     }
+
+    
 
     if (queueBarFreshFlash && !state.loading && !state.error) {
 
@@ -26354,6 +27448,20 @@ function renderQueueBar(state) {
     }
 
     shell.appendChild(footer);
+
+  }
+
+
+
+  // Update queue bar background color based on update status
+
+  if (state.updateStatus?.isUpdateAvailable) {
+
+    shell.setAttribute("data-has-update", "1");
+
+  } else {
+
+    shell.removeAttribute("data-has-update");
 
   }
 
@@ -26407,6 +27515,48 @@ async function refreshQueueBar(force = false) {
 
 
 
+    // Check for updates (non-blocking)
+
+    if (!queueBarUpdateStatus || force) {
+
+      void (async () => {
+
+        try {
+
+          const updateStatus = await getUpdateStatus();
+
+          if (updateStatus?.isUpdateAvailable && !queueBarUpdateStatus?.isUpdateAvailable) {
+
+            queueBarUpdateStatus = updateStatus;
+
+            // Re-render queue bar to show update badge
+
+            if (queueBarLastState) {
+
+              renderQueueBar({
+
+                ...queueBarLastState,
+
+                updateStatus,
+
+              });
+
+            }
+
+          }
+
+        } catch (error) {
+
+          console.warn("[ModBox] Update check failed:", error);
+
+        }
+
+      })();
+
+    }
+
+
+
     // Render initial state with loading indicator or previous data
 
     renderQueueBar({
@@ -26432,6 +27582,8 @@ async function refreshQueueBar(force = false) {
           : Boolean(settings.queueBarOpenInNewTab),
 
       error: "",
+
+      updateStatus: queueBarUpdateStatus,
 
     });
 
@@ -26511,6 +27663,8 @@ async function refreshQueueBar(force = false) {
 
         error: "",
 
+        updateStatus: queueBarUpdateStatus,
+
       });
 
     }
@@ -26547,6 +27701,8 @@ async function refreshQueueBar(force = false) {
 
           error: "",
 
+          updateStatus: queueBarUpdateStatus,
+
         });
 
       } catch (error) {
@@ -26576,6 +27732,8 @@ async function refreshQueueBar(force = false) {
             openInNewTab: Boolean(settings.queueBarOpenInNewTab),
 
             error: `Queue bar: ${message}`,
+
+            updateStatus: queueBarUpdateStatus,
 
           });
 
@@ -26612,6 +27770,8 @@ async function refreshQueueBar(force = false) {
           : false,
 
       error: `Queue bar: ${message}`,
+
+      updateStatus: queueBarUpdateStatus,
 
     });
 
@@ -26728,6 +27888,20 @@ async function initQueueBar() {
   await loadQueueBarPositionPreference();
 
   console.log("[ModBox] queueBarPosition loaded:", queueBarPosition);
+
+  
+
+  // Initialize update checker
+
+  initializeUpdateChecker();
+
+  
+
+  // Load initial update status
+
+  queueBarUpdateStatus = await getUpdateStatus();
+
+  
 
   await refreshQueueBar(true);
 
@@ -27978,6 +29152,1394 @@ function bindQueueModlogDisplay() {
     subtree: true,
 
   });
+
+}
+
+// ------------------------------------------------------------------------------
+// update-checker.js
+// ------------------------------------------------------------------------------
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Update Checker Feature Module
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Checks for extension updates from the ModBox wiki page and manages update notifications.
+
+// Dependencies: constants.js, state.js, utilities.js, services/reddit-api.js
+
+
+
+// â”€â”€â”€â”€ Update Info Caching â”€â”€â”€â”€
+
+
+
+let updateCheckCache = null;
+
+let updateCheckFetchedAt = 0;
+
+let currentInstalledVersion = null;
+
+
+
+// â”€â”€â”€â”€ Version Parsing & Comparison â”€â”€â”€â”€
+
+
+
+function parseVersionNumber(versionString) {
+
+  const match = String(versionString || "").match(/^(\d+)\.(\d+)\.(\d+)/);
+
+  if (!match) {
+
+    return null;
+
+  }
+
+  const major = Number.parseInt(match[1], 10);
+
+  const minor = Number.parseInt(match[2], 10);
+
+  const patch = Number.parseInt(match[3], 10);
+
+  return { major, minor, patch, full: versionString.trim() };
+
+}
+
+
+
+function compareVersions(v1, v2) {
+
+  // Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+
+  if (!v1 || !v2) return 0;
+
+  
+
+  if (v1.major !== v2.major) return v1.major > v2.major ? 1 : -1;
+
+  if (v1.minor !== v2.minor) return v1.minor > v2.minor ? 1 : -1;
+
+  if (v1.patch !== v2.patch) return v1.patch > v2.patch ? 1 : -1;
+
+  return 0;
+
+}
+
+
+
+// â”€â”€â”€â”€ Wiki Page Parsing â”€â”€â”€â”€
+
+
+
+function parseVersionEntry(markdown) {
+
+  // Parse a version entry from markdown format:
+
+  // ## 1.5.1
+
+  // Changelog content here
+
+  // - Bullet points
+
+  // 
+
+  // [Download](url)
+
+  
+
+  // Extract version from header
+
+  const headerMatch = markdown.match(/^#+\s*(?:Version\s+)?([\d.a-zA-Z-]+)/m);
+
+  const version = headerMatch ? headerMatch[1].trim() : null;
+
+  
+
+  if (!version) return null;
+
+  
+
+  // Extract everything after the header until [Download] or end of text
+
+  const lines = markdown.split('\n');
+
+  const contentLines = [];
+
+  let foundHeader = false;
+
+  
+
+  for (let i = 0; i < lines.length; i++) {
+
+    const line = lines[i];
+
+    
+
+    // Skip the header line itself
+
+    if (!foundHeader && /^#+\s*(?:Version\s+)?([\d.a-zA-Z-]+)/i.test(line)) {
+
+      foundHeader = true;
+
+      continue;
+
+    }
+
+    
+
+    if (foundHeader) {
+
+      // Stop at Download link or next version header
+
+      if (line.includes('[Download]') || /^#+\s*(?:Version\s+)?([\d.a-zA-Z-]+)/i.test(line)) {
+
+        break;
+
+      }
+
+      contentLines.push(line);
+
+    }
+
+  }
+
+  
+
+  const changelog = contentLines
+
+    .join('\n')
+
+    .trim()
+
+    .split('\n')
+
+    .map(l => l.trim())
+
+    .filter(l => l.length > 0)
+
+    .join('\n');
+
+  
+
+  // Extract download URL
+
+  let downloadUrl = null;
+
+  const linkMatch = markdown.match(/\[([^\]]+)\]\(([^)]+)\)/);
+
+  if (linkMatch) {
+
+    downloadUrl = linkMatch[2];
+
+  }
+
+  
+
+  return {
+
+    version,
+
+    changelog: changelog || "No changelog provided",
+
+    downloadUrl: downloadUrl || "",
+
+  };
+
+}
+
+
+
+async function fetchVersionsFromWiki() {
+
+  // Fetch the versions wiki page
+
+  // Format: https://old.reddit.com/r/ModBoxExtension/wiki/extension-admin/versions
+
+  const wikiUrl = "https://old.reddit.com/r/ModBoxExtension/wiki/extension-admin/versions.json";
+
+  
+
+  try {
+
+    const response = await requestJsonViaBackgroundScheduled(
+
+      wikiUrl,
+
+      null,
+
+      { 
+
+        cacheTtlMs: UPDATE_CHECK_CACHE_TTL_MS,
+
+        priority: 0,
+
+        dedupe: true,
+
+      }
+
+    );
+
+    
+
+    if (!response || typeof response !== "object") {
+
+      throw new Error("Invalid wiki response");
+
+    }
+
+    
+
+    // Extract wiki content from Reddit API response
+
+    // Note: Reddit wiki API returns content_md for the markdown content
+
+    const wikiContent = String(response?.data?.content_md || "").trim();
+
+    if (!wikiContent) {
+
+      throw new Error("No wiki content found");
+
+    }
+
+    
+
+    return wikiContent;
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to fetch versions wiki:", error instanceof Error ? error.message : String(error));
+
+    return null;
+
+  }
+
+}
+
+
+
+function extractLatestVersionFromWiki(wikiContent) {
+
+  // Parse the wiki content to find the latest version
+
+  // Assumes the latest version is listed first
+
+  // Supports both "## 1.5.1" and "## Version 1.5.1" formats
+
+  
+
+  if (!wikiContent) return null;
+
+  
+
+  // Split by any level heading followed by version-like number pattern
+
+  const versionBlocks = wikiContent.split(/^#+\s*(?:Version\s+)?([\d.a-zA-Z-]+)/m);
+
+  
+
+  // The first element is content before first version, then alternating [version, content, version, content...]
+
+  for (let i = 1; i < versionBlocks.length; i += 2) {
+
+    const version = versionBlocks[i];
+
+    const blockContent = versionBlocks[i + 1];
+
+    if (!version || !blockContent) continue;
+
+    
+
+    // Reconstruct the block with the version header
+
+    const block = "## " + version + "\n" + blockContent;
+
+    const entry = parseVersionEntry(block);
+
+    
+
+    if (entry && entry.version) {
+
+      return entry;
+
+    }
+
+  }
+
+  
+
+  return null;
+
+}
+
+
+
+// â”€â”€â”€â”€ Update Check & Storage â”€â”€â”€â”€
+
+
+
+async function getInstalledVersion() {
+
+  if (!currentInstalledVersion) {
+
+    try {
+
+      const manifest = await ext.runtime.getManifest?.();
+
+      currentInstalledVersion = manifest?.version || "1.4.2";
+
+    } catch {
+
+      currentInstalledVersion = "1.4.2";
+
+    }
+
+  }
+
+  return currentInstalledVersion;
+
+}
+
+
+
+async function checkForUpdates(force = false) {
+
+  const now = Date.now();
+
+  
+
+  // Return cached result if recent and not forced
+
+  if (
+
+    !force
+
+    && updateCheckCache
+
+    && now - updateCheckFetchedAt < UPDATE_CHECK_CACHE_TTL_MS
+
+  ) {
+
+    return updateCheckCache;
+
+  }
+
+  
+
+  console.log("[ModBox] Checking for updates...");
+
+  
+
+  const wikiContent = await fetchVersionsFromWiki();
+
+  if (!wikiContent) {
+
+    console.warn("[ModBox] Could not fetch versions wiki");
+
+    return null;
+
+  }
+
+  
+
+  const latestEntry = extractLatestVersionFromWiki(wikiContent);
+
+  if (!latestEntry) {
+
+    console.warn("[ModBox] Could not parse latest version from wiki");
+
+    return null;
+
+  }
+
+  
+
+  const installedVersion = await getInstalledVersion();
+
+  const installedParsed = parseVersionNumber(installedVersion);
+
+  const latestParsed = parseVersionNumber(latestEntry.version);
+
+  
+
+  if (!installedParsed || !latestParsed) {
+
+    console.warn("[ModBox] Could not parse versions");
+
+    return null;
+
+  }
+
+  
+
+  const isUpdateAvailable = compareVersions(latestParsed, installedParsed) > 0;
+
+  
+
+  const result = {
+
+    isUpdateAvailable,
+
+    installed: installedVersion,
+
+    latest: latestEntry.version,
+
+    latestEntry,
+
+    checkedAt: now,
+
+  };
+
+  
+
+  updateCheckCache = result;
+
+  updateCheckFetchedAt = now;
+
+  
+
+  // Save to storage
+
+  try {
+
+    await ext.storage.sync.set({
+
+      [UPDATE_CHECK_RESULT_KEY]: result,
+
+    });
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to save update check result:", error);
+
+  }
+
+  
+
+  console.log("[ModBox] Update check complete:", result);
+
+  return result;
+
+}
+
+
+
+async function loadUpdateCheckResult() {
+
+  try {
+
+    const stored = await ext.storage.sync.get([UPDATE_CHECK_RESULT_KEY]);
+
+    const result = stored?.[UPDATE_CHECK_RESULT_KEY];
+
+    
+
+    if (result && typeof result === "object") {
+
+      updateCheckCache = result;
+
+      updateCheckFetchedAt = result.checkedAt || 0;
+
+      return result;
+
+    }
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to load update check result:", error);
+
+  }
+
+  
+
+  return null;
+
+}
+
+
+
+async function getUpdateStatus() {
+
+  // First try to load cached result
+
+  let status = await loadUpdateCheckResult();
+
+  
+
+  // If no cached result or cache is old, perform update check
+
+  if (!status || (Date.now() - (status.checkedAt || 0) > UPDATE_CHECK_CACHE_TTL_MS)) {
+
+    status = await checkForUpdates(false);
+
+  }
+
+  
+
+  return status;
+
+}
+
+
+
+function clearUpdateCheckCache() {
+
+  updateCheckCache = null;
+
+  updateCheckFetchedAt = 0;
+
+  try {
+
+    void ext.storage.sync.set({ [UPDATE_CHECK_RESULT_KEY]: null });
+
+  } catch {
+
+    // Ignore storage errors
+
+  }
+
+}
+
+
+
+// â”€â”€â”€â”€ Update Notification Management â”€â”€â”€â”€
+
+
+
+async function markUpdateAsSeen() {
+
+  try {
+
+    await ext.storage.sync.set({
+
+      [UPDATE_SEEN_KEY]: Date.now(),
+
+    });
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to mark update as seen:", error);
+
+  }
+
+}
+
+
+
+async function hasSeenUpdate(latestVersion) {
+
+  try {
+
+    const stored = await ext.storage.sync.get([UPDATE_SEEN_KEY]);
+
+    const seenAt = stored?.[UPDATE_SEEN_KEY];
+
+    
+
+    // If user has seen an update notification in last 24 hours, don't show again
+
+    if (seenAt && (Date.now() - seenAt) < 24 * 60 * 60 * 1000) {
+
+      return true;
+
+    }
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to check if update was seen:", error);
+
+  }
+
+  
+
+  return false;
+
+}
+
+
+
+// â”€â”€â”€â”€ Public Interface â”€â”€â”€â”€
+
+
+
+async function initializeUpdateChecker() {
+
+  console.log("[ModBox] Initializing update checker...");
+
+  
+
+  // Perform initial check but don't block
+
+  void checkForUpdates(false);
+
+  
+
+  // Schedule periodic checks (every 6 hours)
+
+  const CHECK_INTERVAL = 6 * 60 * 60 * 1000;
+
+  setInterval(() => {
+
+    void checkForUpdates(false);
+
+  }, CHECK_INTERVAL);
+
+}
+
+// ------------------------------------------------------------------------------
+// update-popup.js
+// ------------------------------------------------------------------------------
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Update Popup Module
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Displays update notification popup with version, changelog, and download link.
+
+// Dependencies: constants.js, utilities.js, features/update-checker.js
+
+
+
+let updatePopupState = null;
+
+
+
+function ensureUpdatePopupRoot() {
+
+  let root = document.getElementById("rrw-update-popup-root");
+
+  if (!root) {
+
+    root = document.createElement("div");
+
+    root.id = "rrw-update-popup-root";
+
+    document.documentElement.appendChild(root);
+
+  }
+
+  return root;
+
+}
+
+
+
+function closeUpdatePopup() {
+
+  updatePopupState = null;
+
+  const root = document.getElementById("rrw-update-popup-root");
+
+  if (root instanceof HTMLElement) {
+
+    root.replaceChildren();
+
+    root.remove();
+
+  }
+
+}
+
+
+
+function bindUpdatePopupEvents() {
+
+  const root = document.getElementById("rrw-update-popup-root");
+
+  if (!root) return;
+
+
+
+  // Close button
+
+  root.querySelectorAll('[data-update-popup-close="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      closeUpdatePopup();
+
+    });
+
+  });
+
+
+
+  // Download button
+
+  root.querySelectorAll('[data-update-download="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      if (!updatePopupState?.downloadUrl) return;
+
+      
+
+      const openInNewTab = shouldOpenQueueBarLinkInNewTab(e, true);
+
+      navigateToQueueBarLink(updatePopupState.downloadUrl, openInNewTab);
+
+      
+
+      // Mark update as seen
+
+      void markUpdateAsSeen();
+
+      closeUpdatePopup();
+
+    });
+
+  });
+
+
+
+  // Backdrop close
+
+  root.querySelectorAll('[data-update-popup-backdrop="1"]').forEach((backdrop) => {
+
+    backdrop.addEventListener("click", (e) => {
+
+      if (e.target === backdrop) {
+
+        closeUpdatePopup();
+
+      }
+
+    });
+
+  });
+
+}
+
+
+
+function renderUpdatePopup() {
+
+  const state = updatePopupState;
+
+  if (!state || !state.updateInfo || !state.updateInfo.latestEntry) {
+
+    closeUpdatePopup();
+
+    return;
+
+  }
+
+
+
+  const root = ensureUpdatePopupRoot();
+
+  const entry = state.updateInfo.latestEntry;
+
+  const installed = state.updateInfo.installed || "Unknown";
+
+  const latest = state.updateInfo.latest || "Unknown";
+
+
+
+  // Format changelog - truncate long lines and clean up markdown
+
+  let changelog = String(entry.changelog || "No changelog available").trim();
+
+  // Remove markdown headers and formatting
+
+  changelog = changelog
+
+    .replace(/^#+\s*/gm, "") // Remove headers
+
+    .replace(/\*\*/g, "")     // Remove bold
+
+    .replace(/\*/g, "")       // Remove italics
+
+    .replace(/`/g, "")        // Remove code markers
+
+    .split("\n")
+
+    .map(line => line.trim())
+
+    .filter(line => line.length > 0)
+
+    .slice(0, 10) // Limit to 10 lines
+
+    .join("\n");
+
+
+
+  root.innerHTML = `
+
+    <div class="rrw-update-popup-backdrop" data-update-popup-backdrop="1"></div>
+
+    <div class="rrw-update-popup-container">
+
+      <div class="rrw-update-popup">
+
+        <header class="rrw-update-popup-header">
+
+          <h2 class="rrw-update-popup-title">ModBox Update Available!</h2>
+
+          <button type="button" class="rrw-update-popup-close" data-update-popup-close="1" aria-label="Close">
+
+            X
+
+          </button>
+
+        </header>
+
+
+
+        <div class="rrw-update-popup-body">
+
+          <div class="rrw-update-popup-versions">
+
+            <div class="rrw-update-popup-version">
+
+              <span class="rrw-update-popup-version-label">Current:</span>
+
+              <span class="rrw-update-popup-version-number">${escapeHtml(installed)}</span>
+
+            </div>
+
+            <div class="rrw-update-popup-version">
+
+              <span class="rrw-update-popup-version-label">Available:</span>
+
+              <span class="rrw-update-popup-version-number rrw-update-popup-version-new">${escapeHtml(latest)}</span>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="rrw-update-popup-changelog">
+
+            <h3 class="rrw-update-popup-changelog-title">What's New</h3>
+
+            <pre class="rrw-update-popup-changelog-text">${escapeHtml(changelog)}</pre>
+
+          </div>
+
+        </div>
+
+
+
+        <footer class="rrw-update-popup-footer">
+
+          <button 
+
+            type="button" 
+
+            class="rrw-update-popup-download-btn" 
+
+            data-update-download="1"
+
+          >
+
+            Download Update
+
+          </button>
+
+          <button 
+
+            type="button" 
+
+            class="rrw-update-popup-later-btn" 
+
+            data-update-popup-close="1"
+
+          >
+
+            Later
+
+          </button>
+
+        </footer>
+
+      </div>
+
+    </div>
+
+  `;
+
+
+
+  // Update popup state with download URL
+
+  updatePopupState.downloadUrl = entry.downloadUrl || "";
+
+
+
+  bindUpdatePopupEvents();
+
+}
+
+
+
+async function openUpdatePopup(updateInfo) {
+
+  if (!updateInfo || !updateInfo.latestEntry) {
+
+    return;
+
+  }
+
+
+
+  // Check if user has already seen this update today
+
+  const hasSeenThis = await hasSeenUpdate(updateInfo.latest);
+
+  if (hasSeenThis) {
+
+    return;
+
+  }
+
+
+
+  updatePopupState = {
+
+    updateInfo,
+
+    downloadUrl: "",
+
+  };
+
+
+
+  renderUpdatePopup();
+
+}
+
+// ------------------------------------------------------------------------------
+// about-page.js
+// ------------------------------------------------------------------------------
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// About Page Module
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Displays about page with current version, changelog, and update checker.
+
+// Dependencies: constants.js, utilities.js, features/update-checker.js
+
+
+
+let aboutPageState = null;
+
+let checkingForUpdates = false;
+
+
+
+function ensureAboutPageRoot() {
+
+  let root = document.getElementById("rrw-about-page-root");
+
+  if (!root) {
+
+    root = document.createElement("div");
+
+    root.id = "rrw-about-page-root";
+
+    document.documentElement.appendChild(root);
+
+  }
+
+  return root;
+
+}
+
+
+
+function closeAboutPage() {
+
+  aboutPageState = null;
+
+  const root = document.getElementById("rrw-about-page-root");
+
+  if (root instanceof HTMLElement) {
+
+    root.replaceChildren();
+
+    root.remove();
+
+  }
+
+}
+
+
+
+async function performUpdateCheckFromAboutPage() {
+
+  if (checkingForUpdates) {
+
+    return;
+
+  }
+
+
+
+  checkingForUpdates = true;
+
+  
+
+  // Update button state
+
+  const checkBtn = document.querySelector('[data-about-check-update="1"]');
+
+  if (checkBtn) {
+
+    checkBtn.disabled = true;
+
+    checkBtn.textContent = "Checking...";
+
+  }
+
+
+
+  try {
+
+    // Force update check without using cache
+
+    const result = await checkForUpdates(true);
+
+    
+
+    if (result) {
+
+      // Update the UI with new information
+
+      await openAboutPage();
+
+    } else {
+
+      // Show error message
+
+      const statusEl = document.querySelector('[data-about-check-status]');
+
+      if (statusEl) {
+
+        statusEl.textContent = "Failed to check for updates. Please try again.";
+
+        statusEl.className = "rrw-about-page-check-status rrw-about-page-check-status--error";
+
+      }
+
+    }
+
+  } catch (error) {
+
+    console.warn("[ModBox] Error checking for updates:", error);
+
+    const statusEl = document.querySelector('[data-about-check-status]');
+
+    if (statusEl) {
+
+      statusEl.textContent = "Error checking for updates";
+
+      statusEl.className = "rrw-about-page-check-status rrw-about-page-check-status--error";
+
+    }
+
+  } finally {
+
+    checkingForUpdates = false;
+
+    
+
+    // Reset button state
+
+    const checkBtn = document.querySelector('[data-about-check-update="1"]');
+
+    if (checkBtn) {
+
+      checkBtn.disabled = false;
+
+      checkBtn.textContent = "Check for Update";
+
+    }
+
+  }
+
+}
+
+
+
+function bindAboutPageEvents() {
+
+  const root = document.getElementById("rrw-about-page-root");
+
+  if (!root) return;
+
+
+
+  // Close button
+
+  root.querySelectorAll('[data-about-page-close="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      closeAboutPage();
+
+    });
+
+  });
+
+
+
+  // Check for Update button
+
+  root.querySelectorAll('[data-about-check-update="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      void performUpdateCheckFromAboutPage();
+
+    });
+
+  });
+
+
+
+  // Backdrop close
+
+  root.querySelectorAll('[data-about-page-backdrop="1"]').forEach((backdrop) => {
+
+    backdrop.addEventListener("click", (e) => {
+
+      if (e.target === backdrop) {
+
+        closeAboutPage();
+
+      }
+
+    });
+
+  });
+
+}
+
+
+
+function renderAboutPage() {
+
+  const state = aboutPageState;
+
+  if (!state) {
+
+    closeAboutPage();
+
+    return;
+
+  }
+
+
+
+  const root = ensureAboutPageRoot();
+
+  const installed = state.installedVersion || "Unknown";
+
+  const latest = state.latestVersion || "Unknown";
+
+  const changelog = state.changelog || "No changelog available";
+
+  const isUpdateAvailable = state.isUpdateAvailable || false;
+
+
+
+  // Format changelog - clean markdown and limit lines
+
+  let formattedChangelog = String(changelog).trim();
+
+  formattedChangelog = formattedChangelog
+
+    .replace(/^#+\s*/gm, "") // Remove headers
+
+    .replace(/\*\*/g, "")     // Remove bold
+
+    .replace(/\*/g, "")       // Remove italics
+
+    .replace(/`/g, "")        // Remove code markers
+
+    .split("\n")
+
+    .map(line => line.trim())
+
+    .filter(line => line.length > 0)
+
+    .slice(0, 20) // Limit to 20 lines
+
+    .join("\n");
+
+
+
+  const updateStatusHtml = isUpdateAvailable
+
+    ? '<div class="rrw-about-page-update-available">Update available!</div>'
+
+    : '<div class="rrw-about-page-up-to-date">You\'re up to date</div>';
+
+
+
+  root.innerHTML = `
+
+    <div class="rrw-about-page-backdrop" data-about-page-backdrop="1"></div>
+
+    <div class="rrw-about-page-container">
+
+      <div class="rrw-about-page">
+
+        <header class="rrw-about-page-header">
+
+          <h2 class="rrw-about-page-title">About ModBox</h2>
+
+          <button type="button" class="rrw-about-page-close" data-about-page-close="1" aria-label="Close">
+
+            X
+
+          </button>
+
+        </header>
+
+
+
+        <div class="rrw-about-page-body">
+
+          <div class="rrw-about-page-version-section">
+
+            <div class="rrw-about-page-version-card">
+
+              <span class="rrw-about-page-version-label">Current Version</span>
+
+              <span class="rrw-about-page-version-number">${escapeHtml(installed)}</span>
+
+            </div>
+
+
+
+            <div class="rrw-about-page-version-card">
+
+              <span class="rrw-about-page-version-label">Latest Version</span>
+
+              <span class="rrw-about-page-version-number${isUpdateAvailable ? ' rrw-about-page-version-new' : ''}">${escapeHtml(latest)}</span>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="rrw-about-page-status">
+
+            ${updateStatusHtml}
+
+            <div class="rrw-about-page-check-status" data-about-check-status></div>
+
+          </div>
+
+
+
+          <div class="rrw-about-page-changelog">
+
+            <h3 class="rrw-about-page-changelog-title">Latest Changelog</h3>
+
+            <pre class="rrw-about-page-changelog-text">${escapeHtml(formattedChangelog)}</pre>
+
+          </div>
+
+        </div>
+
+
+
+        <footer class="rrw-about-page-footer">
+
+          <button 
+
+            type="button" 
+
+            class="rrw-about-page-check-btn" 
+
+            data-about-check-update="1"
+
+          >
+
+            Check for Update
+
+          </button>
+
+          <button 
+
+            type="button" 
+
+            class="rrw-about-page-close-btn" 
+
+            data-about-page-close="1"
+
+          >
+
+            Close
+
+          </button>
+
+        </footer>
+
+      </div>
+
+    </div>
+
+  `;
+
+
+
+  bindAboutPageEvents();
+
+}
+
+
+
+async function openAboutPage() {
+
+  try {
+
+    const installedVersion = await getInstalledVersion();
+
+    const updateStatus = await getUpdateStatus();
+
+
+
+    aboutPageState = {
+
+      installedVersion,
+
+      latestVersion: updateStatus?.latest || "Unknown",
+
+      isUpdateAvailable: updateStatus?.isUpdateAvailable || false,
+
+      changelog: updateStatus?.latestEntry?.changelog || "No changelog available",
+
+    };
+
+
+
+    renderAboutPage();
+
+  } catch (error) {
+
+    console.warn("[ModBox] Failed to open about page:", error);
+
+  }
 
 }
 

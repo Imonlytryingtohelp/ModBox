@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.5.0 - Update Checker
+
+- Automatically checks for new updates every 6 hours. 
+- ModBox Queues will display "Update available!" and turn orange when an update is available. 
+- Extension loads version from reddit, so no additional permissions required. 
+- About page (info icon in ModBox Queues box) now shows current version, changelog, and a manual update checker. 
+
 ## 1.4.2 - ModBox Links Updates & Bug Fixes
 
 - Further Z-index fixes to restore functionality on new/sh reddit. 

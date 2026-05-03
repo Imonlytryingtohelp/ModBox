@@ -45,6 +45,8 @@ let queueBarContextFetchedAt = 0;
 let queueBarRefreshInFlight = false;
 let queueBarFreshFlash = false;
 let queueBarLastState = null;
+let queueBarUpdateStatus = null; // Current update status
+let queueBarHasUpdateBadge = false; // Whether update badge is shown
 
 // Extension settings
 let currentExtensionSettingsWikiPage = DEFAULT_EXTENSION_SETTINGS_WIKI_PAGE;
