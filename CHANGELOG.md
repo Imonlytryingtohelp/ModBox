@@ -7,8 +7,8 @@ All notable changes to this project are documented in this file.
 - About page now only displays one close button.   
 - Suppressed non-critical errors so they don't appear in chrome. 
 - Moved ModBox link generator to the about page. 
-- Fixed z-index issue with ModBox link generator page. 
-- Updated ModBox link generator to inlcude subreddit, ban duration, and, note type. 
+- Fixed z-index issue with ModBox link generator page. It now displays correctly on top of the current window.
+- Updated ModBox link generator to include subreddit, ban duration, and, note type. 
 
 ## 1.5.0 - Update Checker
 
