@@ -401,8 +401,8 @@ function bindContainer(container) {
       buttonEl.dataset.commentNukeTarget = String(target).toLowerCase();
       buttonEl.dataset.commentNukeState = "idle";
       attachButtonClickHandlers(buttonEl, () => {
-        void runCommentNukeWorkflow(target).catch((error) => {
-          console.warn("[ModBox] Comment nuke failed:", error instanceof Error ? error.message : String(error));
+        void runCommentNukeWorkflow(target).catch(() => {
+          // Silently handle errors
         });
       });
       return buttonEl;

@@ -2717,8 +2717,6 @@ async function redditFormRequest(path, params, options = null) {
 
       firstFailureMessage = "Reddit modhash unavailable in this page context";
 
-      console.warn("[ModBox] No modhash available");
-
     }
 
   }
@@ -4523,8 +4521,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
 
         // Set global cooldown to back off completely
 
-        console.warn("[ModBox] Rate limit hit! Setting cooldown for 20 seconds to respect Reddit's rate limits");
-
         nativeModnotesRateLimitCooldownUntil = Date.now() + NATIVE_MODNOTES_COOLDOWN_MS;
 
       }
@@ -4538,8 +4534,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
       const fallback = nativeModnotesFallbackCache.get(fallbackKey);
 
       if (fallback && fallback.value.length > 0) {
-
-        console.warn("[ModBox] Using stale cached native modnotes due to fetch failure");
 
         return fallback.value;
 
@@ -18889,6 +18883,56 @@ function injectStyles() {
 
 
 
+    .rrw-about-page-link-gen-btn {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 44px;
+
+      height: 44px;
+
+      padding: 0;
+
+      margin: 0;
+
+      border: none;
+
+      background: var(--rrw-close-bg, rgba(233, 242, 255, 0.95));
+
+      color: var(--rrw-text);
+
+      font-size: 1.3rem;
+
+      font-family: var(--rrw-font-family);
+
+      cursor: pointer;
+
+      border-radius: 50%;
+
+      transition: all 0.2s ease;
+
+      flex-shrink: 0;
+
+    }
+
+
+
+    .rrw-about-page-link-gen-btn:hover {
+
+      background: var(--rrw-link, #245eb8);
+
+      color: white;
+
+      transform: scale(1.1);
+
+    }
+
+
+
     .rrw-about-page-body {
 
       padding: 26px;
@@ -29611,7 +29655,13 @@ async function checkForUpdates(force = false) {
 
   } catch (error) {
 
-    console.warn("[ModBox] Failed to save update check result:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+
+    if (!String(error).includes("Extension context invalidated")) {
+
+      console.warn("[ModBox] Failed to save update check result:", error);
+
+    }
 
   }
 
@@ -29647,7 +29697,13 @@ async function loadUpdateCheckResult() {
 
   } catch (error) {
 
-    console.warn("[ModBox] Failed to load update check result:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+
+    if (!String(error).includes("Extension context invalidated")) {
+
+      console.warn("[ModBox] Failed to load update check result:", error);
+
+    }
 
   }
 
@@ -29719,7 +29775,13 @@ async function markUpdateAsSeen() {
 
   } catch (error) {
 
-    console.warn("[ModBox] Failed to mark update as seen:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+
+    if (!String(error).includes("Extension context invalidated")) {
+
+      console.warn("[ModBox] Failed to mark update as seen:", error);
+
+    }
 
   }
 
@@ -29747,7 +29809,13 @@ async function hasSeenUpdate(latestVersion) {
 
   } catch (error) {
 
-    console.warn("[ModBox] Failed to check if update was seen:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+
+    if (!String(error).includes("Extension context invalidated")) {
+
+      console.warn("[ModBox] Failed to check if update was seen:", error);
+
+    }
 
   }
 
@@ -30237,8 +30305,6 @@ async function performUpdateCheckFromAboutPage() {
 
   } catch (error) {
 
-    console.warn("[ModBox] Error checking for updates:", error);
-
     const statusEl = document.querySelector('[data-about-check-status]');
 
     if (statusEl) {
@@ -30306,6 +30372,22 @@ function bindAboutPageEvents() {
       e.preventDefault();
 
       void performUpdateCheckFromAboutPage();
+
+    });
+
+  });
+
+
+
+  // Link Generator button
+
+  root.querySelectorAll('[data-about-link-gen="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      openLinkGenerator();
 
     });
 
@@ -30405,9 +30487,19 @@ function renderAboutPage() {
 
           <h2 class="rrw-about-page-title">About ModBox</h2>
 
-          <button type="button" class="rrw-about-page-close" data-about-page-close="1" aria-label="Close">
+          <button 
 
-            X
+            type="button" 
+
+            class="rrw-about-page-link-gen-btn" 
+
+            data-about-link-gen="1"
+
+            title="Generate ModBox ban links"
+
+          >
+
+            ${String.fromCodePoint(0x1F517)}
 
           </button>
 
@@ -30537,7 +30629,7 @@ async function openAboutPage() {
 
   } catch (error) {
 
-    console.warn("[ModBox] Failed to open about page:", error);
+    // Silently handle errors
 
   }
 
@@ -31353,9 +31445,9 @@ function bindContainer(container) {
 
       attachButtonClickHandlers(buttonEl, () => {
 
-        void runCommentNukeWorkflow(target).catch((error) => {
+        void runCommentNukeWorkflow(target).catch(() => {
 
-          console.warn("[ModBox] Comment nuke failed:", error instanceof Error ? error.message : String(error));
+          // Silently handle errors
 
         });
 
@@ -33289,9 +33381,7 @@ function renderOverlay() {
 
         <div class="rrw-header-actions">
 
-          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-link-generator" title="Generate ModBox ban links">🔗</button>
-
-          <button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
+          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
 
           <button type="button" class="rrw-refresh-btn" id="rrw-refresh-config" title="Refresh removal reasons">\u21BB</button>` : ""}
 
@@ -33968,20 +34058,6 @@ function renderOverlay() {
         flairTemplates: overlayState.postFlairTemplates || [],
 
       });
-
-    });
-
-  }
-
-
-
-  const linkGeneratorBtn = root.querySelector("#rrw-link-generator");
-
-  if (linkGeneratorBtn) {
-
-    linkGeneratorBtn.addEventListener("click", () => {
-
-      openLinkGenerator();
 
     });
 
@@ -35203,7 +35279,7 @@ function renderOverlay() {
 
                 } catch (err) {
 
-                  console.warn("[ModBox] Flair application failed:", err);
+                  // Silently handle flair application errors
 
                 }
 
@@ -35289,7 +35365,7 @@ function renderOverlay() {
 
                 } catch (err) {
 
-                  console.warn("[ModBox] Comment posting failed:", err);
+                  // Silently handle comment posting errors
 
                 }
 
@@ -35357,7 +35433,7 @@ function renderOverlay() {
 
                 } catch (err) {
 
-                  console.warn("[ModBox] Modmail send failed:", err);
+                  // Silently handle modmail send errors
 
                 }
 
@@ -35397,7 +35473,7 @@ function renderOverlay() {
 
                 } catch (err) {
 
-                  console.warn("[ModBox] Usernote save failed:", err);
+                  // Silently handle usernote save errors
 
                 }
 
@@ -35755,8 +35831,6 @@ function renderOverlay() {
 
           overlay.submitting = false;
 
-          console.warn("[ModBox] Removal blocked: skipRedditRemove=true but no reasons selected");
-
           renderOverlay();
 
           return;
@@ -35768,8 +35842,6 @@ function renderOverlay() {
         if (!validateSelectedFields()) {
 
           overlay.submitting = false;
-
-          console.warn("[ModBox] Removal blocked: validation failed");
 
           renderOverlay();
 
@@ -36113,8 +36185,6 @@ function renderOverlay() {
 
               }
 
-              console.warn("Failed to post removal comment:", commentErrorMsg);
-
             }
 
           }
@@ -36186,8 +36256,6 @@ function renderOverlay() {
                 overlay.error = `Modmail delivery failed: ${modmailErrorMsg}`;
 
               }
-
-              console.warn("Failed to send modmail:", modmailErrorMsg);
 
             }
 
@@ -37135,9 +37203,7 @@ function renderOverlay() {
 
 
 
-            // Unknown step type - log and skip
-
-            console.warn(`[ModBox] Unknown playbook step type: ${stepType}, skipping`);
+            // Unknown step type - skip silently
 
             completed += 1;
 
@@ -37160,8 +37226,6 @@ function renderOverlay() {
 
 
         if (failures.length > 0) {
-
-          console.warn(`[ModBox] Playbook "${playbook.title}" completed with ${failures.length} error(s):`, failures);
 
           showToast(`Playbook "${playbook.title}" completed with ${failures.length} error${failures.length === 1 ? "" : "s"}`, "error");
 
@@ -37222,8 +37286,6 @@ async function openOverlay(target, options = {}) {
   const cleanTarget = String(target || "").trim();
 
   if (!cleanTarget) {
-
-    console.warn("[ModBox] openOverlay called with empty target");
 
     return;
 
@@ -41659,8 +41721,6 @@ async function openContextPopup(contextJsonUrl, targetCommentId = "", clickPoint
 
   if (!url) {
 
-    console.warn("[ModBox] openContextPopup: no URL provided");
-
     return;
 
   }
@@ -42459,8 +42519,6 @@ function buildContextJsonUrlFromContextHref(href) {
 
   if (!parsed) {
 
-    console.warn("[ModBox] Failed to parse URL:", fullHref);
-
     return "";
 
   }
@@ -42670,8 +42728,6 @@ function bindContextPopupEvents() {
     
 
     if (!contextJsonUrl) {
-
-      console.warn("[ModBox] Context popup clicked but no URL in dataset");
 
       return;
 
@@ -45479,10 +45535,6 @@ async function executeModboxBanAction(params, subreddit) {
 
     } catch (err) {
 
-      const errorMsg = getSafeErrorMessage(err);
-
-      console.warn("[ModBox Link Handler] Failed to add usernote:", errorMsg);
-
       // Don't throw - ban succeeded even if usernote failed
 
     }
@@ -46047,6 +46099,116 @@ const LINK_GENERATOR_ROOT_ID = "rrw-link-generator-root";
 
 let linkGeneratorState = null;
 
+let cachedUsernoteTypes = null;
+
+let cachedUsernoteLabels = null;
+
+let cachedTypesMeta = { subreddit: null, loadedAt: 0 };
+
+
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// Wiki Type Loading
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+
+async function loadUsernoteTypesFromWiki(subreddit) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    return { types: [], labels: {} };
+
+  }
+
+  
+
+  // Use cache if still fresh (5 minutes)
+
+  if (cachedTypesMeta.subreddit === cleanSubreddit && Date.now() - cachedTypesMeta.loadedAt < 300000) {
+
+    return { types: cachedUsernoteTypes || [], labels: cachedUsernoteLabels || {} };
+
+  }
+
+  
+
+  try {
+
+    const payload = await requestJsonViaBackground(`/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`, { oauth: true });
+
+    const raw = String(payload?.data?.content_md || "").trim();
+
+    if (!raw) {
+
+      return { types: [], labels: {} };
+
+    }
+
+    
+
+    const doc = JSON.parse(raw);
+
+    const rows = Array.isArray(doc?.usernoteColors) ? doc.usernoteColors : [];
+
+    
+
+    const labels = {};
+
+    const types = [];
+
+    
+
+    rows.forEach((row) => {
+
+      if (!row || typeof row !== "object") {
+
+        return;
+
+      }
+
+      const key = String(row.key || "").trim().toLowerCase();
+
+      if (!key) {
+
+        return;
+
+      }
+
+      types.push(key);
+
+      labels[key] = String(row.text || key).trim() || key;
+
+    });
+
+    
+
+    // Cache the result
+
+    cachedUsernoteTypes = types;
+
+    cachedUsernoteLabels = labels;
+
+    cachedTypesMeta = { subreddit: cleanSubreddit, loadedAt: Date.now() };
+
+    
+
+    return { types, labels };
+
+  } catch (err) {
+
+    console.error("[ModBox] Failed to load usernote types from wiki:", err);
+
+    return { types: [], labels: {} };
+
+  }
+
+}
+
 
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -46057,7 +46219,7 @@ let linkGeneratorState = null;
 
 
 
-function generateModboxBanLink(username, reason, note, subreddit) {
+function generateModboxBanLink(username, reason, note, subreddit, durationDays, notetype) {
 
   const params = new URLSearchParams();
 
@@ -46078,6 +46240,18 @@ function generateModboxBanLink(username, reason, note, subreddit) {
   if (String(note || "").trim()) {
 
     params.set("note", String(note).trim());
+
+  }
+
+  if (String(durationDays || "").trim()) {
+
+    params.set("durationDays", String(durationDays).trim());
+
+  }
+
+  if (String(notetype || "").trim()) {
+
+    params.set("notetype", String(notetype).trim());
 
   }
 
@@ -46105,9 +46279,19 @@ function initLinkGeneratorState() {
 
     note: "",
 
+    subreddit: "",
+
+    durationDays: "",
+
+    notetype: "",
+
     generatedLink: "",
 
     copied: false,
+
+    usernoteTypes: [],
+
+    usernoteLabels: {},
 
   };
 
@@ -46118,6 +46302,28 @@ function initLinkGeneratorState() {
 function openLinkGenerator() {
 
   linkGeneratorState = initLinkGeneratorState();
+
+  loadAndRenderLinkGenerator();
+
+}
+
+
+
+async function loadAndRenderLinkGenerator() {
+
+  // Try to load usernote types from the current subreddit's wiki
+
+  const subreddit = normalizeSubreddit(linkGeneratorState?.subreddit || getSubredditForBanAction());
+
+  if (subreddit && linkGeneratorState) {
+
+    const wikiTypes = await loadUsernoteTypesFromWiki(subreddit);
+
+    linkGeneratorState.usernoteTypes = wikiTypes.types;
+
+    linkGeneratorState.usernoteLabels = wikiTypes.labels;
+
+  }
 
   renderLinkGenerator();
 
@@ -46167,7 +46373,7 @@ function renderLinkGenerator() {
 
     root.id = LINK_GENERATOR_ROOT_ID;
 
-    root.style.cssText = "position: fixed; inset: 0; z-index: 99999; pointer-events: none;";
+    root.style.cssText = "position: fixed; inset: 0; z-index: 2147483648; pointer-events: none;";
 
     document.documentElement.appendChild(root);
 
@@ -46179,7 +46385,7 @@ function renderLinkGenerator() {
 
 
 
-  const { username, reason, note, generatedLink, copied } = linkGeneratorState;
+  const { username, reason, note, subreddit, durationDays, notetype, generatedLink, copied } = linkGeneratorState;
 
 
 
@@ -46240,6 +46446,108 @@ function renderLinkGenerator() {
             >${escapeHtml(reason)}</textarea>
 
             <small class="rrw-muted">Multi-line messages are supported. URL-encoded as %0A for newlines.</small>
+
+          </label>
+
+
+
+          <label class="rrw-field">
+
+            <span>Subreddit</span>
+
+            <input
+
+              type="text"
+
+              id="rrw-link-gen-subreddit"
+
+              placeholder="Optional. Auto-detected if on subreddit page, or specify here."
+
+              value="${escapeHtml(subreddit)}"
+
+            />
+
+          </label>
+
+
+
+          <label class="rrw-field">
+
+            <span>Ban duration (days)</span>
+
+            <input
+
+              type="number"
+
+              id="rrw-link-gen-duration"
+
+              placeholder="Optional. Leave empty for permanent ban."
+
+              value="${escapeHtml(durationDays)}"
+
+              min="0"
+
+            />
+
+          </label>
+
+
+
+          <label class="rrw-field">
+
+            <span>Usernote type</span>
+
+            <select id="rrw-link-gen-notetype">
+
+              <option value="">-- None --</option>
+
+              ${(() => {
+
+                // Use types loaded from wiki first
+
+                const types = linkGeneratorState?.usernoteTypes || [];
+
+                const labels = linkGeneratorState?.usernoteLabels || {};
+
+                if (types.length > 0) {
+
+                  return types.map(key => {
+
+                    const label = labels[key] || key;
+
+                    return `<option value="${escapeHtml(key)}" ${notetype === key ? "selected" : ""}>${escapeHtml(label)}</option>`;
+
+                  }).join('');
+
+                }
+
+                // Fallback to usernotes editor state if available
+
+                const editorTypes = usernotesEditorState?.noteTypes || [];
+
+                const editorLabels = usernotesEditorState?.noteTypeLabels || {};
+
+                if (editorTypes.length > 0) {
+
+                  return editorTypes.map(key => {
+
+                    const label = editorLabels[key] || key;
+
+                    return `<option value="${escapeHtml(key)}" ${notetype === key ? "selected" : ""}>${escapeHtml(label)}</option>`;
+
+                  }).join('');
+
+                }
+
+                // Final fallback to default types
+
+                return DEFAULT_TOOLBOX_USERNOTE_TYPES.map(type => `<option value="${escapeHtml(type.key)}" ${notetype === type.key ? "selected" : ""}>${escapeHtml(type.text)}</option>`).join('');
+
+              })()}
+
+            </select>
+
+            <small class="rrw-muted">Type of usernote to add with this action.</small>
 
           </label>
 
@@ -46359,6 +46667,12 @@ function bindLinkGeneratorEvents() {
 
       const reasonInput = root.querySelector("#rrw-link-gen-reason");
 
+      const subredditInput = root.querySelector("#rrw-link-gen-subreddit");
+
+      const durationInput = root.querySelector("#rrw-link-gen-duration");
+
+      const notetypeSelect = root.querySelector("#rrw-link-gen-notetype");
+
       const noteInput = root.querySelector("#rrw-link-gen-note");
 
 
@@ -46391,11 +46705,17 @@ function bindLinkGeneratorEvents() {
 
       const reason = reasonInput instanceof HTMLTextAreaElement ? reasonInput.value : "";
 
+      const subreddit = subredditInput instanceof HTMLInputElement ? subredditInput.value : "";
+
+      const durationDays = durationInput instanceof HTMLInputElement ? durationInput.value : "";
+
+      const notetype = notetypeSelect instanceof HTMLSelectElement ? notetypeSelect.value : "";
+
       const note = noteInput instanceof HTMLTextAreaElement ? noteInput.value : "";
 
 
 
-      const link = generateModboxBanLink(username, reason, note);
+      const link = generateModboxBanLink(username, reason, note, subreddit, durationDays, notetype);
 
       linkGeneratorState.generatedLink = link;
 
@@ -46477,6 +46797,12 @@ function bindLinkGeneratorEvents() {
 
   const reasonInput = root.querySelector("#rrw-link-gen-reason");
 
+  const subredditInput = root.querySelector("#rrw-link-gen-subreddit");
+
+  const durationInput = root.querySelector("#rrw-link-gen-duration");
+
+  const notetypeSelect = root.querySelector("#rrw-link-gen-notetype");
+
   const noteInput = root.querySelector("#rrw-link-gen-note");
 
 
@@ -46506,6 +46832,60 @@ function bindLinkGeneratorEvents() {
       if (linkGeneratorState) {
 
         linkGeneratorState.reason = reasonInput.value;
+
+        linkGeneratorState.generatedLink = "";
+
+      }
+
+    });
+
+  }
+
+
+
+  if (subredditInput instanceof HTMLInputElement) {
+
+    subredditInput.addEventListener("input", () => {
+
+      if (linkGeneratorState) {
+
+        linkGeneratorState.subreddit = subredditInput.value;
+
+        linkGeneratorState.generatedLink = "";
+
+      }
+
+    });
+
+  }
+
+
+
+  if (durationInput instanceof HTMLInputElement) {
+
+    durationInput.addEventListener("input", () => {
+
+      if (linkGeneratorState) {
+
+        linkGeneratorState.durationDays = durationInput.value;
+
+        linkGeneratorState.generatedLink = "";
+
+      }
+
+    });
+
+  }
+
+
+
+  if (notetypeSelect instanceof HTMLSelectElement) {
+
+    notetypeSelect.addEventListener("change", () => {
+
+      if (linkGeneratorState) {
+
+        linkGeneratorState.notetype = notetypeSelect.value;
 
         linkGeneratorState.generatedLink = "";
 
@@ -46563,7 +46943,7 @@ function injectLinkGeneratorStyles() {
 
     .rrw-link-gen-backdrop {
 
-      position: fixed;
+      position: absolute;
 
       top: 0;
 
@@ -46609,7 +46989,7 @@ function injectLinkGeneratorStyles() {
 
       overflow: auto;
 
-      z-index: 2;
+      z-index: 2147483649;
 
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
@@ -46681,7 +47061,9 @@ function injectLinkGeneratorStyles() {
 
     .rrw-link-gen-body .rrw-field input,
 
-    .rrw-link-gen-body .rrw-field textarea {
+    .rrw-link-gen-body .rrw-field textarea,
+
+    .rrw-link-gen-body .rrw-field select {
 
       width: 100%;
 
@@ -46707,7 +47089,9 @@ function injectLinkGeneratorStyles() {
 
     .rrw-link-gen-body .rrw-field input:focus,
 
-    .rrw-link-gen-body .rrw-field textarea:focus {
+    .rrw-link-gen-body .rrw-field textarea:focus,
+
+    .rrw-link-gen-body .rrw-field select:focus {
 
       outline: none;
 

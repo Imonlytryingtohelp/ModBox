@@ -224,7 +224,10 @@ async function checkForUpdates(force = false) {
       [UPDATE_CHECK_RESULT_KEY]: result,
     });
   } catch (error) {
-    console.warn("[ModBox] Failed to save update check result:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+    if (!String(error).includes("Extension context invalidated")) {
+      console.warn("[ModBox] Failed to save update check result:", error);
+    }
   }
   
   console.log("[ModBox] Update check complete:", result);
@@ -242,7 +245,10 @@ async function loadUpdateCheckResult() {
       return result;
     }
   } catch (error) {
-    console.warn("[ModBox] Failed to load update check result:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+    if (!String(error).includes("Extension context invalidated")) {
+      console.warn("[ModBox] Failed to load update check result:", error);
+    }
   }
   
   return null;
@@ -278,7 +284,10 @@ async function markUpdateAsSeen() {
       [UPDATE_SEEN_KEY]: Date.now(),
     });
   } catch (error) {
-    console.warn("[ModBox] Failed to mark update as seen:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+    if (!String(error).includes("Extension context invalidated")) {
+      console.warn("[ModBox] Failed to mark update as seen:", error);
+    }
   }
 }
 
@@ -292,7 +301,10 @@ async function hasSeenUpdate(latestVersion) {
       return true;
     }
   } catch (error) {
-    console.warn("[ModBox] Failed to check if update was seen:", error);
+    // Silently ignore context invalidation errors (expected on extension reload)
+    if (!String(error).includes("Extension context invalidated")) {
+      console.warn("[ModBox] Failed to check if update was seen:", error);
+    }
   }
   
   return false;

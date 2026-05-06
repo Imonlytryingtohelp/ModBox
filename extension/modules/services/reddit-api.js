@@ -293,7 +293,6 @@ async function redditFormRequest(path, params, options = null) {
       }
     } else {
       firstFailureMessage = "Reddit modhash unavailable in this page context";
-      console.warn("[ModBox] No modhash available");
     }
   }
 
@@ -1196,7 +1195,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
       
       if (isRateLimit) {
         // Set global cooldown to back off completely
-        console.warn("[ModBox] Rate limit hit! Setting cooldown for 20 seconds to respect Reddit's rate limits");
         nativeModnotesRateLimitCooldownUntil = Date.now() + NATIVE_MODNOTES_COOLDOWN_MS;
       }
       
@@ -1204,7 +1202,6 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
       const fallbackKey = cacheKey;
       const fallback = nativeModnotesFallbackCache.get(fallbackKey);
       if (fallback && fallback.value.length > 0) {
-        console.warn("[ModBox] Using stale cached native modnotes due to fetch failure");
         return fallback.value;
       }
       

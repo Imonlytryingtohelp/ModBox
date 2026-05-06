@@ -553,8 +553,7 @@ function renderOverlay() {
       <header class="rrw-overlay-header">
         <h2>${quickActionsOnlyMode ? "Quick Actions" : "ModBox"}</h2>
         <div class="rrw-header-actions">
-          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-link-generator" title="Generate ModBox ban links">🔗</button>
-          <button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
+          ${!quickActionsOnlyMode ? `<button type="button" class="rrw-refresh-btn" id="rrw-edit-config" title="Open ModBox settings editor" ${resolved?.subreddit ? "" : "disabled"}>Edit</button>
           <button type="button" class="rrw-refresh-btn" id="rrw-refresh-config" title="Refresh removal reasons">\u21BB</button>` : ""}
           <button type="button" class="rrw-close" data-overlay-close="1">Close</button>
         </div>
@@ -893,13 +892,6 @@ function renderOverlay() {
         config: overlayState.removalConfig || buildDefaultRemovalConfig(subreddit),
         flairTemplates: overlayState.postFlairTemplates || [],
       });
-    });
-  }
-
-  const linkGeneratorBtn = root.querySelector("#rrw-link-generator");
-  if (linkGeneratorBtn) {
-    linkGeneratorBtn.addEventListener("click", () => {
-      openLinkGenerator();
     });
   }
 
@@ -1510,7 +1502,7 @@ function renderOverlay() {
                     linkFullname: fullname,
                   });
                 } catch (err) {
-                  console.warn("[ModBox] Flair application failed:", err);
+                  // Silently handle flair application errors
                 }
               }
 
@@ -1553,7 +1545,7 @@ function renderOverlay() {
                     }
                   }
                 } catch (err) {
-                  console.warn("[ModBox] Comment posting failed:", err);
+                  // Silently handle comment posting errors
                 }
               }
 
@@ -1587,7 +1579,7 @@ function renderOverlay() {
                     }
                   }
                 } catch (err) {
-                  console.warn("[ModBox] Modmail send failed:", err);
+                  // Silently handle modmail send errors
                 }
               }
 
@@ -1607,7 +1599,7 @@ function renderOverlay() {
                 try {
                   usernoteSaved = await saveInlineRemovalUsernote(overlay);
                 } catch (err) {
-                  console.warn("[ModBox] Usernote save failed:", err);
+                  // Silently handle usernote save errors
                 }
               }
 
@@ -1786,14 +1778,12 @@ function renderOverlay() {
         if (overlay.skipRedditRemove && (overlay.selectedReasonKeys || []).length === 0) {
           overlay.error = "Select at least one reason before sending.";
           overlay.submitting = false;
-          console.warn("[ModBox] Removal blocked: skipRedditRemove=true but no reasons selected");
           renderOverlay();
           return;
         }
 
         if (!validateSelectedFields()) {
           overlay.submitting = false;
-          console.warn("[ModBox] Removal blocked: validation failed");
           renderOverlay();
           return;
         }
@@ -1965,7 +1955,6 @@ function renderOverlay() {
               if (!overlay.error) {
                 overlay.error = `Comment posting failed: ${commentErrorMsg}`;
               }
-              console.warn("Failed to post removal comment:", commentErrorMsg);
             }
           }
 
@@ -2002,7 +1991,6 @@ function renderOverlay() {
               if (!overlay.error) {
                 overlay.error = `Modmail delivery failed: ${modmailErrorMsg}`;
               }
-              console.warn("Failed to send modmail:", modmailErrorMsg);
             }
           }
         } catch (removeError) {
@@ -2476,8 +2464,7 @@ function renderOverlay() {
               continue;
             }
 
-            // Unknown step type - log and skip
-            console.warn(`[ModBox] Unknown playbook step type: ${stepType}, skipping`);
+            // Unknown step type - skip silently
             completed += 1;
           } catch (stepError) {
             console.error(`[ModBox] Step ${completed + 1} (${String(step?.type || "unknown")}) failed:`, stepError);
@@ -2489,7 +2476,6 @@ function renderOverlay() {
         }
 
         if (failures.length > 0) {
-          console.warn(`[ModBox] Playbook "${playbook.title}" completed with ${failures.length} error(s):`, failures);
           showToast(`Playbook "${playbook.title}" completed with ${failures.length} error${failures.length === 1 ? "" : "s"}`, "error");
         } else {
           console.log(`[ModBox] Playbook "${playbook.title}" completed successfully: ${completed} step${completed === 1 ? "" : "s"}`);
@@ -2520,7 +2506,6 @@ function renderOverlay() {
 async function openOverlay(target, options = {}) {
   const cleanTarget = String(target || "").trim();
   if (!cleanTarget) {
-    console.warn("[ModBox] openOverlay called with empty target");
     return;
   }
 

@@ -120,7 +120,6 @@ async function openContextPopup(contextJsonUrl, targetCommentId = "", clickPoint
   const url = String(contextJsonUrl || "").trim();
   
   if (!url) {
-    console.warn("[ModBox] openContextPopup: no URL provided");
     return;
   }
 
@@ -520,7 +519,6 @@ function buildContextJsonUrlFromContextHref(href) {
   
   const parsed = parseUrl(fullHref);
   if (!parsed) {
-    console.warn("[ModBox] Failed to parse URL:", fullHref);
     return "";
   }
 
@@ -626,7 +624,6 @@ function bindContextPopupEvents() {
     console.log("[ModBox] Opening popup with URL:", contextJsonUrl);
     
     if (!contextJsonUrl) {
-      console.warn("[ModBox] Context popup clicked but no URL in dataset");
       return;
     }
 

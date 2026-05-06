@@ -156,8 +156,6 @@ async function executeModboxBanAction(params, subreddit) {
       );
       console.log("[ModBox Link Handler] Usernote added for", params.username);
     } catch (err) {
-      const errorMsg = getSafeErrorMessage(err);
-      console.warn("[ModBox Link Handler] Failed to add usernote:", errorMsg);
       // Don't throw - ban succeeded even if usernote failed
     }
   }

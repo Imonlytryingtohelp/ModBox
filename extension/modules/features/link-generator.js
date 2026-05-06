@@ -8,12 +8,67 @@
 const LINK_GENERATOR_ROOT_ID = "rrw-link-generator-root";
 
 let linkGeneratorState = null;
+let cachedUsernoteTypes = null;
+let cachedUsernoteLabels = null;
+let cachedTypesMeta = { subreddit: null, loadedAt: 0 };
+
+// ────────────────────────────────────────────────────────────────────────────────────────────────
+// Wiki Type Loading
+// ────────────────────────────────────────────────────────────────────────────────────────────────
+
+async function loadUsernoteTypesFromWiki(subreddit) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    return { types: [], labels: {} };
+  }
+  
+  // Use cache if still fresh (5 minutes)
+  if (cachedTypesMeta.subreddit === cleanSubreddit && Date.now() - cachedTypesMeta.loadedAt < 300000) {
+    return { types: cachedUsernoteTypes || [], labels: cachedUsernoteLabels || {} };
+  }
+  
+  try {
+    const payload = await requestJsonViaBackground(`/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`, { oauth: true });
+    const raw = String(payload?.data?.content_md || "").trim();
+    if (!raw) {
+      return { types: [], labels: {} };
+    }
+    
+    const doc = JSON.parse(raw);
+    const rows = Array.isArray(doc?.usernoteColors) ? doc.usernoteColors : [];
+    
+    const labels = {};
+    const types = [];
+    
+    rows.forEach((row) => {
+      if (!row || typeof row !== "object") {
+        return;
+      }
+      const key = String(row.key || "").trim().toLowerCase();
+      if (!key) {
+        return;
+      }
+      types.push(key);
+      labels[key] = String(row.text || key).trim() || key;
+    });
+    
+    // Cache the result
+    cachedUsernoteTypes = types;
+    cachedUsernoteLabels = labels;
+    cachedTypesMeta = { subreddit: cleanSubreddit, loadedAt: Date.now() };
+    
+    return { types, labels };
+  } catch (err) {
+    console.error("[ModBox] Failed to load usernote types from wiki:", err);
+    return { types: [], labels: {} };
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
 // Link Generation
 // ────────────────────────────────────────────────────────────────────────────────────────────────
 
-function generateModboxBanLink(username, reason, note, subreddit) {
+function generateModboxBanLink(username, reason, note, subreddit, durationDays, notetype) {
   const params = new URLSearchParams();
   params.set("user", String(username || "").trim());
   if (String(subreddit || "").trim()) {
@@ -24,6 +79,12 @@ function generateModboxBanLink(username, reason, note, subreddit) {
   }
   if (String(note || "").trim()) {
     params.set("note", String(note).trim());
+  }
+  if (String(durationDays || "").trim()) {
+    params.set("durationDays", String(durationDays).trim());
+  }
+  if (String(notetype || "").trim()) {
+    params.set("notetype", String(notetype).trim());
   }
   return `modbox://ban?${params.toString()}`;
 }
@@ -37,13 +98,29 @@ function initLinkGeneratorState() {
     username: "",
     reason: "",
     note: "",
+    subreddit: "",
+    durationDays: "",
+    notetype: "",
     generatedLink: "",
     copied: false,
+    usernoteTypes: [],
+    usernoteLabels: {},
   };
 }
 
 function openLinkGenerator() {
   linkGeneratorState = initLinkGeneratorState();
+  loadAndRenderLinkGenerator();
+}
+
+async function loadAndRenderLinkGenerator() {
+  // Try to load usernote types from the current subreddit's wiki
+  const subreddit = normalizeSubreddit(linkGeneratorState?.subreddit || getSubredditForBanAction());
+  if (subreddit && linkGeneratorState) {
+    const wikiTypes = await loadUsernoteTypesFromWiki(subreddit);
+    linkGeneratorState.usernoteTypes = wikiTypes.types;
+    linkGeneratorState.usernoteLabels = wikiTypes.labels;
+  }
   renderLinkGenerator();
 }
 
@@ -68,13 +145,13 @@ function renderLinkGenerator() {
   if (!root) {
     root = document.createElement("div");
     root.id = LINK_GENERATOR_ROOT_ID;
-    root.style.cssText = "position: fixed; inset: 0; z-index: 99999; pointer-events: none;";
+    root.style.cssText = "position: fixed; inset: 0; z-index: 2147483648; pointer-events: none;";
     document.documentElement.appendChild(root);
   } else {
     root.style.pointerEvents = "none";
   }
 
-  const { username, reason, note, generatedLink, copied } = linkGeneratorState;
+  const { username, reason, note, subreddit, durationDays, notetype, generatedLink, copied } = linkGeneratorState;
 
   root.innerHTML = `
     <div class="rrw-link-gen-backdrop" data-link-gen-close="1" style="pointer-events: auto;"></div>
@@ -105,6 +182,57 @@ function renderLinkGenerator() {
               placeholder="Optional. The message shown to the banned user. Supports multiple lines."
             >${escapeHtml(reason)}</textarea>
             <small class="rrw-muted">Multi-line messages are supported. URL-encoded as %0A for newlines.</small>
+          </label>
+
+          <label class="rrw-field">
+            <span>Subreddit</span>
+            <input
+              type="text"
+              id="rrw-link-gen-subreddit"
+              placeholder="Optional. Auto-detected if on subreddit page, or specify here."
+              value="${escapeHtml(subreddit)}"
+            />
+          </label>
+
+          <label class="rrw-field">
+            <span>Ban duration (days)</span>
+            <input
+              type="number"
+              id="rrw-link-gen-duration"
+              placeholder="Optional. Leave empty for permanent ban."
+              value="${escapeHtml(durationDays)}"
+              min="0"
+            />
+          </label>
+
+          <label class="rrw-field">
+            <span>Usernote type</span>
+            <select id="rrw-link-gen-notetype">
+              <option value="">-- None --</option>
+              ${(() => {
+                // Use types loaded from wiki first
+                const types = linkGeneratorState?.usernoteTypes || [];
+                const labels = linkGeneratorState?.usernoteLabels || {};
+                if (types.length > 0) {
+                  return types.map(key => {
+                    const label = labels[key] || key;
+                    return `<option value="${escapeHtml(key)}" ${notetype === key ? "selected" : ""}>${escapeHtml(label)}</option>`;
+                  }).join('');
+                }
+                // Fallback to usernotes editor state if available
+                const editorTypes = usernotesEditorState?.noteTypes || [];
+                const editorLabels = usernotesEditorState?.noteTypeLabels || {};
+                if (editorTypes.length > 0) {
+                  return editorTypes.map(key => {
+                    const label = editorLabels[key] || key;
+                    return `<option value="${escapeHtml(key)}" ${notetype === key ? "selected" : ""}>${escapeHtml(label)}</option>`;
+                  }).join('');
+                }
+                // Final fallback to default types
+                return DEFAULT_TOOLBOX_USERNOTE_TYPES.map(type => `<option value="${escapeHtml(type.key)}" ${notetype === type.key ? "selected" : ""}>${escapeHtml(type.text)}</option>`).join('');
+              })()}
+            </select>
+            <small class="rrw-muted">Type of usernote to add with this action.</small>
           </label>
 
           <label class="rrw-field">
@@ -164,6 +292,9 @@ function bindLinkGeneratorEvents() {
       event.preventDefault();
       const usernameInput = root.querySelector("#rrw-link-gen-username");
       const reasonInput = root.querySelector("#rrw-link-gen-reason");
+      const subredditInput = root.querySelector("#rrw-link-gen-subreddit");
+      const durationInput = root.querySelector("#rrw-link-gen-duration");
+      const notetypeSelect = root.querySelector("#rrw-link-gen-notetype");
       const noteInput = root.querySelector("#rrw-link-gen-note");
 
       if (!(usernameInput instanceof HTMLInputElement)) {
@@ -180,9 +311,12 @@ function bindLinkGeneratorEvents() {
       }
 
       const reason = reasonInput instanceof HTMLTextAreaElement ? reasonInput.value : "";
+      const subreddit = subredditInput instanceof HTMLInputElement ? subredditInput.value : "";
+      const durationDays = durationInput instanceof HTMLInputElement ? durationInput.value : "";
+      const notetype = notetypeSelect instanceof HTMLSelectElement ? notetypeSelect.value : "";
       const note = noteInput instanceof HTMLTextAreaElement ? noteInput.value : "";
 
-      const link = generateModboxBanLink(username, reason, note);
+      const link = generateModboxBanLink(username, reason, note, subreddit, durationDays, notetype);
       linkGeneratorState.generatedLink = link;
       linkGeneratorState.copied = false;
       renderLinkGenerator();
@@ -223,6 +357,9 @@ function bindLinkGeneratorEvents() {
   // Input updates
   const usernameInput = root.querySelector("#rrw-link-gen-username");
   const reasonInput = root.querySelector("#rrw-link-gen-reason");
+  const subredditInput = root.querySelector("#rrw-link-gen-subreddit");
+  const durationInput = root.querySelector("#rrw-link-gen-duration");
+  const notetypeSelect = root.querySelector("#rrw-link-gen-notetype");
   const noteInput = root.querySelector("#rrw-link-gen-note");
 
   if (usernameInput instanceof HTMLInputElement) {
@@ -238,6 +375,33 @@ function bindLinkGeneratorEvents() {
     reasonInput.addEventListener("input", () => {
       if (linkGeneratorState) {
         linkGeneratorState.reason = reasonInput.value;
+        linkGeneratorState.generatedLink = "";
+      }
+    });
+  }
+
+  if (subredditInput instanceof HTMLInputElement) {
+    subredditInput.addEventListener("input", () => {
+      if (linkGeneratorState) {
+        linkGeneratorState.subreddit = subredditInput.value;
+        linkGeneratorState.generatedLink = "";
+      }
+    });
+  }
+
+  if (durationInput instanceof HTMLInputElement) {
+    durationInput.addEventListener("input", () => {
+      if (linkGeneratorState) {
+        linkGeneratorState.durationDays = durationInput.value;
+        linkGeneratorState.generatedLink = "";
+      }
+    });
+  }
+
+  if (notetypeSelect instanceof HTMLSelectElement) {
+    notetypeSelect.addEventListener("change", () => {
+      if (linkGeneratorState) {
+        linkGeneratorState.notetype = notetypeSelect.value;
         linkGeneratorState.generatedLink = "";
       }
     });
@@ -266,7 +430,7 @@ function injectLinkGeneratorStyles() {
   style.id = "rrw-link-gen-styles";
   style.textContent = `
     .rrw-link-gen-backdrop {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       right: 0;
@@ -289,7 +453,7 @@ function injectLinkGeneratorStyles() {
       width: 90%;
       max-height: 80vh;
       overflow: auto;
-      z-index: 2;
+      z-index: 2147483649;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
@@ -325,7 +489,8 @@ function injectLinkGeneratorStyles() {
     }
 
     .rrw-link-gen-body .rrw-field input,
-    .rrw-link-gen-body .rrw-field textarea {
+    .rrw-link-gen-body .rrw-field textarea,
+    .rrw-link-gen-body .rrw-field select {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid var(--rrw-border, #ccc);
@@ -338,7 +503,8 @@ function injectLinkGeneratorStyles() {
     }
 
     .rrw-link-gen-body .rrw-field input:focus,
-    .rrw-link-gen-body .rrw-field textarea:focus {
+    .rrw-link-gen-body .rrw-field textarea:focus,
+    .rrw-link-gen-body .rrw-field select:focus {
       outline: none;
       border-color: #0079d3;
       box-shadow: 0 0 0 2px rgba(0, 121, 211, 0.1);

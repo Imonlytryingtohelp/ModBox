@@ -56,7 +56,6 @@ async function performUpdateCheckFromAboutPage() {
       }
     }
   } catch (error) {
-    console.warn("[ModBox] Error checking for updates:", error);
     const statusEl = document.querySelector('[data-about-check-status]');
     if (statusEl) {
       statusEl.textContent = "Error checking for updates";
@@ -91,6 +90,14 @@ function bindAboutPageEvents() {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       void performUpdateCheckFromAboutPage();
+    });
+  });
+
+  // Link Generator button
+  root.querySelectorAll('[data-about-link-gen="1"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openLinkGenerator();
     });
   });
 
@@ -140,8 +147,13 @@ function renderAboutPage() {
       <div class="rrw-about-page">
         <header class="rrw-about-page-header">
           <h2 class="rrw-about-page-title">About ModBox</h2>
-          <button type="button" class="rrw-about-page-close" data-about-page-close="1" aria-label="Close">
-            X
+          <button 
+            type="button" 
+            class="rrw-about-page-link-gen-btn" 
+            data-about-link-gen="1"
+            title="Generate ModBox ban links"
+          >
+            ${String.fromCodePoint(0x1F517)}
           </button>
         </header>
 
@@ -206,6 +218,6 @@ async function openAboutPage() {
 
     renderAboutPage();
   } catch (error) {
-    console.warn("[ModBox] Failed to open about page:", error);
+    // Silently handle errors
   }
 }

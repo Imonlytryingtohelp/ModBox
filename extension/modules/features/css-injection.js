@@ -3932,6 +3932,31 @@ function injectStyles() {
       color: var(--rrw-link, #245eb8);
     }
 
+    .rrw-about-page-link-gen-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      margin: 0;
+      border: none;
+      background: var(--rrw-close-bg, rgba(233, 242, 255, 0.95));
+      color: var(--rrw-text);
+      font-size: 1.3rem;
+      font-family: var(--rrw-font-family);
+      cursor: pointer;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .rrw-about-page-link-gen-btn:hover {
+      background: var(--rrw-link, #245eb8);
+      color: white;
+      transform: scale(1.1);
+    }
+
     .rrw-about-page-body {
       padding: 26px;
       overflow-y: auto;
