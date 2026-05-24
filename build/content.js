@@ -37525,7 +37525,9 @@ async function openOverlay(target, options = {}) {
 
         const thingType = overlayState.resolved.thingType === "submission" ? "post" : "comment";
 
-        const permalinkUrl = buildRedditUrl(overlayState.resolved.permalink, preferredRedditLinkHost);
+        const permalinkPath = new URL(overlayState.resolved.permalink).pathname;
+
+        const permalinkUrl = buildRedditUrl(permalinkPath, preferredRedditLinkHost);
 
         overlayState.banMessage = `[Your ${thingType}](${permalinkUrl}) contributed to this ban.\n\nRead the removal message/comment to find out your ban reason.`;
 
@@ -37573,7 +37575,9 @@ async function openOverlay(target, options = {}) {
 
         const thingType = overlayState.resolved.thingType === "submission" ? "post" : "comment";
 
-        const permalinkUrl = buildRedditUrl(overlayState.resolved.permalink, preferredRedditLinkHost);
+        const permalinkPath = new URL(overlayState.resolved.permalink).pathname;
+
+        const permalinkUrl = buildRedditUrl(permalinkPath, preferredRedditLinkHost);
 
         overlayState.banMessage = `[Your ${thingType}](${permalinkUrl}) contributed to this ban.\n\nRead the removal message/comment to find out your ban reason.`;
 
