@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.5.2 - Ban Message Improvements
+
+- Prefilled default ban message in User Actions ban panel with link to the post/comment that contributed to the ban
+- Ban message is editable before sending
+
 ## 1.5.1 - UI + ModBox Links Fixes
 
 - About page now only displays one close button.   

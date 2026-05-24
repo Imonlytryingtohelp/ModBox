@@ -37517,6 +37517,20 @@ async function openOverlay(target, options = {}) {
 
       console.log("[ModBox] Overlay resolved:", overlayState.resolved);
 
+      
+
+      // Generate default ban message with link to content
+
+      if (overlayState.resolved?.permalink) {
+
+        const thingType = overlayState.resolved.thingType === "submission" ? "post" : "comment";
+
+        const permalinkUrl = buildRedditUrl(overlayState.resolved.permalink, preferredRedditLinkHost);
+
+        overlayState.banMessage = `[Your ${thingType}](${permalinkUrl}) contributed to this ban.\n\nRead the removal message/comment to find out your ban reason.`;
+
+      }
+
     } else if (isFullname(cleanTarget)) {
 
       const subreddit = overrideSubreddit || parseSubredditFromPath(window.location.pathname);
@@ -37550,6 +37564,20 @@ async function openOverlay(target, options = {}) {
       };
 
       overlayState.error = "Metadata lookup failed; using direct fullname fallback.";
+
+      
+
+      // Generate default ban message with link to content (fallback case)
+
+      if (overlayState.resolved?.permalink) {
+
+        const thingType = overlayState.resolved.thingType === "submission" ? "post" : "comment";
+
+        const permalinkUrl = buildRedditUrl(overlayState.resolved.permalink, preferredRedditLinkHost);
+
+        overlayState.banMessage = `[Your ${thingType}](${permalinkUrl}) contributed to this ban.\n\nRead the removal message/comment to find out your ban reason.`;
+
+      }
 
     } else {
 
