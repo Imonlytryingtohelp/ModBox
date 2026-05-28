@@ -241,7 +241,15 @@ async function fetchToolboxUsernoteTypeMetaViaReddit(subreddit) {
 
   let payload = null;
   try {
-    payload = await requestJsonViaBackground(`/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`, { oauth: true });
+    payload = await requestJsonViaBackgroundScheduled(
+      `/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`,
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { 
+        cacheTtlMs: USERNOTE_TYPE_META_CACHE_TTL_MS,
+        priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
+        dedupe: true
+      }
+    );
   } catch {
     const defaults = buildDefaultUsernoteTypeMeta();
     setUsernoteTypeMetaCache(cleanSubreddit, defaults);

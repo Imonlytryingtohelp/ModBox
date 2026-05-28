@@ -245,7 +245,15 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
 
   let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(`/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`, { oauth: true });
+    wikiPayload = await requestJsonViaBackgroundScheduled(
+      `/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`,
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { 
+        cacheTtlMs: USERNOTES_CACHE_TTL_MS,
+        priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
+        dedupe: true
+      }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
@@ -308,17 +316,25 @@ async function saveSubredditUsernotesToWiki(subreddit, notes, reason) {
     blob,
   });
 
-  await requestJsonViaBackground(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, {
-    method: "POST",
-    oauth: true,
-    formData: true,
-    body: {
-      api_type: "json",
-      content: payload,
-      page: "usernotes",
-      reason: String(reason || "updated via ModBox"),
+  await requestJsonViaBackgroundScheduled(
+    `/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`,
+    {
+      method: "POST",
+      oauth: true,
+      formData: true,
+      timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS,
+      body: {
+        api_type: "json",
+        content: payload,
+        page: "usernotes",
+        reason: reason ? `${String(reason)} via ModBox` : "updated via ModBox",
+      },
     },
-  });
+    {
+      priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
+      dedupe: false
+    }
+  );
 }
 
 // ============================================================================
@@ -333,9 +349,12 @@ async function loadRemovalConfigFromWiki(subreddit) {
 
   let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(
-      `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${REMOVAL_REASONS_WIKI_PAGE}.json?raw_json=1`,
-      { oauth: true },
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(
+        `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${REMOVAL_REASONS_WIKI_PAGE}.json?raw_json=1`,
+        { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      ),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -471,7 +490,10 @@ async function loadQuickActionsFromWiki(subreddit) {
   let wikiPayload;
   const wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${QUICK_ACTIONS_WIKI_PAGE}.json?raw_json=1`;
   try {
-    wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(wikiPath, { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS }),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
@@ -724,11 +746,17 @@ async function loadCannedRepliesFromWiki(subreddit) {
   try {
     try {
       console.log("[ModBox] Attempting to load canned replies without OAuth");
-      wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: false });
+      wikiPayload = await withRetry(
+        () => requestJsonViaBackground(wikiPath, { oauth: false, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS }),
+        { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+      );
     } catch (noAuthError) {
       console.log("[ModBox] Non-authenticated request failed, attempting with OAuth:", noAuthError);
       // Try with OAuth if non-authenticated request fails
-      wikiPayload = await requestJsonViaBackground(wikiPath, { oauth: true });
+      wikiPayload = await withRetry(
+        () => requestJsonViaBackground(wikiPath, { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS }),
+        { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+      );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1071,9 +1099,12 @@ async function loadPlaybooksFromWiki(subreddit) {
   }
   let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(
-      `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${PLAYBOOKS_WIKI_PAGE}.json?raw_json=1`,
-      { oauth: true },
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(
+        `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${PLAYBOOKS_WIKI_PAGE}.json?raw_json=1`,
+        { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      ),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1124,9 +1155,12 @@ async function importToolboxQuickActions(subreddit) {
   }
   let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(
-      `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${TOOLBOX_WIKI_PAGE}.json?raw_json=1`,
-      { oauth: true },
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(
+        `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${TOOLBOX_WIKI_PAGE}.json?raw_json=1`,
+        { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      ),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1199,9 +1233,12 @@ async function loadExtensionSettingsFromWiki(subreddit, wikiPage) {
 
   let wikiPayload;
   try {
-    wikiPayload = await requestJsonViaBackground(
-      `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${wikiPath}.json?raw_json=1`,
-      { oauth: true },
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(
+        `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${wikiPath}.json?raw_json=1`,
+        { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      ),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -61,6 +61,37 @@ function withTimeout(promise, timeoutMs, timeoutMessage) {
 }
 
 // ============================================================================
+// RETRY UTILITIES WITH EXPONENTIAL BACKOFF
+// ============================================================================
+
+async function withRetry(taskFactory, options = null) {
+  const maxRetries = Number(options?.maxRetries || BACKGROUND_REQUEST_MAX_RETRIES);
+  const baseDelayMs = Number(options?.baseDelayMs || BACKGROUND_REQUEST_RETRY_DELAY_MS);
+  const shouldRetry = typeof options?.shouldRetry === "function" ? options.shouldRetry : null;
+  
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await taskFactory();
+    } catch (error) {
+      lastError = error;
+      
+      // Check if error is retryable
+      const isRetryable = !shouldRetry || shouldRetry(error);
+      if (!isRetryable || attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Exponential backoff: delay = baseDelay * (2 ^ attemptNumber)
+      const delayMs = baseDelayMs * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  throw lastError || new Error("Request failed after retries");
+}
+
+// ============================================================================
 // REDDIT MODHASH & SESSION UTILITIES
 // ============================================================================
 
@@ -832,7 +863,7 @@ async function fetchModmailUnreadCount() {
   const payload = await requestJsonViaBackgroundScheduled(
     "/api/mod/conversations/unread/count",
     { oauth: true },
-    { cacheTtlMs: QUEUE_REQUEST_CACHE_TTL_MS, priority: 2 },
+    { cacheTtlMs: QUEUE_REQUEST_CACHE_TTL_MS, priority: BACKGROUND_REQUEST_PRIORITY_MODMAIL },
   );
   return parseModmailUnreadCount(payload);
 }
@@ -1145,7 +1176,7 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
         { oauth: true },
         {
           cacheTtlMs: 30 * 60 * 1000, // 30 minute cache (very long to reduce requests)
-          priority: 1,
+          priority: BACKGROUND_REQUEST_PRIORITY_MODNOTES,
           dedupe: true,
         }
       );

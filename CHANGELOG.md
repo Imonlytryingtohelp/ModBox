@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 - Prefilled default ban message in User Actions ban panel with link to the post/comment that contributed to the ban
 - Ban message is editable before sending
+- Usernotes modlog entries now include "via ModBox" to indicate they were created by the extension
 
 ## 1.5.1 - UI + ModBox Links Fixes
 
