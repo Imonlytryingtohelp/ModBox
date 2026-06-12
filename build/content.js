@@ -31783,6 +31783,26 @@ function renderOverlay() {
 
   const canAct = Boolean(resolved?.isActionable || isFullname(target));
 
+
+
+  // Check if there are incomplete dropdown fields (all dropdowns are required)
+
+  const incompleteDropdowns = (dynamicBlocks || [])
+
+    .filter((block) => block.type === "select")
+
+    .filter((block) => !String(inputValues[block.key] || "").trim());
+
+  const hasIncompleteDropdowns = incompleteDropdowns.length > 0;
+
+  const incompleteDropdownsMessage = hasIncompleteDropdowns
+
+    ? `Please select a value for: ${incompleteDropdowns.map((b) => b.label || b.key).join(", ")}`
+
+    : "";
+
+
+
   const actionsTabLabel = thingType === "submission" ? "Post Actions" : "Comment Actions";
 
   const overlayTab = quickActionsOnlyMode
@@ -32129,6 +32149,8 @@ function renderOverlay() {
 
             <div class="rrw-sticky-footer">
 
+              ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
+
               <div class="rrw-actions">
 
                 ${thingType === "comment" ? `<button type="button" class="rrw-btn rrw-btn-danger" id="rrw-comment-nuke" ${submitting || !canAct ? "disabled" : ""}>Nuke Thread</button>` : ""}
@@ -32139,7 +32161,7 @@ function renderOverlay() {
 
                 ${overlayState.skipRedditRemove ? "" : `<button type="button" class="rrw-btn rrw-btn-secondary" id="rrw-remove-no-reason" ${submitting || !canAct ? "disabled" : ""}>Remove (No reason)</button>`}
 
-                <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-remove" ${submitting || !canAct ? "disabled" : ""}>${overlayState.skipRedditRemove ? "Send reason" : "Remove"}</button>
+                <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-remove" ${submitting || !canAct || hasIncompleteDropdowns ? "disabled" : ""}>${overlayState.skipRedditRemove ? "Send reason" : "Remove"}</button>
 
               </div>
 
@@ -33670,6 +33692,26 @@ function renderOverlay() {
             if (overlay.skipRedditRemove && (overlay.selectedReasonKeys || []).length === 0) {
 
               showToast("Error: Select at least one reason before sending", "error");
+
+              return;
+
+            }
+
+
+
+            // Check for incomplete dropdowns (all dropdowns are required)
+
+            const incompleteDropdowns = (overlay.dynamicBlocks || [])
+
+              .filter((block) => block.type === "select")
+
+              .filter((block) => !String(overlay.inputValues?.[block.key] || "").trim());
+
+            if (incompleteDropdowns.length > 0) {
+
+              const fieldNames = incompleteDropdowns.map((b) => b.label || b.key).join(", ");
+
+              showToast(`Error: Please select a value for: ${fieldNames}`, "error");
 
               return;
 

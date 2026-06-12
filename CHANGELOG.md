@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.5.3 - Removal Reason Dropdown Validation
+
+- Removal reasons with dropdown options now require all dropdowns to be completed before removal
+- Remove button is disabled when any dropdown selection is incomplete
+- Clear validation message displays above buttons explaining which dropdowns need values
+- Prevents accidental removals without completing required dropdown selections
+
 ## 1.5.2 - Ban Message Improvements
 
 - Prefilled default ban message in User Actions ban panel with link to the post/comment that contributed to the ban
