@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.5.4 (UPCOMING) - Bug Fixes
+
+- Changes to canned replies. Improving load speed and usability. 
+
 ## 1.5.3 - Removal Reason Dropdown Validation
 
 - Removal reasons with dropdown options now require all dropdowns to be completed before removal

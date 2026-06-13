@@ -703,40 +703,28 @@ async function loadCannedRepliesFromWiki(subreddit) {
     console.log("[ModBox] Could not read canned replies URL from storage:", err);
   }
   
-  // If configured URL exists, use it (subreddit parameter is optional in this case)
-  if (configuredUrl) {
-    let path = String(configuredUrl).trim();
-    
-    // Handle full URLs
-    if (path.startsWith('http')) {
-      path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
-    }
-    
-    // Ensure leading slash
-    if (!path.startsWith('/')) {
-      path = '/' + path;
-    }
-    
-    // Remove trailing slash
-    path = path.replace(/\/$/, '');
-    
-    wikiPath = path + '.json?raw_json=1';
-    console.log("[ModBox] Using configured canned replies URL:", wikiPath);
-  } else {
-    // Otherwise, build from subreddit parameter
-    const cleanSubreddit = normalizeSubreddit(subreddit);
-    if (!cleanSubreddit) {
-      throw new Error("Subreddit is required to load canned replies");
-    }
-
-    const cached = getInMemoryCannedReplies(cleanSubreddit);
-    if (cached) {
-      return cached;
-    }
-
-    wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${CANNED_REPLIES_WIKI_PAGE}.json?raw_json=1`;
-    subreddit = cleanSubreddit;
+  // Canned replies require a configured wiki URL in extension settings
+  if (!configuredUrl) {
+    throw new Error("Canned replies wiki URL must be configured in extension settings");
   }
+
+  let path = String(configuredUrl).trim();
+  
+  // Handle full URLs
+  if (path.startsWith('http')) {
+    path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+  }
+  
+  // Ensure leading slash
+  if (!path.startsWith('/')) {
+    path = '/' + path;
+  }
+  
+  // Remove trailing slash
+  path = path.replace(/\/$/, '');
+  
+  wikiPath = path + '.json?raw_json=1';
+  console.log("[ModBox] Using configured canned replies URL:", wikiPath);
   
   console.log("[ModBox] Loading canned replies from:", wikiPath);
   
@@ -806,23 +794,10 @@ async function loadCannedRepliesFromWiki(subreddit) {
 }
 
 async function saveCannedRepliesToWiki(subreddit, config, reason) {
-  const cleanSubreddit = normalizeSubreddit(subreddit);
-  console.log("[ModBox] saveCannedRepliesToWiki called with subreddit:", cleanSubreddit);
+  console.log("[ModBox] saveCannedRepliesToWiki called");
   
-  if (!cleanSubreddit) {
-    throw new Error("Subreddit is required to save canned replies");
-  }
-
-  const normalized = normalizeCannedRepliesDoc(config, cleanSubreddit);
-  console.log("[ModBox] Normalized config:", normalized);
-  
-  const payload = JSON.stringify(normalized, null, 2);
-  console.log("[ModBox] Payload to save:", payload);
-  
-  // Try to get configured wiki URL
-  let wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`;
-  let wikiPageName = CANNED_REPLIES_WIKI_PAGE;
-  
+  // Get configured wiki URL - this is required for saving
+  let configuredUrl = null;
   try {
     const data = await new Promise(resolve => {
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
@@ -831,36 +806,47 @@ async function saveCannedRepliesToWiki(subreddit, config, reason) {
         resolve({});
       }
     });
-    
-    const configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
-    if (configuredUrl) {
-      let path = String(configuredUrl).trim();
-      
-      // Handle full URLs
-      if (path.startsWith('http')) {
-        path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
-      }
-      
-      // Ensure leading slash
-      if (!path.startsWith('/')) {
-        path = '/' + path;
-      }
-      
-      // Remove trailing .json and query strings
-      path = path.replace(/\.json(\?.*)?$/, '').replace(/\/$/, '');
-      
-      // Extract subreddit and page name from path
-      const match = path.match(/^\/r\/([^/]+)\/wiki\/(.+)$/i);
-      if (match) {
-        const configuredSubreddit = match[1];
-        wikiPageName = match[2];
-        wikiPath = `/r/${encodeURIComponent(configuredSubreddit)}/api/wiki/edit`;
-        console.log("[ModBox] Using configured wiki location:", wikiPath, "page:", wikiPageName);
-      }
-    }
+    configuredUrl = data[CANNED_REPLIES_WIKI_URL_KEY] || data.wikiUrl;
   } catch (err) {
-    console.log("[ModBox] Could not read configured wiki URL, using default:", err);
+    console.error("[ModBox] Could not read configured wiki URL:", err);
   }
+
+  if (!configuredUrl) {
+    throw new Error("Canned replies wiki URL must be configured in extension settings to save");
+  }
+
+  let path = String(configuredUrl).trim();
+  
+  // Handle full URLs
+  if (path.startsWith('http')) {
+    path = path.replace(/^https?:\/\/(old\.|www\.)?reddit\.com/, '');
+  }
+  
+  // Ensure leading slash
+  if (!path.startsWith('/')) {
+    path = '/' + path;
+  }
+  
+  // Remove trailing .json and query strings
+  path = path.replace(/\.json(\?.*)?$/, '').replace(/\/$/, '');
+  
+  // Extract subreddit and page name from path
+  const match = path.match(/^\/r\/([^/]+)\/wiki\/(.+)$/i);
+  if (!match) {
+    throw new Error("Configured canned replies URL must be in format: /r/subreddit/wiki/pagename");
+  }
+  
+  const configuredSubreddit = match[1];
+  const wikiPageName = match[2];
+  const wikiPath = `/r/${encodeURIComponent(configuredSubreddit)}/api/wiki/edit`;
+  
+  console.log("[ModBox] Using configured wiki location:", wikiPath, "page:", wikiPageName);
+
+  const normalized = normalizeCannedRepliesDoc(config, configuredSubreddit);
+  console.log("[ModBox] Normalized config:", normalized);
+  
+  const payload = JSON.stringify(normalized, null, 2);
+  console.log("[ModBox] Payload to save:", payload);
   
   const params = new URLSearchParams();
   params.set("content", payload);
@@ -878,7 +864,7 @@ async function saveCannedRepliesToWiki(subreddit, config, reason) {
     throw err;
   }
   
-  setInMemoryCannedReplies(cleanSubreddit, normalized);
+  setInMemoryCannedReplies(configuredSubreddit, normalized);
   console.log("[ModBox] Updated in-memory cache for canned replies");
   return normalized;
 }

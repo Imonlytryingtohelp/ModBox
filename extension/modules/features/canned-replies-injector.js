@@ -10,7 +10,8 @@ let cannedRepliesLoadPromise = null;
 
 function initCannedRepliesInjector() {
   console.log("[ModBox] Initializing canned replies injector");
-  // Injector is now accessed via queue bar button only
+  // Pre-load canned replies in the background for instant display when button is clicked
+  void loadCannedRepliesIfNeeded();
 }
 
 async function loadCannedRepliesIfNeeded() {
@@ -27,28 +28,18 @@ async function loadCannedRepliesIfNeeded() {
   // Load from wiki
   cannedRepliesLoadPromise = (async () => {
     try {
-      // Try to get subreddit from current page
-      let subreddit = parseSubredditFromPath(window.location.pathname);
-      console.log("[ModBox] Canned replies: parsed subreddit =", subreddit);
-      
-      // If no subreddit on page (e.g., modmail), pass empty string
-      // loadCannedRepliesFromWiki will check for configured URL first
-      if (!subreddit) {
-        subreddit = "";
-      }
-      
-      console.log("[ModBox] Loading canned replies from wiki");
-      const config = await loadCannedRepliesFromWiki(subreddit);
+      console.log("[ModBox] Loading canned replies from configured wiki URL");
+      const config = await loadCannedRepliesFromWiki("");
       console.log("[ModBox] Wiki returned config:", config);
       
-      cannedRepliesConfig = normalizeCannedRepliesDoc(config, subreddit);
+      cannedRepliesConfig = normalizeCannedRepliesDoc(config, "");
       console.log("[ModBox] Normalized canned replies config:", cannedRepliesConfig);
       
       return cannedRepliesConfig;
     } catch (err) {
       console.error("[ModBox] Error loading canned replies:", err);
-      const subreddit = parseSubredditFromPath(window.location.pathname);
-      cannedRepliesConfig = buildDefaultCannedRepliesConfig(subreddit || "");
+      // Return empty config when canned replies are not configured
+      cannedRepliesConfig = buildDefaultCannedRepliesConfig("");
       return cannedRepliesConfig;
     }
   })();
@@ -237,16 +228,6 @@ async function openCannedRepliesEditor() {
   const config = await loadCannedRepliesIfNeeded();
   const replies = JSON.parse(JSON.stringify(config?.replies || [])); // Deep copy
   
-  // Get current subreddit from page
-  const currentSubreddit = parseSubredditFromPath(window.location.pathname);
-  const subreddit = currentSubreddit || config?.subreddit || "";
-  console.log("[ModBox] Editor using subreddit:", subreddit);
-  
-  if (!subreddit) {
-    alert('Could not determine subreddit. Make sure you are on a subreddit page.');
-    return;
-  }
-  
   closeCannedRepliesEditorModal();
   
   const overlayRoot = ensureOverlayRoot();
@@ -330,7 +311,6 @@ async function openCannedRepliesEditor() {
     saveBtn.textContent = 'Saving...';
     try {
       console.log("[ModBox] Save button clicked");
-      console.log("[ModBox] Subreddit:", subreddit);
       console.log("[ModBox] Replies to save:", replies);
       
       // Filter out empty replies
@@ -344,16 +324,16 @@ async function openCannedRepliesEditor() {
       console.log("[ModBox] Non-empty replies count:", nonEmptyReplies.length);
       
       // Update the config with modified replies
+      // Note: subreddit will be extracted from configured wiki URL by saveCannedRepliesToWiki()
       const newConfig = {
         schema: config.schema,
         version: config.version,
-        subreddit: subreddit,
         replies: nonEmptyReplies
       };
       
       console.log("[ModBox] Calling saveCannedRepliesToWiki with config:", JSON.stringify(newConfig, null, 2));
       
-      await saveCannedRepliesToWiki(subreddit, newConfig, "Updated canned replies via ModBox Editor");
+      await saveCannedRepliesToWiki("", newConfig, "Updated canned replies via ModBox Editor");
       
       // Clear caches so fresh data is loaded
       cannedRepliesConfig = null;
