@@ -1454,9 +1454,7 @@ function renderRemovalConfigEditor() {
     element.addEventListener("input", applyPlaybookChange);
     element.addEventListener("change", (event) => {
       applyPlaybookChange(event);
-      if (element.tagName === "SELECT" || element.type === "checkbox") {
-        renderRemovalConfigEditor();
-      }
+      // No re-render needed for playbook fields - they only update state values
     });
   });
 
@@ -1701,8 +1699,11 @@ function renderRemovalConfigEditor() {
 
     element.addEventListener("input", applyStepFieldChange);
     element.addEventListener("change", (event) => {
+      const field = String(event.currentTarget.getAttribute("data-pb-step-field") || "");
       applyStepFieldChange(event);
-      if (element.tagName === "SELECT" || element.type === "checkbox") {
+      // Only re-render if the field change affects the UI structure (type or comment_source)
+      // Most other fields just update state values without changing what's displayed
+      if (field === "type" || field === "comment_source") {
         renderRemovalConfigEditor();
       }
     });

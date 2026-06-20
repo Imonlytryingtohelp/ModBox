@@ -249,9 +249,9 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
       `/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`,
       { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
       { 
-        cacheTtlMs: USERNOTES_CACHE_TTL_MS,
+        cacheTtlMs: 0,
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
-        dedupe: true
+        dedupe: false
       }
     );
   } catch (error) {

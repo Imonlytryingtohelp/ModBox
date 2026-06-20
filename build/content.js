@@ -5305,11 +5305,11 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
 
       { 
 
-        cacheTtlMs: USERNOTES_CACHE_TTL_MS,
+        cacheTtlMs: 0,
 
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
 
-        dedupe: true
+        dedupe: false
 
       }
 
@@ -25017,11 +25017,7 @@ function renderRemovalConfigEditor() {
 
       applyPlaybookChange(event);
 
-      if (element.tagName === "SELECT" || element.type === "checkbox") {
-
-        renderRemovalConfigEditor();
-
-      }
+      // No re-render needed for playbook fields - they only update state values
 
     });
 
@@ -25511,9 +25507,15 @@ function renderRemovalConfigEditor() {
 
     element.addEventListener("change", (event) => {
 
+      const field = String(event.currentTarget.getAttribute("data-pb-step-field") || "");
+
       applyStepFieldChange(event);
 
-      if (element.tagName === "SELECT" || element.type === "checkbox") {
+      // Only re-render if the field change affects the UI structure (type or comment_source)
+
+      // Most other fields just update state values without changing what's displayed
+
+      if (field === "type" || field === "comment_source") {
 
         renderRemovalConfigEditor();
 
