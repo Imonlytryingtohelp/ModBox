@@ -2,9 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
-## 1.5.4 (UPCOMING) - Bug Fixes
+## 1.5.4 - Bug Fixes
 
 - Changes to canned replies. Improving load speed and usability. 
+- Disabled caching for wiki loads before writes. Making multiple new notes quickly no longer overwrites previous notes. 
+- Fixed playbook editor modal collapsing when clicking dropdowns
 
 ## 1.5.3 - Removal Reason Dropdown Validation
 
