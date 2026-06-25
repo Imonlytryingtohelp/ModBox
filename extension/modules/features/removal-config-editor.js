@@ -281,10 +281,17 @@ function renderRemovalConfigEditor() {
                         <button type="button" class="rrw-btn rrw-btn-danger" data-qa-delete="${index}">Delete</button>
                       </div>
                     </div>
-                    <label class="rrw-field">
-                      <span>Key</span>
-                      <input type="text" data-qa-index="${index}" data-qa-field="key" value="${escapeHtml(action.key)}" placeholder="Action key" />
-                    </label>
+                    <div class="rrw-config-reason-key-row">
+                      <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                        <input type="checkbox" data-qa-index="${index}" data-qa-field="key_override" ${action.key_override ? "checked" : ""} />
+                        <span>Override action key</span>
+                      </label>
+                      ${action.key_override ? `
+                        <input type="text" data-qa-index="${index}" data-qa-field="key" value="${escapeHtml(action.key)}" placeholder="Action key" />
+                      ` : `
+                        <div class="rrw-config-reason-key-preview">Auto-generated key: <code>${escapeHtml(action.key || slugifyReasonKey(action.title, `action-${index + 1}`))}</code></div>
+                      `}
+                    </div>
                   </div>
                   <div class="rrw-config-grid">
                     <label class="rrw-field">
@@ -720,10 +727,17 @@ function renderRemovalConfigEditor() {
                       </div>
                     </div>
                     ${isPlaybookCollapsed ? "" : `
-                      <label class="rrw-field">
-                        <span>Key</span>
-                        <input type="text" data-pb-index="${index}" data-pb-field="key" value="${escapeHtml(playbook.key)}" placeholder="Playbook key" />
-                      </label>
+                      <div class="rrw-config-reason-key-row">
+                        <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                          <input type="checkbox" data-pb-index="${index}" data-pb-field="key_override" ${playbook.key_override ? "checked" : ""} />
+                          <span>Override playbook key</span>
+                        </label>
+                        ${playbook.key_override ? `
+                          <input type="text" data-pb-index="${index}" data-pb-field="key" value="${escapeHtml(playbook.key)}" placeholder="Playbook key" />
+                        ` : `
+                          <div class="rrw-config-reason-key-preview">Auto-generated key: <code>${escapeHtml(playbook.key || slugifyReasonKey(playbook.title, `playbook-${index + 1}`))}</code></div>
+                        `}
+                      </div>
                     `}
                   </div>
                   ${isPlaybookCollapsed ? "" : `
@@ -968,6 +982,27 @@ function renderRemovalConfigEditor() {
     if (nextQuickActionList instanceof HTMLElement && previousQuickActionListScrollTop > 0) {
       nextQuickActionList.scrollTop = previousQuickActionListScrollTop;
     }
+    if (nextBody instanceof HTMLElement && removalConfigEditorState?.scrollToReasonIndex != null) {
+      const reasonCard = modal.querySelector(`[data-reason-index="${removalConfigEditorState.scrollToReasonIndex}"]`);
+      if (reasonCard instanceof HTMLElement) {
+        reasonCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      removalConfigEditorState.scrollToReasonIndex = null;
+    }
+    if (nextBody instanceof HTMLElement && removalConfigEditorState?.scrollToPlaybookIndex != null) {
+      const playbookCard = modal.querySelector(`[data-pb-index="${removalConfigEditorState.scrollToPlaybookIndex}"]`);
+      if (playbookCard instanceof HTMLElement) {
+        playbookCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      removalConfigEditorState.scrollToPlaybookIndex = null;
+    }
+    if (nextBody instanceof HTMLElement && removalConfigEditorState?.scrollToQuickActionIndex != null) {
+      const actionCard = modal.querySelector(`[data-qa-index="${removalConfigEditorState.scrollToQuickActionIndex}"]`);
+      if (actionCard instanceof HTMLElement) {
+        actionCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      removalConfigEditorState.scrollToQuickActionIndex = null;
+    }
     modal.querySelectorAll("[data-pb-reason-list]").forEach((element) => {
       if (!(element instanceof HTMLElement)) {
         return;
@@ -1003,6 +1038,9 @@ function renderRemovalConfigEditor() {
       removalConfigEditorState.reasonsUserEdited = true;
     }
     addRemovalConfigReason();
+    if (removalConfigEditorState?.config?.reasons) {
+      removalConfigEditorState.scrollToReasonIndex = removalConfigEditorState.config.reasons.length - 1;
+    }
     renderRemovalConfigEditor();
   });
   modal.querySelector("#rrw-config-load-flair")?.addEventListener("click", () => {
@@ -1300,6 +1338,7 @@ function renderRemovalConfigEditor() {
     }
     const newIndex = actions.length;
     actions.push(normalizeQuickAction({}, newIndex));
+    removalConfigEditorState.scrollToQuickActionIndex = newIndex;
     renderRemovalConfigEditor();
   });
 
@@ -1376,7 +1415,7 @@ function renderRemovalConfigEditor() {
       if (!action) {
         return;
       }
-      if (["sticky", "mod_only", "comment_as_subreddit", "lock_post"].includes(field)) {
+      if (["sticky", "mod_only", "comment_as_subreddit", "lock_post", "key_override"].includes(field)) {
         action[field] = Boolean(event.target.checked);
       } else {
         action[field] = String(event.target.value || "");
@@ -1385,7 +1424,7 @@ function renderRemovalConfigEditor() {
     element.addEventListener("input", applyQaChange);
     element.addEventListener("change", (event) => {
       applyQaChange(event);
-      if (element.tagName === "SELECT" || element.type === "checkbox") {
+      if (field === "key_override" || element.tagName === "SELECT" || element.type === "checkbox") {
         renderRemovalConfigEditor();
       }
     });
@@ -1431,6 +1470,7 @@ function renderRemovalConfigEditor() {
     const items = removalConfigEditorState.playbooksConfig.playbooks;
     const newIndex = items.length;
     items.push(normalizePlaybook({}, newIndex));
+    removalConfigEditorState.scrollToPlaybookIndex = newIndex;
     renderRemovalConfigEditor();
   });
 
@@ -1473,7 +1513,7 @@ function renderRemovalConfigEditor() {
       }
 
       removalConfigEditorState.playbooksUserEdited = true;
-      if (["is_enabled", "confirm", "stop_on_error"].includes(field)) {
+      if (["is_enabled", "confirm", "stop_on_error", "key_override"].includes(field)) {
         playbook[field] = Boolean(event.target.checked);
         return;
       }
@@ -1487,7 +1527,11 @@ function renderRemovalConfigEditor() {
     element.addEventListener("input", applyPlaybookChange);
     element.addEventListener("change", (event) => {
       applyPlaybookChange(event);
-      // No re-render needed for playbook fields - they only update state values
+      const field = String(event.currentTarget.getAttribute("data-pb-field") || "");
+      if (field === "key_override") {
+        renderRemovalConfigEditor();
+      }
+      // No re-render needed for other playbook fields - they only update state values
     });
   });
 
