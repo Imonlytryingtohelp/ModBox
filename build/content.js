@@ -11331,7 +11331,7 @@ function injectStyles() {
 
       left: var(--rrw-queuebar-left, auto);
 
-      z-index: 2147483647;
+      z-index: 100;
 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
@@ -15261,7 +15261,7 @@ function injectStyles() {
 
       background: rgba(8, 14, 26, 0.7);
 
-      z-index: 2147483646;
+      z-index: 2147483645;
 
     }
 
@@ -18383,7 +18383,7 @@ function injectStyles() {
 
       top: 10px;
 
-      z-index: 2147482998;
+      z-index: 100;
 
       margin: 8px 14px;
 

@@ -86,7 +86,7 @@ function injectStyles() {
       bottom: 10px;
       right: var(--rrw-queuebar-right, 10px);
       left: var(--rrw-queuebar-left, auto);
-      z-index: 2147483647;
+      z-index: 100;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
     }
 
@@ -2051,7 +2051,7 @@ function injectStyles() {
       position: fixed;
       inset: 0;
       background: rgba(8, 14, 26, 0.7);
-      z-index: 2147483646;
+      z-index: 2147483645;
     }
 
     .rrw-removal-config-modal {
@@ -3612,7 +3612,7 @@ function injectStyles() {
     .rrw-queue-tools {
       position: sticky;
       top: 10px;
-      z-index: 2147482998;
+      z-index: 100;
       margin: 8px 14px;
       padding: 7px 8px;
       border: 1px solid rgba(98, 133, 192, 0.55);
