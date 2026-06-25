@@ -23665,75 +23665,123 @@ function renderRemovalConfigEditor() {
 
           <div class="rrw-preview-panel__header">
 
-            <h3>Runtime options</h3>
+            <h3>General settings</h3>
 
           </div>
 
-          <div class="rrw-config-grid">
+          <div class="rrw-config-subsection">
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+            <h4>ModBox behavior</h4>
 
-              <input type="checkbox" data-ext-setting="auto_close_on_remove" ${extensionSettings.auto_close_on_remove ? "checked" : ""} />
+            <div class="rrw-config-grid">
 
-              <span>Auto-close overlay after successful remove</span>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-            </label>
+                <input type="checkbox" data-ext-setting="auto_close_on_remove" ${extensionSettings.auto_close_on_remove ? "checked" : ""} />
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                <span>Automatically close ModBox after a successful removal</span>
 
-              <input type="checkbox" data-ext-setting="intercept_native_remove" ${extensionSettings.intercept_native_remove !== false ? "checked" : ""} />
+              </label>
 
-              <span>Open ModBox when clicking Reddit native Remove</span>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-            </label>
+                <input type="checkbox" data-ext-setting="intercept_native_remove" ${extensionSettings.intercept_native_remove !== false ? "checked" : ""} />
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                <span>Use ModBox overlay when clicking Reddit's native Remove button</span>
 
-              <input type="checkbox" data-ext-setting="context_popup_enabled" ${extensionSettings.context_popup_enabled !== false ? "checked" : ""} />
+              </label>
 
-              <span>Enable old Reddit context-popup button</span>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-            </label>
+                <input type="checkbox" data-ext-setting="context_popup_enabled" ${extensionSettings.context_popup_enabled !== false ? "checked" : ""} />
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                <span>Show old Reddit context popup button</span>
 
-              <input type="checkbox" data-ext-setting="comment_nuke_ignore_distinguished" ${extensionSettings.comment_nuke_ignore_distinguished ? "checked" : ""} />
+              </label>
 
-              <span>Comment nuke: skip distinguished (mod/admin) comments</span>
+            </div>
 
-            </label>
+          </div>
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-              <input type="checkbox" data-ext-setting="history_button_enabled" ${extensionSettings.history_button_enabled !== false ? "checked" : ""} />
 
-              <span>Show (H)istory button on comments</span>
+          <div class="rrw-config-subsection">
 
-            </label>
+            <h4>Comment tools</h4>
 
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+            <div class="rrw-config-grid">
 
-              <input type="checkbox" data-ext-setting="comment_nuke_button_enabled" ${extensionSettings.comment_nuke_button_enabled !== false ? "checked" : ""} />
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-              <span>Show (R) Comment Nuke button on comments</span>
+                <input type="checkbox" data-ext-setting="history_button_enabled" ${extensionSettings.history_button_enabled !== false ? "checked" : ""} />
 
-            </label>
+                <span>Show history button on comments</span>
 
-            <label class="rrw-field">
+              </label>
 
-              <span>Theme mode</span>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-              <select data-ext-setting="theme_mode">
+                <input type="checkbox" data-ext-setting="comment_nuke_button_enabled" ${extensionSettings.comment_nuke_button_enabled !== false ? "checked" : ""} />
 
-                <option value="auto" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "auto" ? "selected" : ""}>Auto (old Reddit defaults to light)</option>
+                <span>Show comment nuke button on comments</span>
 
-                <option value="light" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "light" ? "selected" : ""}>Light</option>
+              </label>
 
-                <option value="dark" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "dark" ? "selected" : ""}>Dark</option>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
-              </select>
+                <input type="checkbox" data-ext-setting="comment_nuke_ignore_distinguished" ${extensionSettings.comment_nuke_ignore_distinguished ? "checked" : ""} />
 
-            </label>
+                <span>Skip moderator/admin distinguished comments when using Comment Nuke</span>
+
+              </label>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="rrw-config-subsection">
+
+            <h4>Appearance</h4>
+
+            <div class="rrw-config-grid">
+
+              <label class="rrw-field">
+
+                <span>Theme mode</span>
+
+                <select data-ext-setting="theme_mode">
+
+                  <option value="auto" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "auto" ? "selected" : ""}>Auto (use current Reddit theme when available)</option>
+
+                  <option value="light" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "light" ? "selected" : ""}>Light</option>
+
+                  <option value="dark" ${normalizeThemeMode(extensionSettings.theme_mode, "auto") === "dark" ? "selected" : ""}>Dark</option>
+
+                </select>
+
+              </label>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+
+        <section class="rrw-preview-panel rrw-config-section">
+
+          <div class="rrw-preview-panel__header">
+
+            <h3>Queue bar</h3>
+
+          </div>
+
+          <p class="rrw-muted">Queue bar options control the queue portal widget, its position, and where links open.</p>
+
+          <div class="rrw-config-grid rrw-config-grid--queue-bar">
 
             <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
@@ -23742,10 +23790,6 @@ function renderRemovalConfigEditor() {
               <span>Open queue bar links in a new tab</span>
 
             </label>
-
-          </div>
-
-          <div class="rrw-config-grid rrw-config-grid--queue-bar">
 
             <label class="rrw-field">
 
@@ -23785,17 +23829,27 @@ function renderRemovalConfigEditor() {
 
             <label class="rrw-field">
 
-              <span>Open on Reddit link host</span>
+              <span>Target host for queue bar links</span>
 
               <select data-ext-setting="queue_bar_link_host">
 
-                <option value="extension_preference" ${extensionSettings.queue_bar_link_host === "extension_preference" ? "selected" : ""}>Follow extension preference</option>
+                <option value="extension_preference" ${extensionSettings.queue_bar_link_host === "extension_preference" ? "selected" : ""}>Follow current Reddit host</option>
 
                 <option value="old_reddit" ${extensionSettings.queue_bar_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>
 
                 <option value="new_reddit" ${extensionSettings.queue_bar_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
 
               </select>
+
+              <small class="rrw-muted rrw-config-help">When following current Reddit host, this controls whether old Reddit is preferred.</small>
+
+            </label>
+
+            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
+              <input type="checkbox" data-ext-setting="queue_bar_use_old_reddit" ${extensionSettings.queue_bar_use_old_reddit ? "checked" : ""} />
+
+              <span>When following current Reddit host, prefer old.reddit.com</span>
 
             </label>
 
@@ -23810,14 +23864,6 @@ function renderRemovalConfigEditor() {
                 <option value="bottom_left" ${extensionSettings.queue_bar_position === "bottom_left" ? "selected" : ""}>Bottom left</option>
 
               </select>
-
-            </label>
-
-            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
-
-              <input type="checkbox" data-ext-setting="queue_bar_use_old_reddit" ${extensionSettings.queue_bar_use_old_reddit ? "checked" : ""} />
-
-              <span>When using extension preference, open queue links on old.reddit.com</span>
 
             </label>
 

@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## (UNRELEASED) 1.6.0 - QoL Improvements
+
+### Improved
+
+- **Extension settings organization** - Reorganized settings into logical groups:
+  - **General settings** with subsections for ModBox behavior, Comment tools, and Appearance
+  - **Queue bar** section with all queue bar-related options grouped together
+- **Extension settings labels** - Clearer, more direct wording:
+  - "Auto-close overlay after successful remove" → "Automatically close ModBox after a successful removal"
+  - "Open ModBox when clicking Reddit native Remove" → "Use ModBox overlay when clicking Reddit's native Remove button"
+  - "Enable old Reddit context-popup button" → "Show old Reddit context popup button"
+  - "Comment nuke: skip distinguished (mod/admin) comments" → "Skip moderator/admin distinguished comments when using Comment Nuke"
+  - "Show (H)istory button on comments" → "Show history button on comments"
+  - "Show (R) Comment Nuke button on comments" → "Show comment nuke button on comments"
+  - "Open on Reddit link host" → "Target host for queue bar links"
+  - "Auto (old Reddit defaults to light)" → "Auto (use current Reddit theme when available)"
+- **Extension settings help text** - Added clarification for queue bar options:
+  - Fixed subreddit selector only applies when scope is "Specific moderated subreddit"
+  - Queue bar link host and preference behavior explained
+
 ## 1.5.4 - Bug Fixes
 
 - Changes to canned replies. Improving load speed and usability. 
