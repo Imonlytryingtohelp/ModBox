@@ -1,243 +1,344 @@
 ﻿# ModBox
 
-A lightweight, Reddit-native browser extension that brings Toolbox-style moderation tools directly into Reddit.
+**A lightweight, Reddit-native browser extension that brings Toolbox-style moderation tools directly into Reddit.**
 
-**Current release:** `1.5.4`
+![Version](https://img.shields.io/badge/version-1.5.4-blue) ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 ---
 
 ## What is ModBox?
 
-ModBox is a browser extension designed for Reddit moderators who need to action content quickly while staying in context. It works on all major Reddit interfaces (new Reddit, old Reddit, and mod.reddit.com) and provides a comprehensive moderation toolkit directly in the page, inspired by the philosophy and workflows of [Reddit Toolbox](https://www.reddit.com/r/toolbox).
+ModBox is a moderation extension for Reddit that helps you moderate faster **without leaving the page**. It brings tools directly into Reddit's interface, inspired by the legendary [Reddit Toolbox](https://www.reddit.com/r/toolbox) extension.
+
+Whether you're removing spam, banning users, organizing removal reasons, or executing complex multi-step workflows—ModBox keeps everything in context with a clean, modern interface.
+
+**Works on:** www.reddit.com, old.reddit.com, mod.reddit.com, and sh.reddit.com
 
 ---
 
-## Core Features
+## Key Features
 
-### Moderation overlay
-Fast, in-page moderation:
+### 🎯 Quick Moderation Actions
+
+**Quick moderation directly on posts and comments:**
+- **Remove** content with categorized removal reasons
 - **Approve** posts and comments
-- **Remove** with configurable removal reasons
-- **Mark as spam** with optional removal message
-- **Ban/unban** users with duration options (temporary, permanent)
-- **Set flair** on posts
-- **Edit user flair** (apply or remove)
-- **Playbooks** - Multi-step workflows (remove + comment + note, remove + ban + modmail, etc.)
+- **Ban/Unban** users (temporary or permanent)
+- **Spam** content with removal messages
+- **Flair** posts and edit user flair
+- **Add usernotes** while you act (no need to switch tabs)
 
-### Inline moderation pills
-Action buttons next to usernames:
-- **N** - Opens user notes editor (full toolbox compatibility)
-- **H** - Shows user history (account age, karma, top submissions/comments by domain/subreddit)
-- **P** - Opens user profile (overview, submissions, comments tabs)
-- **R** - Comment nuke
-- **ML** - Opens modlog popup showing recent actions on that post/comment
+### 📋 Inline Action Pills
 
-### Queue Tools
-Bulk moderation on queue pages (`modqueue`, `unmoderated`, `reports`):
-- **Multi-select checkboxes** - Select multiple items at once
-- **Bulk actions** - Approve, remove, or mark-as-spam selected items
-- **Filtering** - Filter by post/comment, keyword search
-- **Queue counts** - Persistent caching of queue sizes with background refresh
-- **Context popup** - Quick preview of post/comment context before taking action
+**Quick-access buttons next to usernames:**
+- **N** - Open user notes editor (full Toolbox compatibility)
+- **H** - View user history (account age, karma breakdown, domain/subreddit stats)
+- **P** - Open user profile (overview, posts, comments)
+- **R** - Nuke comment and reply tree (if enabled in settings)
+- **ML** - Show modlog entries for this post/comment
 
-### Wiki configuration
-All moderation settings backed by your subreddit's wiki (no ModBox config needed):
-- **Removal reasons** - Categorized by post/comment type, with suggested usernote types per reason
-- **Quick Actions** - Macro buttons for common workflows (e.g., "Remove + ban AutoMod")
-- **Playbooks** - Complex multi-step workflows with branching, templating, and modmail integration
+### 📦 Queue Management
 
-### Settings & customization
-Browser-based settings panel:
-- **Theme mode** - Auto, Light, or Dark
-- **Comment nuke behavior** - Skip distinguished comments when removing reply trees
-- **Auto-close overlay** - Automatically close after successful actions
+**Powerful bulk moderation tools:**
+- **Batch select** items from your queues
+- **Bulk actions** (approve/remove/spam all selected)
+- **Live queue counts** with background refresh
+- **Context preview** before taking action
+- **Modlog display** showing recent actions on each item
 
----
+### 🔧 Playbooks & Workflows
 
-## How it Works
+**Multi-step automation:**
+- **Playbooks** - Chain actions together (remove + ban + usernote + modmail)
+- **Quick Actions** - Pre-configured buttons for common workflows
+- **Templated messages** - Use variables in removal comments and bans
+- **One-click execution** - Replace multiple clicks with 1
 
-### Architecture
+### ⚙️ Wiki-Powered Configuration
 
-ModBox is built as a **modular content script** with clear separation of concerns:
+**Store all config in your subreddit's wiki (no extra setup):**
+- **Removal reasons** - Categorized, with dropdowns and suggested usernote types
+- **Quick Actions** - Custom macro buttons for your subreddit
+- **Playbooks** - Complex workflows saved to wiki
+- **No ModBox account needed** - Everything is local to your browser
 
-```
-extension/modules/
-├── constants.js          # Version, selectors, configuration defaults
-├── state.js              # Global state management (auth, subreddit, etc.)
-├── utilities.js          # Shared helper functions
-├── services/
-│   ├── reddit-api.js     # Reddit API wrappers (json API, OAuth methods)
-│   └── wiki-loader.js    # Wiki config parsing and caching
-└── features/             # 18 feature modules
-    ├── comment-nuke.js        # Remove comment + reply tree
-    ├── context-popup.js       # Preview popup for queue items
-    ├── core-ui.js             # Native Reddit button interception
-    ├── css-injection.js       # Styling + theme support
-    ├── dom-binding.js         # Attach UI elements to page
-    ├── history-popup.js       # User history modal
-    ├── modlog-popup.js        # User modlog popup
-    ├── modmail.js             # Modmail integration (mark read, etc.)
-    ├── overlay.js             # Core moderation overlay & action dispatch
-    ├── profile-view.js        # User profile modal
-    ├── queue-bar.js           # Queue counts & filters bar
-    ├── queue-tools.js         # Bulk action toolbar
-    ├── removal-config.js      # Removal reason parser
-    ├── removal-config-editor.js  # Settings editor UI
-    ├── theme.js               # Theme detection & switching
-    ├── usernotes.js           # Usernotes editor & parser
-    └── stubs.js               # Placeholder modules
-```
+### 🎨 Modern UI
 
-**Build process:** All modules are bundled into a single `build/content.js` (~686 KB minified)
-
-### Toolbox Influence
-
-ModBox borrows heavily from Toolbox's design philosophy:
-
-1. **Removal reasons wiki config** - Same format as Toolbox, parsed and rendered identically
-2. **Inline pill buttons** - Modeled after Toolbox's N/H/P pills for quick access
-3. **Queue filtering & bulk actions** - Inspired by Toolbox's queue tools usability patterns
-4. **Usernotes** - Full support for Toolbox's usernotes format (read/write)
-5. **User history** - Renders domain/subreddit statistics like Toolbox's user-history popup
-
-However, ModBox also offers:
-- **Modern UI** - Responsive design, dark/light theme support, smooth animations
-- **Playbooks** - Multi-step workflows similar to Toolbox's "mod actions" chains
-- **In-action notes** - Add a note as you remove, ban, etc. 
-- **Shreddit compatibility** - Work in progress, currently functional from pill buttons. 
----
-
-## Supported Platforms
-
-- **www.reddit.com** (Reddit)
-- **old.reddit.com** (classic Reddit)
-- **mod.reddit.com** (mod pages)
-- **sh.reddit.com** (Shreddit)
+- **Dark/Light theme** support with auto-detection
+- **Responsive design** that works everywhere
+- **Smooth animations** and instant feedback
+- **Toast notifications** for action status
+- **Theme options** for removal reason editor, modlog colors, and more
 
 ---
 
 ## Installation
 
-### Chrome
+### Chrome / Edge / Brave
 
-1. Download the latest .zip file from the [release page](https://github.com/Imonlytryingtohelp/ModBox/releases)
-2. Extract the zip file. 
-3. Open `chrome://extensions` (or `edge://extensions`)
-4. Enable **Developer mode** (top right)
-5. Click **Load unpacked**
-6. Select the folder you extracted earlier.
-7. Open any Reddit page and verify ModBox controls appear on posts/comments in sub's you moderate.
+**Please note: I recommend running on Chrome for now**
 
+1. Download the latest `.zip` file from [Releases](https://github.com/Imonlytryingtohelp/ModBox/releases)
+2. Extract the zip file to a folder
+3. Go to `chrome://extensions` (or `edge://extensions` / `brave://extensions`)
+4. Turn on **Developer mode** (top right toggle)
+5. Click **Load unpacked** and select the extracted folder
+6. ✅ Done! Look for ModBox buttons on any moderated subreddit
+
+---
 
 ## Quick Start
 
-1. **Navigate to Reddit** (www.reddit.com, old.reddit.com, or mod.reddit.com/r/yoursubreddit) *Works best on old.reddit*
-2. **Open a moderated community** (one where you're a moderator)
-3. Look for **ModBox action buttons** in the post/comment area
-4. Click any button to open the moderation overlay
+### 1️⃣ Find ModBox on a Post or Comment
 
-### Common Workflows
+Navigate to a subreddit you moderate on old.reddit.com (works best there). You'll see a **MOD ACTIONS** button appear.
 
-**Remove Content:**
-1. Click the **Mod Actions** button on any post or comment
-2. Choose a removal reason from the dropdown
-3. Optionally set a **usernote** to record the action
-4. Click **Remove** → Post gets a **red border** ✓
+### 2️⃣ Common Actions
 
+**Remove with a reason:**
+1. Click **MOD ACTIONS**
+2. Select a removal reason from the dropdown
+3. (Optional) Add a usernote
+4. Click **Remove** ✓
 
-**Bulk Moderation (Queue):**
-1. Navigate to `/r/yoursubreddit/about/modqueue` (or unmoderated/reports)
-2. A **queue bar** appears with counts, filters, and search
-3. Select items and click **Approve**, **Remove**, or **Spam** ✓
+**Bulk moderate a queue:**
+1. Go to `/r/yoursubreddit/about/modqueue`
+2. Use the ModBox queue bar to filter and select items
+3. Click **Approve**, **Remove**, or **Spam** ✓
 
-**View User History:**
-1. Enable History Button in settings.
-1. Click **H** next to a username
-2. Popup shows account age, karma, top domains/subreddits
+**Check user history:**
+1. Click the **H** pill next to a username
+2. See account age, karma, top domains/subreddits ✓
 
-**Edit User Notes:**
-1. Click **N** next to a username
-2. Add/edit/remove notes (Toolbox-compatible format)
+**Add a user note:**
+1. Click the **N** pill next to a username
+2. Manage all notes on that user (Toolbox format) ✓
 
 ---
 
 ## Configuration
 
-### Wiki Setup (Optional)
+### Setting Up Wiki Config (Optional)
 
-ModBox can pull all moderation config from your subreddit's wiki. Create these pages (on old.reddit.com) if you want custom config:
+For custom removal reasons, quick actions, and playbooks, create these pages in your subreddit's wiki:
 
-- **Removal reasons** - `wiki/modbox_removal_config`
-- **Quick actions** - `wiki/modbox_quick_actions`
-- **Playbooks** - `wiki/modbox_playbooks`
+- `wiki/modbox_removal_config` - Your removal reasons (Toolbox format)
+- `wiki/modbox_quick_actions` - Custom quick action buttons
+- `wiki/modbox_playbooks` - Multi-step workflows
 
-If these pages don't exist, ModBox works with basic remove/approve actions.
+**If you don't create these pages, ModBox works fine with basic actions.**
 
+### Editing Settings
 
-### Extension Settings
+1. Open any moderated subreddit
+2. Click the **ModBox Queue Box** (bottom right)
+3. Click the **gear icon** (⚙️)
+4. Edit theme, notification settings, queue bar position, etc.
+5. Click **Save Changes**
 
-1. Open ModQueue Box on any moderated subreddit (Bottom right)
-2. Click the **gear icon** (⚙) 
-3. Click "Extension Settings"
-4. Make necessary changes 
-5. Save Changes
-
----
-
-## Development
-
-### Debugging
-
-1. Open DevTools on any Reddit page (F12)
-2. Look for `[ModBox]` console messages
-3. Check **Storage** tab for cached config/state
+See [mod_wiki.md](mod_wiki.md) for detailed configuration guides.
 
 ---
 
-## Changelog
+## How It Works
 
-See [CHANGELOG.md](CHANGELOG.md) for a complete history of releases and features.
+### Architecture
+
+ModBox is built as a modular content script. Each feature is independent and clearly organized:
+
+```
+extension/modules/
+├── services/               # API wrappers & utilities
+│   ├── reddit-api.js       # Reddit API integration
+│   └── wiki-loader.js      # Wiki config parsing
+├── features/               # 24 feature modules
+│   ├── overlay.js          # Core moderation panel
+│   ├── queue-tools.js      # Bulk moderation
+│   ├── removal-config.js   # Removal reason logic
+│   ├── usernotes.js        # Usernotes (Toolbox format)
+│   ├── history-popup.js    # User history modal
+│   ├── playbooks.js        # Multi-step workflows
+│   └── ...17 more features
+└── constants.js, state.js, utilities.js
+```
+
+All modules are bundled into `build/content.js` (~686 KB).
+
+### Toolbox Compatibility
+
+ModBox is **compatible with Toolbox** for:
+- ✅ Removal reason format and parsing
+- ✅ Usernotes (read and write)
+- ✅ Inline pill buttons (N/H/P/R/ML)
+- ✅ User history statistics
+
+But ModBox adds:
+- 🆕 Modern responsive UI
+- 🆕 Playbooks for automation
+- 🆕 Wiki-based configuration  
+- 🆕 In-action usernotes (add notes while removing)
+- 🆕 Queue modlog display
+- 🆕 Canned replies for quick responses
+
+---
+
+## Features in Detail
+
+### Moderation Overlay
+
+The main panel that appears when you click **MOD ACTIONS**:
+
+**Post/Comment Actions Tab:**
+- Remove with categorized reasons
+- Set removal reason dropdowns
+- Approve without removal
+- Mark as spam
+- Auto-select removal reason categories (for posts vs comments)
+
+**User Actions Tab:**
+- Ban users (temporary or permanent)
+- Ban message with templating (auto-includes post/comment link)
+- Unban users
+- Set/edit user flair
+
+**Quick Actions Tab:**
+- Pre-configured buttons for common tasks
+- Customizable via wiki configuration
+
+**Playbooks Tab:**
+- Complex workflows in one click
+- Chain removal → ban → modmail → usernote
+- Add optional confirmation prompts
+- Edit/add new playbooks in settings
+
+**Settings Tab:**
+- Theme (auto/light/dark)
+- Auto-close after successful action
+- Comment nuke settings
+- Notifications and queue display options
+
+### Queue Management
+
+**Queue bar** appears on modqueue, unmoderated, and reports:
+- Filter by post/comment type
+- Search by keyword
+- Bulk select checkboxes for multiple items
+- Bulk action buttons (Approve All, Remove All, Spam All)
+- Context preview before taking action
+- Displays last 2 modlog entries under each item
+
+### Inline Pills
+
+Appear next to every username:
+
+| Pill | Action |
+|------|--------|
+| **N** | Edit user notes (Toolbox format) |
+| **H** | Show user history & stats |
+| **P** | Open user profile modal |
+| **R** | Remove comment + reply tree (nuke) |
+| **ML** | Show recent modlog actions |
+
+*(Can be toggled on/off in settings)*
+
+### Usernotes
+
+**Full Toolbox compatibility:**
+- View all notes on a user
+- Add color-coded notes with types (ban, warning, etc.)
+- Delete notes
+- Edit note types
+* Reddit native modnotes support (read-only)
+
+### Canned Replies
+
+Quick-access buttons for common messages:
+- Store templates in wiki
+- One-click copy to clipboard
+- Available in modmail and comments
+- Mod-specific (not shared between moderators)
+
+---
+
+## Supported Platforms
+
+| Platform | Support |
+|----------|---------|
+| www.reddit.com | ✅ Full |
+| old.reddit.com | ✅ Full (recommended) |
+| mod.reddit.com | ✅ Full |
+| sh.reddit.com | ✅ Pills only (work in progress) |
+| Mobile | ❌ Not supported |
 
 ---
 
 ## Troubleshooting
 
-**ModBox controls don't appear:**
-- Confirm your account moderates the current subreddit
-- Reload the extension and refresh the Reddit page
-- Check you're on a supported site (www.reddit.com, old.reddit.com, sh.reddit.com)
+| Problem | Solution |
+|---------|----------|
+| ModBox buttons don't appear | 1. Confirm you're a moderator 2. Refresh the page 3. Check supported platform |
+| Queue shows no items | Switch between queue tabs to refresh |
+| Usernotes seem outdated | Reopen the notes editor to refresh |
+| Config isn't loading | Check wiki page name: `modbox_removal_config`, `modbox_quick_actions`, `modbox_playbooks` |
+| Extension won't install | Enable Developer Mode in `chrome://extensions` |
 
-**Queue appears empty or stale:**
-- Switch between queue tabs to refresh
-- Verify the subreddit actually has items
-
-**Usernotes/modlog seem outdated:**
-- Reopen the overlay/popup to refresh
-- Confirm moderator permissions
+For more help, check the [mod_wiki.md](mod_wiki.md) guide.
 
 ---
 
-## License
+## Guides
 
-MIT License - See [LICENSE](LICENSE)
-
----
-
-## Acknowledgments
-
-ModBox is inspired by [Reddit Toolbox](https://www.reddit.com/r/toolbox), the legendary browser extension that set the standard for Reddit moderation tools. ModBox aims to preserve Toolbox's usability while providing a modern alternative.
-
-Special thanks to the Toolbox team and community.
+- **[Moderator Guide](mod_wiki.md)** - Detailed walkthrough of all features
+- **[Changelog](CHANGELOG.md)** - Release history and updates
+- **[GitHub](https://github.com/Imonlytryingtohelp/ModBox)** - Source code and issue tracking
 
 ---
 
 ## Permissions
 
-The extension requests:
-- `storage` - Save extension settings and cache
-- `cookies` - Read auth information for Reddit integration
-- Host access to Reddit domains for moderation and OAuth flows
+ModBox requests minimal permissions:
 
-See `build/manifest.json` for full details.
+- **`storage`** - Save your settings locally
+- **`cookies`** - Read Reddit authentication
+- **`host_permissions`** - Access Reddit domains for moderation
+
+No data is sent to external servers. Everything runs locally in your browser.
+
+---
+
+## Development
+
+### For Developers
+
+- **Source:** `extension/modules/` (modular architecture)
+- **Build:** `scripts/build-content.ps1` (PowerShell)
+- **Testing:** Load unpacked from `build/` folder
+- **Releases:** `scripts/create-release.ps1` (generates .crx and .zip)
+
+See the [extension directory](extension/) for architecture details.
+
+### Debugging
+
+1. Open DevTools on Reddit (F12)
+2. Look for `[ModBox]` console messages
+3. Check DevTools **Storage** > **Local Storage** for state
+
+---
+
+## License
+
+**Apache License 2.0** - Use, modify, and distribute freely, but you must provide attribution to the original project.
+
+---
+
+## Credits
+
+**ModBox** is inspired by and built with respect for [Reddit Toolbox](https://www.reddit.com/r/toolbox), the gold standard of Reddit moderation tools.
+
+ModBox aims to preserve Toolbox's philosophy (fast, in-context moderation) while offering a modern UI and new features like playbooks.
+
+**Special thanks to:**
+- The Toolbox team for setting the standard
+- All moderators using ModBox to keep Reddit clean
 
 
