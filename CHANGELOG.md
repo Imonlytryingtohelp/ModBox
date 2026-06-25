@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 - **Extension settings labels** - Clearer, more direct wording.
 - **Extension settings help text** - Added clarification for queue bar options.
 - **Settings modal layering** - Fixed queue bar z-index so the Extension Settings screen and reddit chat display on top.
+- **Removal reason editor** - Hidden the internal reason key field behind an override toggle so users only see it when needed.
 
 
 ## 1.5.4 - Bug Fixes

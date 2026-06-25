@@ -2240,6 +2240,26 @@ function injectStyles() {
       gap: 8px;
     }
 
+    .rrw-config-reason-key-row {
+      display: grid;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .rrw-config-reason-key-preview {
+      margin: 0;
+      color: var(--rrw-muted);
+      font-size: 0.9rem;
+      padding-left: 14px;
+    }
+
+    .rrw-config-reason-key-preview code {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
     .rrw-config-reason-title-row {
       display: grid;
       gap: 8px;

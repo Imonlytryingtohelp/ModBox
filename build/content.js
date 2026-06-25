@@ -15639,6 +15639,46 @@ function injectStyles() {
 
 
 
+    .rrw-config-reason-key-row {
+
+      display: grid;
+
+      gap: 8px;
+
+      align-items: center;
+
+    }
+
+
+
+    .rrw-config-reason-key-preview {
+
+      margin: 0;
+
+      color: var(--rrw-muted);
+
+      font-size: 0.9rem;
+
+      padding-left: 14px;
+
+    }
+
+
+
+    .rrw-config-reason-key-preview code {
+
+      background: rgba(255, 255, 255, 0.08);
+
+      border-radius: 5px;
+
+      padding: 2px 6px;
+
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+
+    }
+
+
+
     .rrw-config-reason-title-row {
 
       display: grid;
@@ -20667,6 +20707,8 @@ function addRemovalConfigReason() {
 
     config.reasons.push({
 
+      external_key_override: false,
+
       external_key: nextRemovalReasonKey(existingKeys, "New reason"),
 
       title: "New reason",
@@ -22265,7 +22307,27 @@ function renderRemovalConfigEditor() {
 
           </div>
 
-          <input type="text" data-reason-index="${index}" data-reason-field="external_key" value="${escapeHtml(reason.external_key)}" placeholder="Reason key" />
+          <div class="rrw-config-reason-key-row">
+
+            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
+              <input type="checkbox" data-reason-index="${index}" data-reason-field="external_key_override" ${reason.external_key_override ? "checked" : ""} />
+
+              <span>Override reason key</span>
+
+            </label>
+
+            ${reason.external_key_override ? `
+
+              <input type="text" data-reason-index="${index}" data-reason-field="external_key" value="${escapeHtml(reason.external_key)}" placeholder="Reason key" />
+
+            ` : `
+
+              <div class="rrw-config-reason-key-preview">Auto-generated key: <code>${escapeHtml(reason.external_key || slugifyReasonKey(reason.title, "new-reason"))}</code></div>
+
+            `}
+
+          </div>
 
         </div>
 
@@ -24477,7 +24539,7 @@ function renderRemovalConfigEditor() {
 
         }
 
-        if (["is_enabled", "sticky_comment", "lock_post"].includes(field)) {
+        if (["is_enabled", "sticky_comment", "lock_post", "external_key_override"].includes(field)) {
 
           reason[field] = Boolean(event.target.checked);
 

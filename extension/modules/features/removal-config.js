@@ -210,6 +210,7 @@ function addRemovalConfigReason() {
       ? Math.max(...config.reasons.map((reason) => Number(reason.position || 0))) + 10
       : 10;
     config.reasons.push({
+      external_key_override: false,
       external_key: nextRemovalReasonKey(existingKeys, "New reason"),
       title: "New reason",
       is_enabled: true,

@@ -78,7 +78,17 @@ function renderRemovalConfigEditor() {
             <button type="button" class="rrw-btn rrw-btn-secondary" data-reason-move="down" data-reason-index="${index}" ${index === config.reasons.length - 1 ? "disabled" : ""}>Down</button>
             <button type="button" class="rrw-btn rrw-btn-danger" data-reason-delete="${index}">Delete</button>
           </div>
-          <input type="text" data-reason-index="${index}" data-reason-field="external_key" value="${escapeHtml(reason.external_key)}" placeholder="Reason key" />
+          <div class="rrw-config-reason-key-row">
+            <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+              <input type="checkbox" data-reason-index="${index}" data-reason-field="external_key_override" ${reason.external_key_override ? "checked" : ""} />
+              <span>Override reason key</span>
+            </label>
+            ${reason.external_key_override ? `
+              <input type="text" data-reason-index="${index}" data-reason-field="external_key" value="${escapeHtml(reason.external_key)}" placeholder="Reason key" />
+            ` : `
+              <div class="rrw-config-reason-key-preview">Auto-generated key: <code>${escapeHtml(reason.external_key || slugifyReasonKey(reason.title, "new-reason"))}</code></div>
+            `}
+          </div>
         </div>
 
         <div class="rrw-config-grid">
@@ -1184,7 +1194,7 @@ function renderRemovalConfigEditor() {
         if (!reason) {
           return;
         }
-        if (["is_enabled", "sticky_comment", "lock_post"].includes(field)) {
+        if (["is_enabled", "sticky_comment", "lock_post", "external_key_override"].includes(field)) {
           reason[field] = Boolean(event.target.checked);
           return;
         }
