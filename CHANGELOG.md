@@ -10,7 +10,8 @@ All notable changes to this project are documented in this file.
 - **Extension settings labels** - Clearer, more direct wording.
 - **Extension settings help text** - Added clarification for queue bar options.
 - **Settings modal layering** - Fixed queue bar z-index so the Extension Settings screen and reddit chat display on top.
-- **Auto Scroll and Auto Keys** - Hidden the internal reason key field behind an override toggle so users only see it when needed. Auto scroll page to new item when adding removal reasons, quick actions or playbooks.
+- **Auto scroll and auto keys** - Hidden the internal reason key field behind an override toggle so users only see it when needed. Auto scroll page to new item when adding removal reasons, quick actions or playbooks.
+- **Repo tidying** - Removed redundant fils and streamlined release process. 
 
 
 ## 1.5.4 - Bug Fixes
