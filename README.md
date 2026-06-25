@@ -2,7 +2,7 @@
 
 A lightweight, Reddit-native browser extension that brings Toolbox-style moderation tools directly into Reddit.
 
-**Current release:** `1.4.2`
+**Current release:** `1.5.4`
 
 ---
 
