@@ -391,6 +391,8 @@ function renderOverlay() {
     : matchingReasons;
 
   const selectedReasonSet = new Set(selectedReasonKeys || []);
+  const hasSelectedReasons = selectedReasonSet.size > 0;
+  const mustSelectReason = !overlayState.skipRedditRemove && matchingReasons.length > 0;
   const reasonChecklist = visibleReasons
     .map(
       (r) => `
@@ -494,6 +496,9 @@ function renderOverlay() {
   const hasIncompleteDropdowns = incompleteDropdowns.length > 0;
   const incompleteDropdownsMessage = hasIncompleteDropdowns
     ? `Please select a value for: ${incompleteDropdowns.map((b) => b.label || b.key).join(", ")}`
+    : "";
+  const missingReasonMessage = mustSelectReason && !hasSelectedReasons
+    ? "Pick at least one removal reason, or click 'Remove without reason'."
     : "";
 
   const actionsTabLabel = thingType === "submission" ? "Post Actions" : "Comment Actions";
@@ -669,13 +674,14 @@ function renderOverlay() {
             </section>
 
             <div class="rrw-sticky-footer">
-              ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
+                ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
+                ${missingReasonMessage ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(missingReasonMessage)}</p>` : ""}
               <div class="rrw-actions">
                 ${thingType === "comment" ? `<button type="button" class="rrw-btn rrw-btn-danger" id="rrw-comment-nuke" ${submitting || !canAct ? "disabled" : ""}>Nuke Thread</button>` : ""}
                 ${overlayState.skipRedditRemove ? "" : `<button type="button" class="rrw-btn rrw-btn-secondary" id="rrw-approve" ${submitting || !canAct ? "disabled" : ""}>Approve</button>`}
                 ${overlayState.skipRedditRemove ? "" : `<button type="button" class="rrw-btn rrw-btn-danger" id="rrw-spam" ${submitting || !canAct ? "disabled" : ""}>Spam</button>`}
                 ${overlayState.skipRedditRemove ? "" : `<button type="button" class="rrw-btn rrw-btn-secondary" id="rrw-remove-no-reason" ${submitting || !canAct ? "disabled" : ""}>Remove (No reason)</button>`}
-                <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-remove" ${submitting || !canAct || hasIncompleteDropdowns ? "disabled" : ""}>${overlayState.skipRedditRemove ? "Send reason" : "Remove"}</button>
+                <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-remove" ${ (submitting || !canAct || hasIncompleteDropdowns || (mustSelectReason && !hasSelectedReasons)) ? "disabled" : "" }>${overlayState.skipRedditRemove ? "Send reason" : "Remove"}</button>
               </div>
 
               <div class="rrw-footer-links">

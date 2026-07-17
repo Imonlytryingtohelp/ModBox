@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## (UNRELEASED) 1.6.0 - QoL Improvements
+## 1.6.0 - QoL Improvements
 
 ### Improved
 
