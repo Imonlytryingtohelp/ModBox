@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## 1.7.0 - Repost Checker + Bug Fixes
+
+- Prevented users clicking "remove" when no reason is selected in removal reasons GUI. 
+- Added `RC` (Repost Checker) pill: shows a user's recent submissions in the subreddit and highlights possible reposts. The pill preloads data in the background on page load so it updates colour state without clicking.
+
 
 ## 1.6.0 - QoL Improvements
 

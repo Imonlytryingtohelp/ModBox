@@ -547,6 +547,7 @@ async function applyExtensionSettingsToRuntime(settings) {
   contextPopupFeatureEnabled = Boolean(settings.context_popup_enabled);
   commentNukeIgnoreDistinguished = Boolean(settings.comment_nuke_ignore_distinguished);
   historyButtonEnabled = typeof settings.history_button_enabled === "boolean" ? settings.history_button_enabled : false;
+  repostCheckerButtonEnabled = typeof settings.repost_checker_button_enabled === "boolean" ? settings.repost_checker_button_enabled : false;
   commentNukeButtonEnabled = typeof settings.comment_nuke_button_enabled === "boolean" ? settings.comment_nuke_button_enabled : false;
   currentThemeMode = normalizeThemeMode(settings.theme_mode, currentThemeMode);
   applyThemeToDocument();
@@ -575,7 +576,7 @@ async function openRemovalConfigEditor(context) {
       AUTO_CLOSE_KEY, INTERCEPT_NATIVE_REMOVE_KEY, CONTEXT_POPUP_ENABLED_KEY,
       QUEUE_BAR_SCOPE_KEY, QUEUE_BAR_FIXED_SUBREDDIT_KEY, QUEUE_BAR_LINK_HOST_KEY,
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
-      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
+      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, REPOST_CHECKER_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
     ]).catch(() => ({})),
     Promise.resolve(null), // getExtensionSettingsWikiPagePreference stub
   ]);
@@ -605,6 +606,7 @@ async function openRemovalConfigEditor(context) {
       queue_bar_open_in_new_tab: typeof stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
       comment_nuke_ignore_distinguished: typeof stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] === "boolean" ? stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] : false,
       history_button_enabled: typeof stored[HISTORY_BUTTON_ENABLED_KEY] === "boolean" ? stored[HISTORY_BUTTON_ENABLED_KEY] : false,
+      repost_checker_button_enabled: typeof stored[REPOST_CHECKER_BUTTON_ENABLED_KEY] === "boolean" ? stored[REPOST_CHECKER_BUTTON_ENABLED_KEY] : false,
       comment_nuke_button_enabled: typeof stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] === "boolean" ? stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] : false,
       canned_replies_wiki_url: String(stored[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
     },

@@ -41,6 +41,7 @@ function start() {
   void loadThemePreference();
   void loadCommentNukeIgnoreDistinguishedPreference();
   void loadHistoryButtonPreference();
+  void loadRepostCheckerButtonPreference();
   void loadCommentNukeButtonPreference();
   void loadContextPopupPosition();
   // Initialize canned replies injector to add buttons to reply forms
@@ -88,6 +89,7 @@ function start() {
           changes?.[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] ||
           changes?.[QUEUE_BAR_POSITION_KEY] ||
           changes?.[CONTEXT_POPUP_ENABLED_KEY] ||
+          changes?.[REPOST_CHECKER_BUTTON_ENABLED_KEY] ||
           changes?.[THEME_MODE_KEY] ||
           changes?.buttonVisibilityScope
         ) {
@@ -108,6 +110,12 @@ function start() {
             } else {
               bindOldRedditContextPopupLinks();
             }
+          }
+          if (changes?.[REPOST_CHECKER_BUTTON_ENABLED_KEY]) {
+            const nextValue = changes[REPOST_CHECKER_BUTTON_ENABLED_KEY].newValue;
+            repostCheckerButtonEnabled = typeof nextValue === "boolean" ? nextValue : false;
+            // Re-scan visible containers to add/remove the pill
+            scheduleVisibleContainerBind({ fullScan: true });
           }
 
           if (changes?.[THEME_MODE_KEY]) {

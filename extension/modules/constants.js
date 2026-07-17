@@ -20,6 +20,7 @@ const AUTO_CLOSE_KEY = "autoCloseOnRemove";
 const INTERCEPT_NATIVE_REMOVE_KEY = "interceptNativeRemove";
 const CONTEXT_POPUP_ENABLED_KEY = "contextPopupEnabled";
 const HISTORY_BUTTON_ENABLED_KEY = "historyButtonEnabled";
+const REPOST_CHECKER_BUTTON_ENABLED_KEY = "repostCheckerButtonEnabled";
 const COMMENT_NUKE_BUTTON_ENABLED_KEY = "commentNukeButtonEnabled";
 const QUEUE_BAR_ENABLED_KEY = "queueBarEnabled";
 const QUEUE_BAR_SCOPE_KEY = "queueBarScope";

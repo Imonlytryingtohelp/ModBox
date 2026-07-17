@@ -995,23 +995,60 @@ function injectStyles() {
       text-overflow: ellipsis;
     }
 
-    .rrw-note-type-pill--compact {
-      font-size: 0.62rem;
-      padding: 1px 4px;
-      border-radius: 4px;
-      line-height: 1;
-      max-width: 88px;
-      flex: 0 0 auto;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
+    .rrw-repost-pill {
+      margin: 0;
+      min-width: 18px;
+      justify-content: center;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      border-color: #8a6d2c;
+      background: linear-gradient(180deg, #6b4f1f 0%, #4f3714 100%);
+      color: #fff8e6;
     }
 
-    .rrw-usernotes-backdrop {
+    .rrw-repost-pill.rrw-repost-pill--warning {
+      border-color: #d9822b !important;
+      background: linear-gradient(180deg, #ffcf80 0%, #ffb347 100%) !important;
+      color: #2b2008 !important;
+    }
+
+    .rrw-repost-pill.rrw-repost-pill--available {
+      border-color: #2b6cb0 !important;
+      background: linear-gradient(180deg, #60a5fa 0%, #1e90ff 100%) !important;
+      color: #ffffff !important;
+    }
+
+    #rrw-repost-checker-root {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.62);
-      z-index: 2147483646;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2147483647;
+      pointer-events: auto;
+      font-family: var(--rrw-font-family);
     }
+
+    .rrw-repost-checker-popup {
+      position: relative;
+      width: min(760px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--rrw-border);
+      background: var(--rrw-modal-bg);
+      color: var(--rrw-text);
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+      z-index: 2147483647;
+      padding: 0;
+      font-family: var(--rrw-font-family);
+    }
+
+    .rrw-repost-body { padding: 12px 14px 14px; }
+
+    .rrw-repost-table { width: 100%; border-collapse: collapse; }
+    .rrw-repost-table th, .rrw-repost-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rrw-soft-border); }
+    .rrw-repost-row--match td { background: rgba(255,190,80,0.12); }
 
     .rrw-usernotes-modal {
       position: fixed;

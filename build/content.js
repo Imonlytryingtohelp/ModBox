@@ -47,6 +47,8 @@ const CONTEXT_POPUP_ENABLED_KEY = "contextPopupEnabled";
 
 const HISTORY_BUTTON_ENABLED_KEY = "historyButtonEnabled";
 
+const REPOST_CHECKER_BUTTON_ENABLED_KEY = "repostCheckerButtonEnabled";
+
 const COMMENT_NUKE_BUTTON_ENABLED_KEY = "commentNukeButtonEnabled";
 
 const QUEUE_BAR_ENABLED_KEY = "queueBarEnabled";
@@ -298,6 +300,8 @@ let preferredRedditLinkHost = "extension_preference";
 let historyButtonEnabled = false;
 
 let commentNukeButtonEnabled = false;
+
+let repostCheckerButtonEnabled = false;
 
 
 
@@ -7693,6 +7697,28 @@ async function loadHistoryButtonPreference() {
 
 
 
+async function loadRepostCheckerButtonPreference() {
+
+  try {
+
+    const stored = await ext.storage.sync.get([REPOST_CHECKER_BUTTON_ENABLED_KEY]);
+
+    repostCheckerButtonEnabled = typeof stored?.[REPOST_CHECKER_BUTTON_ENABLED_KEY] === "boolean"
+
+      ? stored[REPOST_CHECKER_BUTTON_ENABLED_KEY]
+
+      : false;
+
+  } catch {
+
+    repostCheckerButtonEnabled = false;
+
+  }
+
+}
+
+
+
 async function loadCommentNukeButtonPreference() {
 
   try {
@@ -13149,39 +13175,113 @@ function injectStyles() {
 
 
 
-    .rrw-note-type-pill--compact {
+    .rrw-repost-pill {
 
-      font-size: 0.62rem;
+      margin: 0;
 
-      padding: 1px 4px;
+      min-width: 18px;
 
-      border-radius: 4px;
+      justify-content: center;
 
-      line-height: 1;
+      font-weight: 700;
 
-      max-width: 88px;
+      letter-spacing: 0.01em;
 
-      flex: 0 0 auto;
+      border-color: #8a6d2c;
 
-      text-transform: uppercase;
+      background: linear-gradient(180deg, #6b4f1f 0%, #4f3714 100%);
 
-      letter-spacing: 0.02em;
+      color: #fff8e6;
 
     }
 
 
 
-    .rrw-usernotes-backdrop {
+    .rrw-repost-pill.rrw-repost-pill--warning {
+
+      border-color: #d9822b !important;
+
+      background: linear-gradient(180deg, #ffcf80 0%, #ffb347 100%) !important;
+
+      color: #2b2008 !important;
+
+    }
+
+
+
+    .rrw-repost-pill.rrw-repost-pill--available {
+
+      border-color: #2b6cb0 !important;
+
+      background: linear-gradient(180deg, #60a5fa 0%, #1e90ff 100%) !important;
+
+      color: #ffffff !important;
+
+    }
+
+
+
+    #rrw-repost-checker-root {
 
       position: fixed;
 
       inset: 0;
 
-      background: rgba(15, 23, 42, 0.62);
+      display: flex;
 
-      z-index: 2147483646;
+      align-items: center;
+
+      justify-content: center;
+
+      z-index: 2147483647;
+
+      pointer-events: auto;
+
+      font-family: var(--rrw-font-family);
 
     }
+
+
+
+    .rrw-repost-checker-popup {
+
+      position: relative;
+
+      width: min(760px, calc(100vw - 24px));
+
+      max-height: calc(100vh - 24px);
+
+      overflow: auto;
+
+      border-radius: 12px;
+
+      border: 1px solid var(--rrw-border);
+
+      background: var(--rrw-modal-bg);
+
+      color: var(--rrw-text);
+
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+
+      z-index: 2147483647;
+
+      padding: 0;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-repost-body { padding: 12px 14px 14px; }
+
+
+
+    .rrw-repost-table { width: 100%; border-collapse: collapse; }
+
+    .rrw-repost-table th, .rrw-repost-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rrw-soft-border); }
+
+    .rrw-repost-row--match td { background: rgba(255,190,80,0.12); }
 
 
 
@@ -21381,6 +21481,8 @@ async function applyExtensionSettingsToRuntime(settings) {
 
   historyButtonEnabled = typeof settings.history_button_enabled === "boolean" ? settings.history_button_enabled : false;
 
+  repostCheckerButtonEnabled = typeof settings.repost_checker_button_enabled === "boolean" ? settings.repost_checker_button_enabled : false;
+
   commentNukeButtonEnabled = typeof settings.comment_nuke_button_enabled === "boolean" ? settings.comment_nuke_button_enabled : false;
 
   currentThemeMode = normalizeThemeMode(settings.theme_mode, currentThemeMode);
@@ -21437,7 +21539,7 @@ async function openRemovalConfigEditor(context) {
 
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
 
-      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
+      COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, REPOST_CHECKER_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
 
     ]).catch(() => ({})),
 
@@ -21496,6 +21598,8 @@ async function openRemovalConfigEditor(context) {
       comment_nuke_ignore_distinguished: typeof stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] === "boolean" ? stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] : false,
 
       history_button_enabled: typeof stored[HISTORY_BUTTON_ENABLED_KEY] === "boolean" ? stored[HISTORY_BUTTON_ENABLED_KEY] : false,
+
+      repost_checker_button_enabled: typeof stored[REPOST_CHECKER_BUTTON_ENABLED_KEY] === "boolean" ? stored[REPOST_CHECKER_BUTTON_ENABLED_KEY] : false,
 
       comment_nuke_button_enabled: typeof stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] === "boolean" ? stored[COMMENT_NUKE_BUTTON_ENABLED_KEY] : false,
 
@@ -23811,6 +23915,14 @@ function renderRemovalConfigEditor() {
 
               <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
+                <input type="checkbox" data-ext-setting="repost_checker_button_enabled" ${extensionSettings.repost_checker_button_enabled !== false ? "checked" : ""} />
+
+                <span>Show Repost Checker (RC) button</span>
+
+              </label>
+
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
                 <input type="checkbox" data-ext-setting="comment_nuke_button_enabled" ${extensionSettings.comment_nuke_button_enabled !== false ? "checked" : ""} />
 
                 <span>Show comment nuke button on comments</span>
@@ -24321,7 +24433,7 @@ function renderRemovalConfigEditor() {
 
       }
 
-      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
+      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
 
         removalConfigEditorState.extensionSettings[key] = Boolean(event.target.checked);
 
@@ -25851,6 +25963,8 @@ function renderRemovalConfigEditor() {
 
         const historyButtonEnabled = typeof s.history_button_enabled === "boolean" ? s.history_button_enabled : true;
 
+        const repostCheckerButtonEnabled = typeof s.repost_checker_button_enabled === "boolean" ? s.repost_checker_button_enabled : true;
+
         const commentNukeButtonEnabled = typeof s.comment_nuke_button_enabled === "boolean" ? s.comment_nuke_button_enabled : true;
 
         const cannedRepliesWikiUrl = String(s.canned_replies_wiki_url || "").trim() || "";
@@ -25882,6 +25996,8 @@ function renderRemovalConfigEditor() {
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
 
           [HISTORY_BUTTON_ENABLED_KEY]: historyButtonEnabled,
+
+          [REPOST_CHECKER_BUTTON_ENABLED_KEY]: repostCheckerButtonEnabled,
 
           [COMMENT_NUKE_BUTTON_ENABLED_KEY]: commentNukeButtonEnabled,
 
@@ -25916,6 +26032,8 @@ function renderRemovalConfigEditor() {
           comment_nuke_ignore_distinguished: ignoreDistinguished,
 
           history_button_enabled: historyButtonEnabled,
+
+          repost_checker_button_enabled: repostCheckerButtonEnabled,
 
           comment_nuke_button_enabled: commentNukeButtonEnabled,
 
@@ -36764,6 +36882,630 @@ async function openOverlay(target, options = {}) {
 }
 
 // ------------------------------------------------------------------------------
+// repost-checker.js
+// ------------------------------------------------------------------------------
+
+// Repost Checker Popup Module
+
+// Shows a user's recent submissions in a subreddit and highlights possible reposts
+
+// Dependencies: utilities.js (escapeHtml), history-popup.js (fetchUserListing)
+
+
+
+let repostCheckerState = null;
+
+
+
+function ensureRepostCheckerRoot() {
+
+  let root = document.getElementById("rrw-repost-checker-root");
+
+  if (root instanceof HTMLElement) return root;
+
+  root = document.createElement("div");
+
+  root.id = "rrw-repost-checker-root";
+
+  document.documentElement.appendChild(root);
+
+  return root;
+
+}
+
+
+
+function closeRepostCheckerPopup() {
+
+  repostCheckerState = null;
+
+  const root = document.getElementById("rrw-repost-checker-root");
+
+  if (root instanceof HTMLElement) root.remove();
+
+}
+
+
+
+function positionRepostCheckerPopup(root, triggerEl) {
+
+  if (!(root instanceof HTMLElement) || !(triggerEl instanceof HTMLElement)) return;
+
+  const rect = triggerEl.getBoundingClientRect();
+
+  const margin = 8;
+
+  const width = 720;
+
+  const heightGuess = 480;
+
+  let left = Math.round(rect.left);
+
+  let top = Math.round(rect.bottom + 6);
+
+  if (left + width > window.innerWidth - margin) {
+
+    left = Math.max(margin, window.innerWidth - width - margin);
+
+  }
+
+  if (top + heightGuess > window.innerHeight - margin) {
+
+    top = Math.max(margin, Math.round(rect.top - heightGuess - 6));
+
+  }
+
+  root.style.left = `${left}px`;
+
+  root.style.top = `${top}px`;
+
+}
+
+
+
+function normalizeTitleForCompare(t) {
+
+  return String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+
+}
+
+
+
+function formatAgeFromMs(ms) {
+
+  const s = Math.max(0, Math.floor(ms / 1000));
+
+  if (s < 60) return `${s}s`;
+
+  const m = Math.floor(s / 60);
+
+  if (m < 60) return `${m}m`;
+
+  const h = Math.floor(m / 60);
+
+  if (h < 24) return `${h}h`;
+
+  const d = Math.floor(h / 24);
+
+  return `${d}d`;
+
+}
+
+
+
+function levenshteinDistance(a, b) {
+
+  const al = String(a || "");
+
+  const bl = String(b || "");
+
+  if (al.length === 0) return bl.length;
+
+  if (bl.length === 0) return al.length;
+
+  const v0 = new Array(bl.length + 1).fill(0);
+
+  const v1 = new Array(bl.length + 1).fill(0);
+
+  for (let j = 0; j <= bl.length; j++) v0[j] = j;
+
+  for (let i = 0; i < al.length; i++) {
+
+    v1[0] = i + 1;
+
+    for (let j = 0; j < bl.length; j++) {
+
+      const cost = al[i] === bl[j] ? 0 : 1;
+
+      v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+
+    }
+
+    for (let j = 0; j <= bl.length; j++) v0[j] = v1[j];
+
+  }
+
+  return v1[bl.length];
+
+}
+
+
+
+function titleSimilarity(a, b) {
+
+  // normalized Levenshtein similarity: 1 - (dist / maxLen)
+
+  const A = String(a || "");
+
+  const B = String(b || "");
+
+  const maxLen = Math.max(A.length, B.length);
+
+  if (maxLen === 0) return 1;
+
+  const dist = levenshteinDistance(A, B);
+
+  return 1 - dist / maxLen;
+
+}
+
+
+
+function renderRepostCheckerPopup() {
+
+  const state = repostCheckerState;
+
+  if (!state) return closeRepostCheckerPopup();
+
+  const root = ensureRepostCheckerRoot();
+
+
+
+  const rows = Array.isArray(state.entries) ? state.entries.map((row) => {
+
+    const data = row?.data || {};
+
+    const flair = escapeHtml(String(data.link_flair_text || ""));
+
+    const title = escapeHtml(String(data.title || ""));
+
+    const age = escapeHtml(formatAgeFromMs(Date.now() - (Number.parseFloat(String(data.created_utc || 0)) * 1000)));
+
+    const score = escapeHtml(String(data.score || 0));
+
+    const url = escapeHtml(String(data.url || ""));
+
+    const isMatch = Boolean(state.possibleMatches && state.possibleMatches.has(String(data.id || "")));
+
+    return `
+
+      <tr class="${isMatch ? 'rrw-repost-row rrw-repost-row--match' : 'rrw-repost-row'}">
+
+        <td>${flair || "-"}</td>
+
+        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${escapeHtml(data.id)}`))}" target="_blank" rel="noreferrer">${title}</a></td>
+
+        <td>${score}</td>
+
+        <td>${age}</td>
+
+      </tr>
+
+    `;
+
+  }).join("") : "";
+
+
+
+  const loadMoreBtn = state.hasMore && !state.loadingMore ? `<button type=\"button\" id=\"rrw-repost-load-more\" class=\"rrw-btn rrw-btn-secondary\">Load more</button>` : "";
+
+
+
+  root.innerHTML = `
+
+    <div class="rrw-usernotes-backdrop" tabindex="-1"></div>
+
+    <section class="rrw-usernotes-modal rrw-repost-checker-popup" role="dialog" aria-label="Repost checker">
+
+      <header class="rrw-usernotes-header">
+
+        <h3>Reposts in r/${escapeHtml(state.subreddit)} - u/${escapeHtml(state.username)}</h3>
+
+        <button type="button" class="rrw-close" data-repost-close="1">Close</button>
+
+      </header>
+
+      <div class="rrw-repost-body">
+
+        ${state.loading ? '<p class="rrw-muted">Loading submissions...</p>' : ''}
+
+        ${state.error ? `<div class="rrw-error">${escapeHtml(state.error)}</div>` : ''}
+
+        ${!state.loading && !state.error && rows === '' ? '<p class="rrw-muted">No submissions found.</p>' : ''}
+
+        ${rows ? `
+
+          <table class="rrw-repost-table">
+
+            <thead><tr><th>flair</th><th>title</th><th>score</th><th>age</th></tr></thead>
+
+            <tbody>${rows}</tbody>
+
+          </table>
+
+        ` : ''}
+
+        <div style="margin-top:8px">${loadMoreBtn}</div>
+
+      </div>
+
+    </section>
+
+  `;
+
+
+
+  // Attach events
+
+  root.querySelector('.rrw-usernotes-backdrop')?.addEventListener('click', () => closeRepostCheckerPopup());
+
+  root.querySelector('[data-repost-close="1"]')?.addEventListener('click', () => closeRepostCheckerPopup());
+
+  const loadMoreEl = root.querySelector('#rrw-repost-load-more');
+
+  if (loadMoreEl) {
+
+    loadMoreEl.addEventListener('click', async () => {
+
+      await loadMoreRepostEntries();
+
+      renderRepostCheckerPopup();
+
+    });
+
+  }
+
+}
+
+
+
+async function loadMoreRepostEntries() {
+
+  if (!repostCheckerState) return;
+
+  repostCheckerState.loadingMore = true;
+
+  try {
+
+    const currentCount = Array.isArray(repostCheckerState.entries) ? repostCheckerState.entries.length : 0;
+
+    const toFetch = Math.min(100, currentCount + 25);
+
+    const fetched = await fetchUserListing(repostCheckerState.username, 'submitted', toFetch);
+
+    repostCheckerState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === String(repostCheckerState.subreddit).toLowerCase());
+
+    repostCheckerState.hasMore = fetched.length >= toFetch;
+
+    computePossibleMatches();
+
+  } catch (err) {
+
+    repostCheckerState.error = getSafeErrorMessage(err);
+
+  } finally {
+
+    repostCheckerState.loadingMore = false;
+
+  }
+
+}
+
+
+
+function computePossibleMatches() {
+
+  if (!repostCheckerState) return;
+
+  const set = new Set();
+
+  const normCurrentTitle = normalizeTitleForCompare(repostCheckerState.currentTitle || '');
+
+  const curUrl = String(repostCheckerState.currentUrl || '').toLowerCase();
+
+  (repostCheckerState.entries || []).forEach((row) => {
+
+    const data = row?.data || {};
+
+    const id = String(data.id || '');
+
+    const title = normalizeTitleForCompare(data.title || '');
+
+    const url = String(data.url || '').toLowerCase();
+
+    if (normCurrentTitle && title && normCurrentTitle === title) {
+
+      set.add(id);
+
+    }
+
+    // fuzzy title match: allow close titles (e.g. small edits, punctuation)
+
+    else if (normCurrentTitle && title) {
+
+      const sim = titleSimilarity(normCurrentTitle, title);
+
+      if (sim >= 0.78) {
+
+        set.add(id);
+
+      }
+
+    }
+
+    if (curUrl && url && curUrl === url) {
+
+      set.add(id);
+
+    }
+
+  });
+
+  repostCheckerState.possibleMatches = set;
+
+  // toggle highlight on trigger button
+
+  try {
+
+    if (repostCheckerState.triggerEl instanceof HTMLElement) {
+
+      if (set.size > 0) {
+
+        repostCheckerState.triggerEl.classList.add('rrw-repost-pill--warning');
+
+      } else {
+
+        repostCheckerState.triggerEl.classList.remove('rrw-repost-pill--warning');
+
+      }
+
+    }
+
+  } catch (e) {
+
+    // ignore
+
+  }
+
+
+
+  // indicate presence of any previous posts on the subreddit
+
+  try {
+
+    if (repostCheckerState.triggerEl instanceof HTMLElement) {
+
+      if (Array.isArray(repostCheckerState.entries) && repostCheckerState.entries.length >= 2) {
+
+        repostCheckerState.triggerEl.classList.add('rrw-repost-pill--available');
+
+      } else {
+
+        repostCheckerState.triggerEl.classList.remove('rrw-repost-pill--available');
+
+      }
+
+    }
+
+  } catch (e) {
+
+    // ignore
+
+  }
+
+}
+
+
+
+async function openRepostCheckerPopup(triggerEl, context = {}) {
+
+  const username = String(context.username || '').trim();
+
+  const subreddit = normalizeSubreddit(context.subreddit || '');
+
+  const currentTitle = String(context.currentTitle || '').trim();
+
+  const currentUrl = String(context.currentUrl || '').trim();
+
+  if (!username || !subreddit) return;
+
+
+
+  repostCheckerState = {
+
+    triggerEl,
+
+    username,
+
+    subreddit,
+
+    currentTitle,
+
+    currentUrl,
+
+    loading: true,
+
+    error: null,
+
+    entries: [],
+
+    hasMore: false,
+
+    possibleMatches: new Set(),
+
+  };
+
+
+
+  renderRepostCheckerPopup();
+
+
+
+  try {
+
+    const fetched = await fetchUserListing(username, 'submitted', 25);
+
+    repostCheckerState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
+
+    repostCheckerState.hasMore = fetched.length >= 25;
+
+    computePossibleMatches();
+
+  } catch (err) {
+
+    repostCheckerState.error = getSafeErrorMessage(err);
+
+  } finally {
+
+    repostCheckerState.loading = false;
+
+    renderRepostCheckerPopup();
+
+  }
+
+}
+
+
+
+// Expose for other modules
+
+window.openRepostCheckerPopup = openRepostCheckerPopup;
+
+
+
+// Preload repost checker data in the background for a trigger element without opening the UI.
+
+async function preloadRepostChecker(triggerEl, context = {}) {
+
+  const username = String(context.username || '').trim();
+
+  const subreddit = normalizeSubreddit(context.subreddit || '');
+
+  const currentTitle = String(context.currentTitle || '').trim();
+
+  const currentUrl = String(context.currentUrl || '').trim();
+
+  if (!username || !subreddit) return;
+
+
+
+  // Use a transient state object separate from the popup state so we don't clobber UI if open
+
+  const transientState = {
+
+    triggerEl,
+
+    username,
+
+    subreddit,
+
+    currentTitle,
+
+    currentUrl,
+
+    loading: true,
+
+    error: null,
+
+    entries: [],
+
+    hasMore: false,
+
+    possibleMatches: new Set(),
+
+  };
+
+
+
+  try {
+
+    const fetched = await fetchUserListing(username, 'submitted', 25);
+
+    transientState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
+
+    transientState.hasMore = fetched.length >= 25;
+
+    // compute matches using same logic but apply to transient state
+
+    const set = new Set();
+
+    const normCurrentTitle = normalizeTitleForCompare(transientState.currentTitle || '');
+
+    const curUrl = String(transientState.currentUrl || '').toLowerCase();
+
+    (transientState.entries || []).forEach((row) => {
+
+      const data = row?.data || {};
+
+      const id = String(data.id || '');
+
+      const title = normalizeTitleForCompare(data.title || '');
+
+      const url = String(data.url || '').toLowerCase();
+
+      if (normCurrentTitle && title && normCurrentTitle === title) {
+
+        set.add(id);
+
+      } else if (normCurrentTitle && title) {
+
+        const sim = titleSimilarity(normCurrentTitle, title);
+
+        if (sim >= 0.78) set.add(id);
+
+      }
+
+      if (curUrl && url && curUrl === url) set.add(id);
+
+    });
+
+
+
+    // Toggle classes on the trigger element
+
+    try {
+
+      if (triggerEl instanceof HTMLElement) {
+
+        if (set.size > 0) triggerEl.classList.add('rrw-repost-pill--warning');
+
+        else triggerEl.classList.remove('rrw-repost-pill--warning');
+
+        if (Array.isArray(transientState.entries) && transientState.entries.length >= 2) triggerEl.classList.add('rrw-repost-pill--available');
+
+        else triggerEl.classList.remove('rrw-repost-pill--available');
+
+      }
+
+    } catch (e) {
+
+      // ignore
+
+    }
+
+  } catch (err) {
+
+    // ignore errors for background preload
+
+  }
+
+}
+
+
+
+window.preloadRepostChecker = preloadRepostChecker;
+
+// ------------------------------------------------------------------------------
 // dom-binding.js
 // ------------------------------------------------------------------------------
 
@@ -37685,6 +38427,42 @@ function bindContainer(container) {
 
     });
 
+    // Only create the repost checker button for submissions (posts), not comments
+
+    const isSubmission = /^t3_[a-z0-9]{5,10}$/i.test(target) || getThingTypeFromFullname(target) === "submission";
+
+    let repostCheckerButton = null;
+
+    if (isSubmission) {
+
+      repostCheckerButton = document.createElement("button");
+
+      repostCheckerButton.type = "button";
+
+      repostCheckerButton.className = "rrw-repost-pill rrw-quick-actions-pill";
+
+      repostCheckerButton.textContent = "RC";
+
+      repostCheckerButton.title = "Open Repost Checker";
+
+      attachButtonClickHandlers(repostCheckerButton, () => {
+
+        if (username) {
+
+          const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+
+          const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
+
+          const currentUrl = linkTarget || "";
+
+          void openRepostCheckerPopup(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+
+        }
+
+      });
+
+    }
+
     const profileButton = document.createElement("button");
 
     profileButton.type = "button";
@@ -37718,6 +38496,34 @@ function bindContainer(container) {
     if (username && historyButtonEnabled) {
 
       inlineGroup.appendChild(historyButton);
+
+    }
+
+    if (username && repostCheckerButtonEnabled && repostCheckerButton instanceof HTMLElement) {
+
+      inlineGroup.appendChild(repostCheckerButton);
+
+      // Preload repost checker in background so the pill can indicate matches/availability
+
+      try {
+
+        const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+
+        const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
+
+        const currentUrl = linkTarget || "";
+
+        if (window.preloadRepostChecker) {
+
+          void window.preloadRepostChecker(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+
+        }
+
+      } catch (e) {
+
+        // ignore background preload errors
+
+      }
 
     }
 
@@ -47763,6 +48569,8 @@ function start() {
 
   void loadHistoryButtonPreference();
 
+  void loadRepostCheckerButtonPreference();
+
   void loadCommentNukeButtonPreference();
 
   void loadContextPopupPosition();
@@ -47857,6 +48665,8 @@ function start() {
 
           changes?.[CONTEXT_POPUP_ENABLED_KEY] ||
 
+          changes?.[REPOST_CHECKER_BUTTON_ENABLED_KEY] ||
+
           changes?.[THEME_MODE_KEY] ||
 
           changes?.buttonVisibilityScope
@@ -47896,6 +48706,18 @@ function start() {
               bindOldRedditContextPopupLinks();
 
             }
+
+          }
+
+          if (changes?.[REPOST_CHECKER_BUTTON_ENABLED_KEY]) {
+
+            const nextValue = changes[REPOST_CHECKER_BUTTON_ENABLED_KEY].newValue;
+
+            repostCheckerButtonEnabled = typeof nextValue === "boolean" ? nextValue : false;
+
+            // Re-scan visible containers to add/remove the pill
+
+            scheduleVisibleContainerBind({ fullScan: true });
 
           }
 

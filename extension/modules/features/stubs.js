@@ -132,6 +132,17 @@ async function loadHistoryButtonPreference() {
   }
 }
 
+async function loadRepostCheckerButtonPreference() {
+  try {
+    const stored = await ext.storage.sync.get([REPOST_CHECKER_BUTTON_ENABLED_KEY]);
+    repostCheckerButtonEnabled = typeof stored?.[REPOST_CHECKER_BUTTON_ENABLED_KEY] === "boolean"
+      ? stored[REPOST_CHECKER_BUTTON_ENABLED_KEY]
+      : false;
+  } catch {
+    repostCheckerButtonEnabled = false;
+  }
+}
+
 async function loadCommentNukeButtonPreference() {
   try {
     const stored = await ext.storage.sync.get([COMMENT_NUKE_BUTTON_ENABLED_KEY]);

@@ -33,6 +33,7 @@ let buttonVisibilityScope = "configured_plus_mod";
 let preferredRedditLinkHost = "extension_preference";
 let historyButtonEnabled = false;
 let commentNukeButtonEnabled = false;
+let repostCheckerButtonEnabled = false;
 
 // Queue bar state
 let queueBarRoot = null;

@@ -457,6 +457,24 @@ function bindContainer(container) {
         void openInlineHistoryPopup(historyButton, { username, subreddit });
       }
     });
+    // Only create the repost checker button for submissions (posts), not comments
+    const isSubmission = /^t3_[a-z0-9]{5,10}$/i.test(target) || getThingTypeFromFullname(target) === "submission";
+    let repostCheckerButton = null;
+    if (isSubmission) {
+      repostCheckerButton = document.createElement("button");
+      repostCheckerButton.type = "button";
+      repostCheckerButton.className = "rrw-repost-pill rrw-quick-actions-pill";
+      repostCheckerButton.textContent = "RC";
+      repostCheckerButton.title = "Open Repost Checker";
+      attachButtonClickHandlers(repostCheckerButton, () => {
+        if (username) {
+          const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+          const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
+          const currentUrl = linkTarget || "";
+          void openRepostCheckerPopup(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+        }
+      });
+    }
     const profileButton = document.createElement("button");
     profileButton.type = "button";
     profileButton.className = PROFILE_BUTTON_CLASS;
@@ -474,6 +492,20 @@ function bindContainer(container) {
     }
     if (username && historyButtonEnabled) {
       inlineGroup.appendChild(historyButton);
+    }
+    if (username && repostCheckerButtonEnabled && repostCheckerButton instanceof HTMLElement) {
+      inlineGroup.appendChild(repostCheckerButton);
+      // Preload repost checker in background so the pill can indicate matches/availability
+      try {
+        const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+        const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
+        const currentUrl = linkTarget || "";
+        if (window.preloadRepostChecker) {
+          void window.preloadRepostChecker(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+        }
+      } catch (e) {
+        // ignore background preload errors
+      }
     }
     if (contextButton) {
       inlineGroup.appendChild(contextButton);

@@ -830,6 +830,10 @@ function renderRemovalConfigEditor() {
                 <span>Show history button on comments</span>
               </label>
               <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                <input type="checkbox" data-ext-setting="repost_checker_button_enabled" ${extensionSettings.repost_checker_button_enabled !== false ? "checked" : ""} />
+                <span>Show Repost Checker (RC) button</span>
+              </label>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
                 <input type="checkbox" data-ext-setting="comment_nuke_button_enabled" ${extensionSettings.comment_nuke_button_enabled !== false ? "checked" : ""} />
                 <span>Show comment nuke button on comments</span>
               </label>
@@ -1085,7 +1089,7 @@ function renderRemovalConfigEditor() {
       if (!removalConfigEditorState.extensionSettings) {
         removalConfigEditorState.extensionSettings = {};
       }
-      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
+      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
         removalConfigEditorState.extensionSettings[key] = Boolean(event.target.checked);
       } else if (key === "theme_mode") {
         removalConfigEditorState.extensionSettings.theme_mode = normalizeThemeMode(event.target.value, "auto");
@@ -1850,6 +1854,7 @@ function renderRemovalConfigEditor() {
         const themeMode = normalizeThemeMode(s.theme_mode, "auto");
         const ignoreDistinguished = typeof s.comment_nuke_ignore_distinguished === "boolean" ? s.comment_nuke_ignore_distinguished : false;
         const historyButtonEnabled = typeof s.history_button_enabled === "boolean" ? s.history_button_enabled : true;
+        const repostCheckerButtonEnabled = typeof s.repost_checker_button_enabled === "boolean" ? s.repost_checker_button_enabled : true;
         const commentNukeButtonEnabled = typeof s.comment_nuke_button_enabled === "boolean" ? s.comment_nuke_button_enabled : true;
         const cannedRepliesWikiUrl = String(s.canned_replies_wiki_url || "").trim() || "";
 
@@ -1866,6 +1871,7 @@ function renderRemovalConfigEditor() {
           [THEME_MODE_KEY]: themeMode,
           [COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY]: ignoreDistinguished,
           [HISTORY_BUTTON_ENABLED_KEY]: historyButtonEnabled,
+          [REPOST_CHECKER_BUTTON_ENABLED_KEY]: repostCheckerButtonEnabled,
           [COMMENT_NUKE_BUTTON_ENABLED_KEY]: commentNukeButtonEnabled,
           [CANNED_REPLIES_WIKI_URL_KEY]: cannedRepliesWikiUrl,
         });
@@ -1883,6 +1889,7 @@ function renderRemovalConfigEditor() {
           theme_mode: themeMode,
           comment_nuke_ignore_distinguished: ignoreDistinguished,
           history_button_enabled: historyButtonEnabled,
+          repost_checker_button_enabled: repostCheckerButtonEnabled,
           comment_nuke_button_enabled: commentNukeButtonEnabled,
         });
         await refreshQueueBar(true);
