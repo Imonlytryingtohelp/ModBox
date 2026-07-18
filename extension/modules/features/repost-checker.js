@@ -38,7 +38,49 @@ function positionRepostCheckerPopup(root, triggerEl) {
 }
 
 function normalizeTitleForCompare(t) {
-  return String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  let s = String(t || "").toLowerCase();
+  // remove common status tokens that are not part of the semantic title
+  s = s.replace(/\b(unsolved|solved|waiting for op|post removed|removed)\b/g, "");
+  // remove bracketed or parenthesized tags often appended to titles, e.g. [Solved], (Removed)
+  s = s.replace(/^[\[\(].*?[\]\)]\s*/g, "");
+  s = s.replace(/\s*[\[\(].*?[\]\)]$/g, "");
+  // strip punctuation and collapse whitespace
+  return s.replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function normalizePostId(id) {
+  return String(id || "").toLowerCase().replace(/^t3_/, "").trim();
+}
+
+function postIdEquals(a, b) {
+  const A = normalizePostId(a);
+  const B = normalizePostId(b);
+  if (!A || !B) return false;
+  if (A === B) return true;
+  // allow prefix match when one id is missing trailing char(s)
+  if (A.length >= 5 && B.length >= 5 && (A.startsWith(B) || B.startsWith(A))) return true;
+  return false;
+}
+
+function isPostRemoved(entry) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  const data = entry.data;
+  if (!data) {
+    return false;
+  }
+  if (data.removed === true) {
+    return true;
+  }
+  if (String(data.removed_by_category || "").trim()) {
+    return true;
+  }
+  if (data.author === null) {
+    return true;
+  }
+  const body = entry.kind === "t1" ? data.body : data.selftext;
+  return String(body || "").trim() === "[removed]";
 }
 
 function formatAgeFromMs(ms) {
@@ -86,18 +128,23 @@ function renderRepostCheckerPopup() {
   if (!state) return closeRepostCheckerPopup();
   const root = ensureRepostCheckerRoot();
 
-  const rows = Array.isArray(state.entries) ? state.entries.map((row) => {
+  const rows = Array.isArray(state.entries) ? state.entries
+    .filter((row) => !postIdEquals(String((row?.data?.id || '')), state.currentPostId || ''))
+    .map((row) => {
     const data = row?.data || {};
     const flair = escapeHtml(String(data.link_flair_text || ""));
-    const title = escapeHtml(String(data.title || ""));
+    const titleText = String(data.title || "");
+    const removed = isPostRemoved(row);
+    const title = escapeHtml(titleText);
     const age = escapeHtml(formatAgeFromMs(Date.now() - (Number.parseFloat(String(data.created_utc || 0)) * 1000)));
     const score = escapeHtml(String(data.score || 0));
     const url = escapeHtml(String(data.url || ""));
-    const isMatch = Boolean(state.possibleMatches && state.possibleMatches.has(String(data.id || "")));
+    const rowClass = removed ? 'rrw-repost-row rrw-repost-row--removed' : (state.possibleMatches && state.possibleMatches.has(String(data.id || "")) ? 'rrw-repost-row rrw-repost-row--match' : 'rrw-repost-row');
+    const removedSuffix = removed ? ' <span class="rrw-muted">(removed)</span>' : '';
     return `
-      <tr class="${isMatch ? 'rrw-repost-row rrw-repost-row--match' : 'rrw-repost-row'}">
+      <tr class="${rowClass}">
         <td>${flair || "-"}</td>
-        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${escapeHtml(data.id)}`))}" target="_blank" rel="noreferrer">${title}</a></td>
+        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${String(data.id || '')}`, preferredRedditLinkHost))}" target="_blank" rel="noreferrer">${title}</a>${removedSuffix}</td>
         <td>${score}</td>
         <td>${age}</td>
       </tr>
@@ -105,12 +152,13 @@ function renderRepostCheckerPopup() {
   }).join("") : "";
 
   const loadMoreBtn = state.hasMore && !state.loadingMore ? `<button type=\"button\" id=\"rrw-repost-load-more\" class=\"rrw-btn rrw-btn-secondary\">Load more</button>` : "";
+  const footerNote = (String(state.currentPostId || '').trim() !== '') ? `<p class="rrw-muted rrw-repost-footnote" style="margin-top:8px">Note: The current post is not shown in this list.</p>` : '';
 
   root.innerHTML = `
     <div class="rrw-usernotes-backdrop" tabindex="-1"></div>
     <section class="rrw-usernotes-modal rrw-repost-checker-popup" role="dialog" aria-label="Repost checker">
       <header class="rrw-usernotes-header">
-        <h3>Reposts in r/${escapeHtml(state.subreddit)} - u/${escapeHtml(state.username)}</h3>
+        <h3>Posts in r/${escapeHtml(state.subreddit)} - u/${escapeHtml(state.username)}</h3>
         <button type="button" class="rrw-close" data-repost-close="1">Close</button>
       </header>
       <div class="rrw-repost-body">
@@ -124,6 +172,7 @@ function renderRepostCheckerPopup() {
           </table>
         ` : ''}
         <div style="margin-top:8px">${loadMoreBtn}</div>
+        ${footerNote}
       </div>
     </section>
   `;
@@ -147,7 +196,8 @@ async function loadMoreRepostEntries() {
     const currentCount = Array.isArray(repostCheckerState.entries) ? repostCheckerState.entries.length : 0;
     const toFetch = Math.min(100, currentCount + 25);
     const fetched = await fetchUserListing(repostCheckerState.username, 'submitted', toFetch);
-    repostCheckerState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === String(repostCheckerState.subreddit).toLowerCase());
+    repostCheckerState.entries = fetched
+      .filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === String(repostCheckerState.subreddit).toLowerCase());
     repostCheckerState.hasMore = fetched.length >= toFetch;
     computePossibleMatches();
   } catch (err) {
@@ -167,13 +217,18 @@ function computePossibleMatches() {
     const id = String(data.id || '');
     const title = normalizeTitleForCompare(data.title || '');
     const url = String(data.url || '').toLowerCase();
+    const removed = isPostRemoved(row);
+    // ignore the current post id if present (robust comparison)
+    if (postIdEquals(id, repostCheckerState.currentPostId || '')) return;
+    // removed posts should not trigger a repost warning, but they may still count as prior posts.
+    if (removed) return;
     if (normCurrentTitle && title && normCurrentTitle === title) {
       set.add(id);
     }
     // fuzzy title match: allow close titles (e.g. small edits, punctuation)
     else if (normCurrentTitle && title) {
       const sim = titleSimilarity(normCurrentTitle, title);
-      if (sim >= 0.78) {
+      if (sim >= 0.82) {
         set.add(id);
       }
     }
@@ -198,7 +253,11 @@ function computePossibleMatches() {
   // indicate presence of any previous posts on the subreddit
   try {
     if (repostCheckerState.triggerEl instanceof HTMLElement) {
-      if (Array.isArray(repostCheckerState.entries) && repostCheckerState.entries.length >= 2) {
+      // count entries excluding the current post id so availability reflects prior posts only
+      const prevCount = Array.isArray(repostCheckerState.entries)
+        ? repostCheckerState.entries.filter((r) => normalizePostId(String((r?.data?.id || ''))) !== normalizePostId(repostCheckerState.currentPostId || '')).length
+        : 0;
+      if (prevCount >= 1) {
         repostCheckerState.triggerEl.classList.add('rrw-repost-pill--available');
       } else {
         repostCheckerState.triggerEl.classList.remove('rrw-repost-pill--available');
@@ -214,6 +273,7 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
   const subreddit = normalizeSubreddit(context.subreddit || '');
   const currentTitle = String(context.currentTitle || '').trim();
   const currentUrl = String(context.currentUrl || '').trim();
+  const currentPostId = String(context.currentPostId || '').trim();
   if (!username || !subreddit) return;
 
   repostCheckerState = {
@@ -222,6 +282,7 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
     subreddit,
     currentTitle,
     currentUrl,
+    currentPostId,
     loading: true,
     error: null,
     entries: [],
@@ -233,9 +294,16 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
 
   try {
     const fetched = await fetchUserListing(username, 'submitted', 25);
-    repostCheckerState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
+    // filter to subreddit; keep the current post in `entries` (we hide it from display but avoid self-matches)
+    repostCheckerState.entries = fetched
+      .filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
     repostCheckerState.hasMore = fetched.length >= 25;
     computePossibleMatches();
+    try {
+      console.log('[ModBox][RepostChecker][open] currentTitle=', repostCheckerState.currentTitle, 'currentUrl=', repostCheckerState.currentUrl, 'currentPostId=', repostCheckerState.currentPostId, 'entries=', (repostCheckerState.entries || []).length, 'matches=', (repostCheckerState.possibleMatches && typeof repostCheckerState.possibleMatches.size === 'number') ? repostCheckerState.possibleMatches.size : 0);
+    } catch (e) {
+      // ignore
+    }
   } catch (err) {
     repostCheckerState.error = getSafeErrorMessage(err);
   } finally {
@@ -262,6 +330,7 @@ async function preloadRepostChecker(triggerEl, context = {}) {
     subreddit,
     currentTitle,
     currentUrl,
+    currentPostId: String(context.currentPostId || '').trim(),
     loading: true,
     error: null,
     entries: [],
@@ -271,7 +340,8 @@ async function preloadRepostChecker(triggerEl, context = {}) {
 
   try {
     const fetched = await fetchUserListing(username, 'submitted', 25);
-    transientState.entries = fetched.filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
+    transientState.entries = fetched
+      .filter((c) => String((c?.data?.subreddit || '')).toLowerCase() === subreddit.toLowerCase());
     transientState.hasMore = fetched.length >= 25;
     // compute matches using same logic but apply to transient state
     const set = new Set();
@@ -282,21 +352,33 @@ async function preloadRepostChecker(triggerEl, context = {}) {
       const id = String(data.id || '');
       const title = normalizeTitleForCompare(data.title || '');
       const url = String(data.url || '').toLowerCase();
+      const removed = isPostRemoved(row);
+      if (postIdEquals(id, transientState.currentPostId || '')) return;
+      if (removed) return;
       if (normCurrentTitle && title && normCurrentTitle === title) {
         set.add(id);
       } else if (normCurrentTitle && title) {
         const sim = titleSimilarity(normCurrentTitle, title);
-        if (sim >= 0.78) set.add(id);
+        if (sim >= 0.82) set.add(id);
       }
       if (curUrl && url && curUrl === url) set.add(id);
     });
+
+    try {
+      console.log('[ModBox][RepostChecker][preload] currentTitle=', transientState.currentTitle, 'currentUrl=', transientState.currentUrl, 'currentPostId=', transientState.currentPostId, 'entries=', (transientState.entries || []).length, 'matches=', set.size);
+    } catch (e) {
+      // ignore
+    }
 
     // Toggle classes on the trigger element
     try {
       if (triggerEl instanceof HTMLElement) {
         if (set.size > 0) triggerEl.classList.add('rrw-repost-pill--warning');
         else triggerEl.classList.remove('rrw-repost-pill--warning');
-        if (Array.isArray(transientState.entries) && transientState.entries.length >= 2) triggerEl.classList.add('rrw-repost-pill--available');
+          const prevCount = Array.isArray(transientState.entries)
+            ? transientState.entries.filter((r) => !postIdEquals(String((r?.data?.id || '')), transientState.currentPostId || '')).length
+            : 0;
+        if (prevCount >= 1) triggerEl.classList.add('rrw-repost-pill--available');
         else triggerEl.classList.remove('rrw-repost-pill--available');
       }
     } catch (e) {

@@ -1221,7 +1221,14 @@ async function fetchNativeModnotesViaReddit(subreddit, username, retryCount = 0)
       const errorKey = `native-modnotes-${isRateLimit ? 'ratelimit' : 'fetch'}`;
       
       if (shouldLogError(errorKey)) {
-        console.error("[ModBox] Native modnotes fetch failed, falling back to Toolbox only. Error:", errorMsg, isRateLimit ? "(RATE LIMITED)" : "");
+        try {
+          const ignoreSnippet = "A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received";
+          if (!String(errorMsg || "").includes(ignoreSnippet)) {
+            console.error("[ModBox] Native modnotes fetch failed, falling back to Toolbox only. Error:", errorMsg, isRateLimit ? "(RATE LIMITED)" : "");
+          }
+        } catch (e) {
+          // ignore logging errors
+        }
       }
       
       if (isRateLimit) {

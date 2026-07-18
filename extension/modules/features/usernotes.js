@@ -488,7 +488,15 @@ async function fetchUsernotesWithNativeViaReddit(subreddit, username, forceRefre
     return payload;
   } catch (error) {
     // Fallback to Toolbox-only notes if native fetch fails
-    console.warn("[ModBox] Native modnotes fetch failed, falling back to Toolbox only:", error);
+    try {
+      const errorMsg = (typeof getSafeErrorMessage === 'function') ? getSafeErrorMessage(error) : String(error || "");
+      const ignoreSnippet = "A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received";
+      if (!String(errorMsg || "").includes(ignoreSnippet)) {
+        console.warn("[ModBox] Native modnotes fetch failed, falling back to Toolbox only:", error);
+      }
+    } catch (e) {
+      // ignore logging errors
+    }
     return fetchUsernotesViaReddit(cleanSubreddit, cleanUser, forceRefresh);
   }
 }

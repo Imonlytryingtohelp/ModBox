@@ -1,10 +1,24 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+
+## 1.7.1 - Repost Checker Fixes
+
+- Fixed CSS precedence so the Repost Checker warning (orange) takes visual precedence over the available (blue) state.
+- Hidden the current post from the Repost Checker table while keeping it in fetched results; the module still passes and uses `currentPostId` to avoid self-matches, and availability counts only consider prior posts (the current post is excluded from the availability count).
+- Improved post-id extraction in `dom-binding.js` for listing views (derive from element attributes/target when pathname is not sufficient).
+- Added runtime debug logs (`[ModBox][RepostChecker][preload]` and `[ModBox][RepostChecker][open]`) to help diagnose matching and availability decisions.
+- Added a footer note in the Repost Checker popup explaining the current post is not shown in the list.
+- Repost Checker title links now respect the "Target host for queue bar links" extension setting (uses configured link host instead of always opening reddit.com).
+- Silenced a non-actionable console error about the message channel closing when fetching native modnotes to avoid showing an error indicator in the extension.
+
+
 ## 1.7.0 - Repost Checker + Bug Fixes
 
 - Prevented users clicking "remove" when no reason is selected in removal reasons GUI. 
 - Added `RC` (Repost Checker) pill: shows a user's recent submissions in the subreddit and highlights possible reposts. The pill preloads data in the background on page load so it updates colour state without clicking.
+
+
 
 
 ## 1.6.0 - QoL Improvements

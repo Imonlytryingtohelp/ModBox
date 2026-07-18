@@ -140,7 +140,13 @@ function pickTargetForContainer(container) {
   }
 
   if (isLikelyPostContainer(container)) {
-    const postId = parsePostIdFromPath(window.location.pathname);
+    let postId = parsePostIdFromPath(window.location.pathname);
+    if (!postId) {
+      const fullnameAttr = extractFullnameFromAttributes(container);
+      if (fullnameAttr && String(fullnameAttr).toLowerCase().startsWith("t3_")) {
+        postId = String(fullnameAttr).slice(3);
+      }
+    }
     if (postId) {
       return `t3_${postId}`;
     }
@@ -439,7 +445,11 @@ function bindContainer(container) {
     const subreddit =
       normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
       parseSubredditFromPath(window.location.pathname);
-    const postId = parsePostIdFromPath(window.location.pathname);
+    let postId = parsePostIdFromPath(window.location.pathname);
+    if (!postId && typeof target === 'string') {
+      const m = String(target).match(/^t3_([a-z0-9]{5,})$/i);
+      if (m) postId = m[1];
+    }
     const linkTarget = postId && subreddit
       ? formatRedditUrl(subreddit, postId)
       : formatRedditByIdUrl(extractFullnameFromAttributes(container)) || window.location.href;
@@ -468,10 +478,23 @@ function bindContainer(container) {
       repostCheckerButton.title = "Open Repost Checker";
       attachButtonClickHandlers(repostCheckerButton, () => {
         if (username) {
-          const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+          const titleSelectors = [
+            "h1",
+            "h2",
+            "h3",
+            "[data-testid='post-title']",
+            ".title",
+            "a.title",
+            "a[data-click-id='body']",
+            "a[data-event-action='title']",
+            ".link .title",
+            ".entry .title"
+          ].join(",");
+          let titleEl = container.querySelector(titleSelectors);
+          if (!titleEl) titleEl = container.querySelector("a");
           const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
           const currentUrl = linkTarget || "";
-          void openRepostCheckerPopup(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+          void openRepostCheckerPopup(repostCheckerButton, { username, subreddit, currentTitle, currentUrl, currentPostId: postId || "" });
         }
       });
     }
@@ -497,11 +520,24 @@ function bindContainer(container) {
       inlineGroup.appendChild(repostCheckerButton);
       // Preload repost checker in background so the pill can indicate matches/availability
       try {
-        const titleEl = container.querySelector("h1, h2, h3, [data-testid='post-title']");
+        const titleSelectors = [
+          "h1",
+          "h2",
+          "h3",
+          "[data-testid='post-title']",
+          ".title",
+          "a.title",
+          "a[data-click-id='body']",
+          "a[data-event-action='title']",
+          ".link .title",
+          ".entry .title"
+        ].join(",");
+        let titleEl = container.querySelector(titleSelectors);
+        if (!titleEl) titleEl = container.querySelector("a");
         const currentTitle = titleEl ? String(titleEl.textContent || "").trim() : "";
         const currentUrl = linkTarget || "";
         if (window.preloadRepostChecker) {
-          void window.preloadRepostChecker(repostCheckerButton, { username, subreddit, currentTitle, currentUrl });
+          void window.preloadRepostChecker(repostCheckerButton, { username, subreddit, currentTitle, currentUrl, currentPostId: postId || "" });
         }
       } catch (e) {
         // ignore background preload errors
