@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.8.0 - Reddit Host Compatibility
+
+- Temporarily disabled inline ModBox pill buttons on `www.reddit.com` and `sh.reddit.com` to avoid layout issues while preserving queue bar functionality.
+- Added an `old.reddit` button to the ModBox Queue Bar on `www.reddit.com` and `sh.reddit.com` for quick post navigation.
+
 ## 1.7.2 - Queue Bar Z-Index Fix
 
 - Lowered the ModBox Queues box stacking order so the Reddit chat overlay on `reddit.com` `old.reddit.com` and `sh.reddit.com` displays on top.

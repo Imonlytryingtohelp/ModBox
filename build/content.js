@@ -27529,6 +27529,18 @@ function renderQueueBar(state) {
 
 
 
+  const currentHost = String(window.location.hostname || "").toLowerCase();
+
+  const showOldRedditButton = currentHost === "www.reddit.com" || currentHost === "sh.reddit.com";
+
+  const oldRedditPostUrl = showOldRedditButton
+
+    ? `https://old.reddit.com${window.location.pathname}${window.location.search}`
+
+    : "";
+
+
+
   const refreshBtn = document.createElement("button");
 
   refreshBtn.type = "button";
@@ -27675,6 +27687,28 @@ function renderQueueBar(state) {
 
 
 
+  const oldRedditBtn = document.createElement("button");
+
+  oldRedditBtn.type = "button";
+
+  oldRedditBtn.className = "rrw-queuebar-icon-btn";
+
+  oldRedditBtn.title = "Open this post in old.reddit";
+
+  oldRedditBtn.textContent = "old";
+
+  oldRedditBtn.addEventListener("click", () => {
+
+    if (oldRedditPostUrl) {
+
+      window.open(oldRedditPostUrl, "_blank");
+
+    }
+
+  });
+
+
+
   const collapseBtn = document.createElement("button");
 
   collapseBtn.type = "button";
@@ -27718,6 +27752,12 @@ function renderQueueBar(state) {
   if (!queueBarCollapsed) {
 
     headerActions.appendChild(cannedRepliesBtn);
+
+    if (showOldRedditButton) {
+
+      headerActions.appendChild(oldRedditBtn);
+
+    }
 
     headerActions.appendChild(settingsBtn);
 
@@ -38571,6 +38611,20 @@ function bindContainer(container) {
 
   if (authorAnchor?.parentElement) {
 
+    const host = String(window.location.hostname || "").toLowerCase();
+
+    if (host === "www.reddit.com" || host === "sh.reddit.com") {
+
+      console.log("[ModBox] Skipping inline pill buttons and Mod Actions on host:", host);
+
+      container.dataset.rrwBound = "1";
+
+      return;
+
+    }
+
+
+
     if (authorAnchor.dataset.rrwInlineBound === "1") {
 
       container.dataset.rrwBound = "1";
@@ -38931,6 +38985,20 @@ function bindContainer(container) {
 
 
 
+  const host = String(window.location.hostname || "").toLowerCase();
+
+  if (host === "www.reddit.com" || host === "sh.reddit.com") {
+
+    console.log("[ModBox] Skipping toolbar inline buttons on host:", host);
+
+    container.dataset.rrwBound = "1";
+
+    return;
+
+  }
+
+
+
   const toolbarHost =
 
     container.querySelector('[data-testid="comment"]') ||
@@ -39182,6 +39250,10 @@ function scheduleVisibleContainerBind(options = {}) {
 
 
 function bindModmailParticipantPills() {
+
+  const host = String(window.location.hostname || "").toLowerCase();
+
+  if (host === "www.reddit.com" || host === "sh.reddit.com") return;
 
   if (!isModmailConversationPage()) return;
 

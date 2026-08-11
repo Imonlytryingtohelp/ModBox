@@ -431,6 +431,13 @@ function bindContainer(container) {
     console.log("[ModBox] bindContainer: found author anchor, binding container with target", target);
   }
   if (authorAnchor?.parentElement) {
+    const host = String(window.location.hostname || "").toLowerCase();
+    if (host === "www.reddit.com" || host === "sh.reddit.com") {
+      console.log("[ModBox] Skipping inline pill buttons and Mod Actions on host:", host);
+      container.dataset.rrwBound = "1";
+      return;
+    }
+
     if (authorAnchor.dataset.rrwInlineBound === "1") {
       container.dataset.rrwBound = "1";
       return;
@@ -611,6 +618,13 @@ function bindContainer(container) {
     return;
   }
 
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (host === "www.reddit.com" || host === "sh.reddit.com") {
+    console.log("[ModBox] Skipping toolbar inline buttons on host:", host);
+    container.dataset.rrwBound = "1";
+    return;
+  }
+
   const toolbarHost =
     container.querySelector('[data-testid="comment"]') ||
     container.querySelector('[slot="actions"]') ||
@@ -737,6 +751,8 @@ function scheduleVisibleContainerBind(options = {}) {
 // ──── Queue Tools Binding (Stub - no UI yet) ────
 
 function bindModmailParticipantPills() {
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (host === "www.reddit.com" || host === "sh.reddit.com") return;
   if (!isModmailConversationPage()) return;
 
   // Guard: if allowed subreddits haven't loaded yet the MutationObserver will

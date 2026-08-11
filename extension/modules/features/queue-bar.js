@@ -617,6 +617,12 @@ function renderQueueBar(state) {
   const headerActions = document.createElement("div");
   headerActions.className = "rrw-queuebar-header-actions";
 
+  const currentHost = String(window.location.hostname || "").toLowerCase();
+  const showOldRedditButton = currentHost === "www.reddit.com" || currentHost === "sh.reddit.com";
+  const oldRedditPostUrl = showOldRedditButton
+    ? `https://old.reddit.com${window.location.pathname}${window.location.search}`
+    : "";
+
   const refreshBtn = document.createElement("button");
   refreshBtn.type = "button";
   refreshBtn.className = "rrw-queuebar-icon-btn";
@@ -690,6 +696,17 @@ function renderQueueBar(state) {
     void openCannedRepliesModal();
   });
 
+  const oldRedditBtn = document.createElement("button");
+  oldRedditBtn.type = "button";
+  oldRedditBtn.className = "rrw-queuebar-icon-btn";
+  oldRedditBtn.title = "Open this post in old.reddit";
+  oldRedditBtn.textContent = "old";
+  oldRedditBtn.addEventListener("click", () => {
+    if (oldRedditPostUrl) {
+      window.open(oldRedditPostUrl, "_blank");
+    }
+  });
+
   const collapseBtn = document.createElement("button");
   collapseBtn.type = "button";
   collapseBtn.className = "rrw-queuebar-icon-btn";
@@ -712,6 +729,9 @@ function renderQueueBar(state) {
 
   if (!queueBarCollapsed) {
     headerActions.appendChild(cannedRepliesBtn);
+    if (showOldRedditButton) {
+      headerActions.appendChild(oldRedditBtn);
+    }
     headerActions.appendChild(settingsBtn);
     headerActions.appendChild(refreshBtn);
     headerActions.appendChild(aboutBtn);
