@@ -11387,7 +11387,7 @@ function injectStyles() {
 
       left: var(--rrw-queuebar-left, auto);
 
-      z-index: 100;
+      z-index: 0;
 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
