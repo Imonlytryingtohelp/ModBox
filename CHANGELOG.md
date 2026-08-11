@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.7.2 - Queue Bar Z-Index Fix
+
+- Lowered the ModBox Queues box stacking order so the Reddit chat overlay on `reddit.com` `old.reddit.com` and `sh.reddit.com` displays on top.
+
 ## 1.7.1 - Repost Checker Fixes
 
 - Fixed CSS precedence so the Repost Checker warning (orange) takes visual precedence over the available (blue) state.
