@@ -19577,7 +19577,9 @@ function injectStyles() {
 
     .rrw-about-page-check-btn,
 
-    .rrw-about-page-close-btn {
+    .rrw-about-page-close-btn,
+
+    .rrw-about-page-download-btn {
 
       padding: 10px 18px;
 
@@ -19602,6 +19604,40 @@ function injectStyles() {
       font-family: var(--rrw-font-family);
 
       letter-spacing: 0.01em;
+
+    }
+
+
+
+    .rrw-about-page-download-btn {
+
+      background: linear-gradient(180deg, #2d70d1 0%, #1f4a94 100%);
+
+      color: #fff;
+
+      border-color: #1f4a94;
+
+    }
+
+
+
+    .rrw-about-page-download-btn:hover:not(:disabled) {
+
+      background: linear-gradient(180deg, #346cbf 0%, #2b5c9d 100%);
+
+      border-color: #1f4a94;
+
+      box-shadow: 0 4px 12px rgba(36, 94, 184, 0.25);
+
+    }
+
+
+
+    .rrw-about-page-download-btn:active:not(:disabled) {
+
+      transform: translateY(1px);
+
+      box-shadow: 0 2px 6px rgba(36, 94, 184, 0.15);
 
     }
 
@@ -30945,6 +30981,32 @@ async function performUpdateCheckFromAboutPage() {
 
 
 
+function getAboutPageDownloadUrl(updateStatus) {
+
+  if (updateStatus?.latestEntry?.downloadUrl) {
+
+    return String(updateStatus.latestEntry.downloadUrl || "").trim();
+
+  }
+
+
+
+  const latestVersion = String(updateStatus?.latest || "").trim();
+
+  if (latestVersion) {
+
+    return `https://github.com/Imonlytryingtohelp/ModBox/releases/tag/${encodeURIComponent(latestVersion)}`;
+
+  }
+
+
+
+  return "https://github.com/Imonlytryingtohelp/ModBox/releases";
+
+}
+
+
+
 function bindAboutPageEvents() {
 
   const root = document.getElementById("rrw-about-page-root");
@@ -30978,6 +31040,26 @@ function bindAboutPageEvents() {
       e.preventDefault();
 
       void performUpdateCheckFromAboutPage();
+
+    });
+
+  });
+
+
+
+  // Download button
+
+  root.querySelectorAll('[data-about-download="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      if (!aboutPageState?.downloadUrl) return;
+
+      const openInNewTab = shouldOpenQueueBarLinkInNewTab(e, true);
+
+      navigateToQueueBarLink(aboutPageState.downloadUrl, openInNewTab);
 
     });
 
@@ -31042,6 +31124,8 @@ function renderAboutPage() {
   const latest = state.latestVersion || "Unknown";
 
   const changelog = state.changelog || "No changelog available";
+
+  const downloadUrl = state.downloadUrl || "";
 
   const isUpdateAvailable = state.isUpdateAvailable || false;
 
@@ -31163,6 +31247,24 @@ function renderAboutPage() {
 
         <footer class="rrw-about-page-footer">
 
+          ${downloadUrl ? `
+
+            <button
+
+              type="button"
+
+              class="rrw-about-page-download-btn"
+
+              data-about-download="1"
+
+            >
+
+              Download Latest Release
+
+            </button>
+
+          ` : ""}
+
           <button 
 
             type="button" 
@@ -31226,6 +31328,8 @@ async function openAboutPage() {
       isUpdateAvailable: updateStatus?.isUpdateAvailable || false,
 
       changelog: updateStatus?.latestEntry?.changelog || "No changelog available",
+
+      downloadUrl: getAboutPageDownloadUrl(updateStatus),
 
     };
 

@@ -73,6 +73,19 @@ async function performUpdateCheckFromAboutPage() {
   }
 }
 
+function getAboutPageDownloadUrl(updateStatus) {
+  if (updateStatus?.latestEntry?.downloadUrl) {
+    return String(updateStatus.latestEntry.downloadUrl || "").trim();
+  }
+
+  const latestVersion = String(updateStatus?.latest || "").trim();
+  if (latestVersion) {
+    return `https://github.com/Imonlytryingtohelp/ModBox/releases/tag/${encodeURIComponent(latestVersion)}`;
+  }
+
+  return "https://github.com/Imonlytryingtohelp/ModBox/releases";
+}
+
 function bindAboutPageEvents() {
   const root = document.getElementById("rrw-about-page-root");
   if (!root) return;
@@ -90,6 +103,16 @@ function bindAboutPageEvents() {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       void performUpdateCheckFromAboutPage();
+    });
+  });
+
+  // Download button
+  root.querySelectorAll('[data-about-download="1"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!aboutPageState?.downloadUrl) return;
+      const openInNewTab = shouldOpenQueueBarLinkInNewTab(e, true);
+      navigateToQueueBarLink(aboutPageState.downloadUrl, openInNewTab);
     });
   });
 
@@ -122,6 +145,7 @@ function renderAboutPage() {
   const installed = state.installedVersion || "Unknown";
   const latest = state.latestVersion || "Unknown";
   const changelog = state.changelog || "No changelog available";
+  const downloadUrl = state.downloadUrl || "";
   const isUpdateAvailable = state.isUpdateAvailable || false;
 
   // Format changelog - clean markdown and limit lines
@@ -182,6 +206,15 @@ function renderAboutPage() {
         </div>
 
         <footer class="rrw-about-page-footer">
+          ${downloadUrl ? `
+            <button
+              type="button"
+              class="rrw-about-page-download-btn"
+              data-about-download="1"
+            >
+              Download Latest Release
+            </button>
+          ` : ""}
           <button 
             type="button" 
             class="rrw-about-page-check-btn" 
@@ -214,6 +247,7 @@ async function openAboutPage() {
       latestVersion: updateStatus?.latest || "Unknown",
       isUpdateAvailable: updateStatus?.isUpdateAvailable || false,
       changelog: updateStatus?.latestEntry?.changelog || "No changelog available",
+      downloadUrl: getAboutPageDownloadUrl(updateStatus),
     };
 
     renderAboutPage();
