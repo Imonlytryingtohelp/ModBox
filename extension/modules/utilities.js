@@ -201,7 +201,46 @@ function getRedditHostForLinkHost(linkHostSetting = "extension_preference") {
 
 function buildRedditUrl(permalink, linkHostSetting = "extension_preference") {
   const host = getRedditHostForLinkHost(linkHostSetting);
-  const path = String(permalink || "").trim();
+  let path = String(permalink || "").trim();
+
+  if (!path) {
+    return `https://${host}/`;
+  }
+
+  // If it's a protocol-relative URL (//reddit.com/...), normalize to https and apply host
+  if (path.startsWith("//")) {
+    path = `https:${path}`;
+  }
+
+  // If it's an absolute, valid URL, prefer to reuse its pathname/query/hash
+  try {
+    const parsed = new URL(path);
+    // If the URL appears to be on reddit, swap the host if a specific host preference is requested
+    if (parsed.hostname && parsed.hostname.toLowerCase().endsWith("reddit.com")) {
+      if (host === "reddit.com") {
+        return parsed.href;
+      }
+      return `${parsed.protocol}//${host}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch (e) {
+    // malformed absolute URL (e.g. "https//reddit.com/...") -> fallthrough to attempt recovery
+  }
+
+  // Recover from malformed inputs that still contain reddit paths (like "https//reddit.com/r/..."),
+  // or inputs that already are paths ("/r/..." or "r/...")
+  const redditIndex = path.toLowerCase().indexOf("reddit.com");
+  if (redditIndex >= 0) {
+    // take everything after the hostname (first slash after reddit.com)
+    const afterHost = path.slice(redditIndex + "reddit.com".length);
+    const normalizedPath = afterHost.startsWith("/") ? afterHost : `/${afterHost}`;
+    return `https://${host}${normalizedPath}`;
+  }
+
+  // Ensure the path starts with a '/'
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+
   return `https://${host}${path}`;
 }
 
