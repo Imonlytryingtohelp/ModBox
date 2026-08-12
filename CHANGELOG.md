@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.8.1 - Bug Fixes
+
+- **Fixed** malformed "Open on Reddit" link generation. `buildRedditUrl()` now normalizes permalinks (handles absolute and protocol-relative URLs, recovers from malformed inputs like `https//...`) and ensures the correct reddit host.    
+- Added a `Download Latest Release` button to the About ModBox popup, using the update checker’s release URL and falling back to the GitHub Releases page when no direct download link was available.
+- Updated the About ModBox popup so the changelog section scrolls independently, removing the outer modal scrollbar for a cleaner display.
+- Modbox Link Generator on about page is now hidden by default and can be enabled in `Extension Settings`   
+- Re-enabled Notes and Profile view pill buttons in modmail conversations. 
+
 ## 1.8.0 - Reddit Host Compatibility
 
 - Temporarily disabled inline ModBox pill buttons on `www.reddit.com` and `sh.reddit.com` to avoid layout issues while preserving queue bar functionality.
