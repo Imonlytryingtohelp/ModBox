@@ -43,6 +43,13 @@ function isModmailConversationPage() {
   return /^\/mail\/[^/]+\/\w/.test(path);
 }
 
+function isModmailPage() {
+  const host = String(window.location.hostname || "").toLowerCase();
+  const path = String(window.location.pathname || "").toLowerCase();
+  // Allow any /mail path on the main reddit host (inbox, convos, etc.)
+  return host === "www.reddit.com" && path.startsWith("/mail");
+}
+
 function getThingTypeLabelFromFullname(fullname) {
   return String(fullname || "").toLowerCase().startsWith("t3_") ? "post" : "comment";
 }
@@ -288,7 +295,9 @@ function bindContainer(container) {
   console.log("[ModBox] bindContainer: starting bind for", container.tagName, "with id=" + container.id, "data-fullname=" + container.getAttribute("data-fullname"));
 
   const containerSubreddit = resolveContainerSubreddit(container);
-  if (!isAllowedLaunchSubreddit(containerSubreddit)) {
+  // Allow binding on ModMail pages even if a subreddit cannot be determined or
+  // the allowed-subreddits list isn't loaded yet.
+  if (!isModmailPage() && !isAllowedLaunchSubreddit(containerSubreddit)) {
     console.log("[ModBox] bindContainer: subreddit '" + containerSubreddit + "' not in allowedLaunchSubreddits (loaded=" + allowedLaunchSubredditsLoaded + ", set=" + (allowedLaunchSubreddits instanceof Set ? "yes size=" + allowedLaunchSubreddits.size : "no") + ")");
     return;
   }
@@ -432,7 +441,8 @@ function bindContainer(container) {
   }
   if (authorAnchor?.parentElement) {
     const host = String(window.location.hostname || "").toLowerCase();
-    if (host === "www.reddit.com" || host === "sh.reddit.com") {
+    // Skip inline pill buttons on Reddit hosts except when we're on Modmail pages
+    if ((host === "www.reddit.com" || host === "sh.reddit.com") && !isModmailPage()) {
       console.log("[ModBox] Skipping inline pill buttons and Mod Actions on host:", host);
       container.dataset.rrwBound = "1";
       return;
@@ -752,7 +762,7 @@ function scheduleVisibleContainerBind(options = {}) {
 
 function bindModmailParticipantPills() {
   const host = String(window.location.hostname || "").toLowerCase();
-  if (host === "www.reddit.com" || host === "sh.reddit.com") return;
+  // Only run on modmail conversation pages
   if (!isModmailConversationPage()) return;
 
   // Guard: if allowed subreddits haven't loaded yet the MutationObserver will
