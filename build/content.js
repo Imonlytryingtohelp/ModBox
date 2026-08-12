@@ -45,6 +45,8 @@ const INTERCEPT_NATIVE_REMOVE_KEY = "interceptNativeRemove";
 
 const CONTEXT_POPUP_ENABLED_KEY = "contextPopupEnabled";
 
+const ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY = "aboutPageLinkGeneratorEnabled";
+
 const HISTORY_BUTTON_ENABLED_KEY = "historyButtonEnabled";
 
 const REPOST_CHECKER_BUTTON_ENABLED_KEY = "repostCheckerButtonEnabled";
@@ -697,6 +699,8 @@ async function getApiBaseUrl() {
 
     CANNED_REPLIES_WIKI_URL_KEY,
 
+    ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY,
+
   ]);
 
 
@@ -752,6 +756,10 @@ async function getApiBaseUrl() {
     contextPopupEnabled:
 
       typeof stored?.[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
+
+    aboutPageLinkGeneratorEnabled:
+
+      typeof stored?.[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] === "boolean" ? stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] : false,
 
     themeMode: normalizeThemeMode(stored?.[THEME_MODE_KEY], "auto"),
 
@@ -21701,6 +21709,8 @@ async function openRemovalConfigEditor(context) {
 
       AUTO_CLOSE_KEY, INTERCEPT_NATIVE_REMOVE_KEY, CONTEXT_POPUP_ENABLED_KEY,
 
+      ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY,
+
       QUEUE_BAR_SCOPE_KEY, QUEUE_BAR_FIXED_SUBREDDIT_KEY, QUEUE_BAR_LINK_HOST_KEY,
 
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
@@ -21748,6 +21758,8 @@ async function openRemovalConfigEditor(context) {
       intercept_native_remove: typeof stored[INTERCEPT_NATIVE_REMOVE_KEY] === "boolean" ? stored[INTERCEPT_NATIVE_REMOVE_KEY] : true,
 
       context_popup_enabled: typeof stored[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
+
+      about_page_link_generator_enabled: typeof stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] === "boolean" ? stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] : false,
 
       theme_mode: normalizeThemeMode(stored[THEME_MODE_KEY], "auto"),
 
@@ -24097,6 +24109,14 @@ function renderRemovalConfigEditor() {
 
               <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
 
+                <input type="checkbox" data-ext-setting="about_page_link_generator_enabled" ${extensionSettings.about_page_link_generator_enabled ? "checked" : ""} />
+
+                <span>Show "Generate ModBox ban links" button on About page</span>
+
+              </label>
+
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+
                 <input type="checkbox" data-ext-setting="comment_nuke_ignore_distinguished" ${extensionSettings.comment_nuke_ignore_distinguished ? "checked" : ""} />
 
                 <span>Skip moderator/admin distinguished comments when using Comment Nuke</span>
@@ -24599,7 +24619,7 @@ function renderRemovalConfigEditor() {
 
       }
 
-      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
+      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "about_page_link_generator_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
 
         removalConfigEditorState.extensionSettings[key] = Boolean(event.target.checked);
 
@@ -24766,6 +24786,10 @@ function renderRemovalConfigEditor() {
         intercept_native_remove: typeof s.intercept_native_remove === "boolean" ? s.intercept_native_remove : true,
 
         context_popup_enabled: typeof s.context_popup_enabled === "boolean" ? s.context_popup_enabled : true,
+
+        about_page_link_generator_enabled:
+
+          typeof s.about_page_link_generator_enabled === "boolean" ? s.about_page_link_generator_enabled : false,
 
         theme_mode: normalizeThemeMode(s.theme_mode, "auto"),
 
@@ -26111,6 +26135,8 @@ function renderRemovalConfigEditor() {
 
         const contextPopup = typeof s.context_popup_enabled === "boolean" ? s.context_popup_enabled : true;
 
+        const aboutPageLinkGeneratorEnabled = typeof s.about_page_link_generator_enabled === "boolean" ? s.about_page_link_generator_enabled : false;
+
         const queueScope = normalizeQueueBarScope(s.queue_bar_scope, "current_subreddit");
 
         const fixedSubreddit = normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null;
@@ -26144,6 +26170,8 @@ function renderRemovalConfigEditor() {
           [INTERCEPT_NATIVE_REMOVE_KEY]: interceptNative,
 
           [CONTEXT_POPUP_ENABLED_KEY]: contextPopup,
+
+          [ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY]: aboutPageLinkGeneratorEnabled,
 
           [QUEUE_BAR_SCOPE_KEY]: queueScope,
 
@@ -31197,25 +31225,27 @@ function renderAboutPage() {
 
           <h2 class="rrw-about-page-title">About ModBox</h2>
 
-          <button 
+          ${aboutPageState?.linkGeneratorEnabled ? `
 
-            type="button" 
+            <button 
 
-            class="rrw-about-page-link-gen-btn" 
+              type="button" 
 
-            data-about-link-gen="1"
+              class="rrw-about-page-link-gen-btn" 
 
-            title="Generate ModBox ban links"
+              data-about-link-gen="1"
 
-          >
+              title="Generate ModBox ban links"
 
-            ${String.fromCodePoint(0x1F517)}
+            >
 
-          </button>
+              ${String.fromCodePoint(0x1F517)}
+
+            </button>
+
+          ` : ""}
 
         </header>
-
-
 
         <div class="rrw-about-page-body">
 
@@ -31335,7 +31365,13 @@ async function openAboutPage() {
 
     const installedVersion = await getInstalledVersion();
 
-    const updateStatus = await getUpdateStatus();
+    const [updateStatus, extensionSettings] = await Promise.all([
+
+      getUpdateStatus(),
+
+      getApiBaseUrl(),
+
+    ]);
 
 
 
@@ -31350,6 +31386,8 @@ async function openAboutPage() {
       changelog: updateStatus?.latestEntry?.changelog || "No changelog available",
 
       downloadUrl: getAboutPageDownloadUrl(updateStatus),
+
+      linkGeneratorEnabled: Boolean(extensionSettings.aboutPageLinkGeneratorEnabled),
 
     };
 

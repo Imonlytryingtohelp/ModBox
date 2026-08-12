@@ -574,6 +574,7 @@ async function openRemovalConfigEditor(context) {
   const [stored, wikiPage] = await Promise.all([
     ext.storage.sync.get([
       AUTO_CLOSE_KEY, INTERCEPT_NATIVE_REMOVE_KEY, CONTEXT_POPUP_ENABLED_KEY,
+      ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY,
       QUEUE_BAR_SCOPE_KEY, QUEUE_BAR_FIXED_SUBREDDIT_KEY, QUEUE_BAR_LINK_HOST_KEY,
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
       COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, REPOST_CHECKER_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
@@ -598,6 +599,7 @@ async function openRemovalConfigEditor(context) {
       auto_close_on_remove: typeof stored[AUTO_CLOSE_KEY] === "boolean" ? stored[AUTO_CLOSE_KEY] : false,
       intercept_native_remove: typeof stored[INTERCEPT_NATIVE_REMOVE_KEY] === "boolean" ? stored[INTERCEPT_NATIVE_REMOVE_KEY] : true,
       context_popup_enabled: typeof stored[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
+      about_page_link_generator_enabled: typeof stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] === "boolean" ? stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] : false,
       theme_mode: normalizeThemeMode(stored[THEME_MODE_KEY], "auto"),
       queue_bar_scope: normalizeQueueBarScope(stored[QUEUE_BAR_SCOPE_KEY], "current_subreddit"),
       queue_bar_fixed_subreddit: normalizeSubreddit(stored[QUEUE_BAR_FIXED_SUBREDDIT_KEY] || "") || null,

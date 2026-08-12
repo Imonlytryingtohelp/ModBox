@@ -19,6 +19,7 @@ const INLINE_MODLOG_ROOT_ID = "rrw-inline-modlog-root";
 const AUTO_CLOSE_KEY = "autoCloseOnRemove";
 const INTERCEPT_NATIVE_REMOVE_KEY = "interceptNativeRemove";
 const CONTEXT_POPUP_ENABLED_KEY = "contextPopupEnabled";
+const ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY = "aboutPageLinkGeneratorEnabled";
 const HISTORY_BUTTON_ENABLED_KEY = "historyButtonEnabled";
 const REPOST_CHECKER_BUTTON_ENABLED_KEY = "repostCheckerButtonEnabled";
 const COMMENT_NUKE_BUTTON_ENABLED_KEY = "commentNukeButtonEnabled";

@@ -838,6 +838,10 @@ function renderRemovalConfigEditor() {
                 <span>Show comment nuke button on comments</span>
               </label>
               <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
+                <input type="checkbox" data-ext-setting="about_page_link_generator_enabled" ${extensionSettings.about_page_link_generator_enabled ? "checked" : ""} />
+                <span>Show "Generate ModBox ban links" button on About page</span>
+              </label>
+              <label class="rrw-field rrw-field--checkbox rrw-config-inline-toggle">
                 <input type="checkbox" data-ext-setting="comment_nuke_ignore_distinguished" ${extensionSettings.comment_nuke_ignore_distinguished ? "checked" : ""} />
                 <span>Skip moderator/admin distinguished comments when using Comment Nuke</span>
               </label>
@@ -1089,7 +1093,7 @@ function renderRemovalConfigEditor() {
       if (!removalConfigEditorState.extensionSettings) {
         removalConfigEditorState.extensionSettings = {};
       }
-      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
+      if (["auto_close_on_remove", "intercept_native_remove", "context_popup_enabled", "about_page_link_generator_enabled", "queue_bar_open_in_new_tab", "queue_bar_use_old_reddit", "comment_nuke_ignore_distinguished", "history_button_enabled", "repost_checker_button_enabled", "comment_nuke_button_enabled"].includes(key)) {
         removalConfigEditorState.extensionSettings[key] = Boolean(event.target.checked);
       } else if (key === "theme_mode") {
         removalConfigEditorState.extensionSettings.theme_mode = normalizeThemeMode(event.target.value, "auto");
@@ -1173,6 +1177,8 @@ function renderRemovalConfigEditor() {
         auto_close_on_remove: typeof s.auto_close_on_remove === "boolean" ? s.auto_close_on_remove : false,
         intercept_native_remove: typeof s.intercept_native_remove === "boolean" ? s.intercept_native_remove : true,
         context_popup_enabled: typeof s.context_popup_enabled === "boolean" ? s.context_popup_enabled : true,
+        about_page_link_generator_enabled:
+          typeof s.about_page_link_generator_enabled === "boolean" ? s.about_page_link_generator_enabled : false,
         theme_mode: normalizeThemeMode(s.theme_mode, "auto"),
         queue_bar_scope: normalizeQueueBarScope(s.queue_bar_scope, "current_subreddit"),
         queue_bar_fixed_subreddit: normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null,
@@ -1845,6 +1851,7 @@ function renderRemovalConfigEditor() {
         const autoClose = typeof s.auto_close_on_remove === "boolean" ? s.auto_close_on_remove : false;
         const interceptNative = typeof s.intercept_native_remove === "boolean" ? s.intercept_native_remove : true;
         const contextPopup = typeof s.context_popup_enabled === "boolean" ? s.context_popup_enabled : true;
+        const aboutPageLinkGeneratorEnabled = typeof s.about_page_link_generator_enabled === "boolean" ? s.about_page_link_generator_enabled : false;
         const queueScope = normalizeQueueBarScope(s.queue_bar_scope, "current_subreddit");
         const fixedSubreddit = normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null;
         const linkHost = normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference");
@@ -1862,6 +1869,7 @@ function renderRemovalConfigEditor() {
           [AUTO_CLOSE_KEY]: autoClose,
           [INTERCEPT_NATIVE_REMOVE_KEY]: interceptNative,
           [CONTEXT_POPUP_ENABLED_KEY]: contextPopup,
+          [ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY]: aboutPageLinkGeneratorEnabled,
           [QUEUE_BAR_SCOPE_KEY]: queueScope,
           [QUEUE_BAR_FIXED_SUBREDDIT_KEY]: fixedSubreddit,
           [QUEUE_BAR_LINK_HOST_KEY]: linkHost,

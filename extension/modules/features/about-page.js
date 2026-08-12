@@ -171,16 +171,17 @@ function renderAboutPage() {
       <div class="rrw-about-page">
         <header class="rrw-about-page-header">
           <h2 class="rrw-about-page-title">About ModBox</h2>
-          <button 
-            type="button" 
-            class="rrw-about-page-link-gen-btn" 
-            data-about-link-gen="1"
-            title="Generate ModBox ban links"
-          >
-            ${String.fromCodePoint(0x1F517)}
-          </button>
+          ${aboutPageState?.linkGeneratorEnabled ? `
+            <button 
+              type="button" 
+              class="rrw-about-page-link-gen-btn" 
+              data-about-link-gen="1"
+              title="Generate ModBox ban links"
+            >
+              ${String.fromCodePoint(0x1F517)}
+            </button>
+          ` : ""}
         </header>
-
         <div class="rrw-about-page-body">
           <div class="rrw-about-page-version-section">
             <div class="rrw-about-page-version-card">
@@ -240,7 +241,10 @@ function renderAboutPage() {
 async function openAboutPage() {
   try {
     const installedVersion = await getInstalledVersion();
-    const updateStatus = await getUpdateStatus();
+    const [updateStatus, extensionSettings] = await Promise.all([
+      getUpdateStatus(),
+      getApiBaseUrl(),
+    ]);
 
     aboutPageState = {
       installedVersion,
@@ -248,6 +252,7 @@ async function openAboutPage() {
       isUpdateAvailable: updateStatus?.isUpdateAvailable || false,
       changelog: updateStatus?.latestEntry?.changelog || "No changelog available",
       downloadUrl: getAboutPageDownloadUrl(updateStatus),
+      linkGeneratorEnabled: Boolean(extensionSettings.aboutPageLinkGeneratorEnabled),
     };
 
     renderAboutPage();

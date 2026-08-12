@@ -231,6 +231,7 @@ async function getApiBaseUrl() {
     CONTEXT_POPUP_ENABLED_KEY,
     THEME_MODE_KEY,
     CANNED_REPLIES_WIKI_URL_KEY,
+    ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY,
   ]);
 
   const scope = String(stored?.buttonVisibilityScope || "configured_plus_mod");
@@ -259,6 +260,8 @@ async function getApiBaseUrl() {
     queueBarPosition: queuePosition,
     contextPopupEnabled:
       typeof stored?.[CONTEXT_POPUP_ENABLED_KEY] === "boolean" ? stored[CONTEXT_POPUP_ENABLED_KEY] : true,
+    aboutPageLinkGeneratorEnabled:
+      typeof stored?.[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] === "boolean" ? stored[ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY] : false,
     themeMode: normalizeThemeMode(stored?.[THEME_MODE_KEY], "auto"),
     cannedRepliesWikiUrl: String(stored?.[CANNED_REPLIES_WIKI_URL_KEY] || "").trim(),
   };
