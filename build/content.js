@@ -19159,7 +19159,7 @@ function injectStyles() {
 
       max-height: 85vh;
 
-      overflow-y: auto;
+      overflow: hidden;
 
     }
 
@@ -19179,11 +19179,13 @@ function injectStyles() {
 
       color: var(--rrw-text);
 
-      overflow: hidden;
-
       display: flex;
 
       flex-direction: column;
+
+      min-height: 0;
+
+      max-height: 85vh;
 
     }
 
@@ -19327,9 +19329,15 @@ function injectStyles() {
 
       padding: 26px;
 
-      overflow-y: auto;
+      overflow: hidden;
 
       flex: 1;
+
+      display: flex;
+
+      flex-direction: column;
+
+      min-height: 0;
 
       font-family: var(--rrw-font-family);
 
@@ -19499,7 +19507,15 @@ function injectStyles() {
 
     .rrw-about-page-changelog {
 
-      margin-bottom: 20px;
+      margin: 0 0 20px 0;
+
+      display: flex;
+
+      flex-direction: column;
+
+      min-height: 0;
+
+      flex: 1;
 
     }
 
@@ -19549,9 +19565,13 @@ function injectStyles() {
 
       word-break: break-word;
 
-      max-height: 280px;
+      max-height: 300px;
 
       overflow-y: auto;
+
+      min-height: 0;
+
+      flex: 1;
 
     }
 

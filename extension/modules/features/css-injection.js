@@ -3933,7 +3933,7 @@ function injectStyles() {
       max-width: 580px;
       width: 90%;
       max-height: 85vh;
-      overflow-y: auto;
+      overflow: hidden;
     }
 
     .rrw-about-page {
@@ -3943,9 +3943,10 @@ function injectStyles() {
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
       font-family: var(--rrw-font-family);
       color: var(--rrw-text);
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 0;
+      max-height: 85vh;
     }
 
     .rrw-about-page-header {
@@ -4017,8 +4018,11 @@ function injectStyles() {
 
     .rrw-about-page-body {
       padding: 26px;
-      overflow-y: auto;
+      overflow: hidden;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
       font-family: var(--rrw-font-family);
     }
 
@@ -4103,7 +4107,11 @@ function injectStyles() {
     }
 
     .rrw-about-page-changelog {
-      margin-bottom: 20px;
+      margin: 0 0 20px 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1;
     }
 
     .rrw-about-page-changelog-title {
@@ -4128,8 +4136,10 @@ function injectStyles() {
       font-family: var(--rrw-font-family);
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 280px;
+      max-height: 300px;
       overflow-y: auto;
+      min-height: 0;
+      flex: 1;
     }
 
     .rrw-about-page-footer {
