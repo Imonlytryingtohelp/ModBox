@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.8.2 - Queue Box Improvements
+
+- **Draggable Queue Bar** - ModBox Queue Bar can now be moved temporarily by clicking and dragging the header to reposition it out of the way of native Reddit buttons or other elements. The box stays in the new position until the page is refreshed or the header is double-clicked to snap back to the original preset position.
+
 ## 1.8.1 - Bug Fixes
 
 - **Fixed** malformed "Open on Reddit" link generation. `buildRedditUrl()` now normalizes permalinks (handles absolute and protocol-relative URLs, recovers from malformed inputs like `https//...`) and ensures the correct reddit host.    
