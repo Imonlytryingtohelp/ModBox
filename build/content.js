@@ -11571,6 +11571,28 @@ function injectStyles() {
 
       padding: 0;
 
+      cursor: grab;
+
+      user-select: none;
+
+      -webkit-user-select: none;
+
+    }
+
+
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-header {
+
+      cursor: grabbing;
+
+    }
+
+
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar {
+
+      box-shadow: 0 10px 26px rgba(5, 9, 14, 0.45), 0 0 0 2px rgba(100, 150, 255, 0.4);
+
     }
 
 
@@ -26611,6 +26633,148 @@ function parseModmailUnreadCount(payload) {
 
 
 
+// â”€â”€â”€â”€ Queue Bar Drag State â”€â”€â”€â”€
+
+
+
+let isDraggingQueueBar = false;
+
+let dragStartX = 0;
+
+let dragStartY = 0;
+
+let dragStartBottom = 0;
+
+let dragStartRight = 0;
+
+let queueBarRootElement = null;
+
+
+
+function handleQueueBarDragStart(event) {
+
+  if (event.button !== 0) return; // Only left mouse button
+
+  isDraggingQueueBar = true;
+
+  dragStartX = event.clientX;
+
+  dragStartY = event.clientY;
+
+  
+
+  queueBarRootElement = document.getElementById("rrw-queuebar-root");
+
+  if (!queueBarRootElement) return;
+
+  
+
+  const rect = queueBarRootElement.getBoundingClientRect();
+
+  dragStartBottom = window.innerHeight - (rect.bottom);
+
+  dragStartRight = window.innerWidth - (rect.right);
+
+  
+
+  queueBarRootElement.setAttribute("data-dragging", "1");
+
+  document.addEventListener("pointermove", handleQueueBarDragMove);
+
+  document.addEventListener("pointerup", handleQueueBarDragEnd);
+
+}
+
+
+
+function handleQueueBarDragMove(event) {
+
+  if (!isDraggingQueueBar || !queueBarRootElement) return;
+
+  
+
+  const deltaX = event.clientX - dragStartX;
+
+  const deltaY = event.clientY - dragStartY;
+
+  
+
+  let newBottom = dragStartBottom - deltaY;
+
+  let newRight = dragStartRight - deltaX;
+
+  
+
+  // Boundary constraints (5px safety margin from viewport edges)
+
+  const minMargin = 5;
+
+  const maxBottom = window.innerHeight - minMargin - 50; // 50px min height
+
+  const maxRight = window.innerWidth - minMargin - 50; // 50px min width
+
+  
+
+  newBottom = Math.max(minMargin, Math.min(newBottom, maxBottom));
+
+  newRight = Math.max(minMargin, Math.min(newRight, maxRight));
+
+  
+
+  queueBarRootElement.style.bottom = `${newBottom}px`;
+
+  queueBarRootElement.style.right = `${newRight}px`;
+
+  queueBarRootElement.style.left = "auto";
+
+}
+
+
+
+function handleQueueBarDragEnd(event) {
+
+  if (!isDraggingQueueBar) return;
+
+  
+
+  isDraggingQueueBar = false;
+
+  if (queueBarRootElement) {
+
+    queueBarRootElement.removeAttribute("data-dragging");
+
+  }
+
+  
+
+  document.removeEventListener("pointermove", handleQueueBarDragMove);
+
+  document.removeEventListener("pointerup", handleQueueBarDragEnd);
+
+}
+
+
+
+function handleQueueBarHeaderDoubleClick(event) {
+
+  const root = document.getElementById("rrw-queuebar-root");
+
+  if (!root) return;
+
+  
+
+  // Clear inline styles to snap back to preset position
+
+  root.style.bottom = "";
+
+  root.style.right = "";
+
+  root.style.left = "";
+
+}
+
+
+
 // â”€â”€â”€â”€ Queue Bar Context & Cache Management â”€â”€â”€â”€
 
 
@@ -27654,6 +27818,10 @@ function renderQueueBar(state) {
   const header = document.createElement("header");
 
   header.className = "rrw-queuebar-header";
+
+  header.addEventListener("pointerdown", handleQueueBarDragStart);
+
+  header.addEventListener("dblclick", handleQueueBarHeaderDoubleClick);
 
 
 

@@ -135,6 +135,17 @@ function injectStyles() {
       justify-content: space-between;
       gap: 6px;
       padding: 0;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-header {
+      cursor: grabbing;
+    }
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar {
+      box-shadow: 0 10px 26px rgba(5, 9, 14, 0.45), 0 0 0 2px rgba(100, 150, 255, 0.4);
     }
 
     .rrw-queuebar[data-collapsed="1"] .rrw-queuebar-header {

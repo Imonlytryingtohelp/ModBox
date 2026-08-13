@@ -77,6 +77,77 @@ function parseModmailUnreadCount(payload) {
   return null;
 }
 
+// ──── Queue Bar Drag State ────
+
+let isDraggingQueueBar = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartBottom = 0;
+let dragStartRight = 0;
+let queueBarRootElement = null;
+
+function handleQueueBarDragStart(event) {
+  if (event.button !== 0) return; // Only left mouse button
+  isDraggingQueueBar = true;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  
+  queueBarRootElement = document.getElementById("rrw-queuebar-root");
+  if (!queueBarRootElement) return;
+  
+  const rect = queueBarRootElement.getBoundingClientRect();
+  dragStartBottom = window.innerHeight - (rect.bottom);
+  dragStartRight = window.innerWidth - (rect.right);
+  
+  queueBarRootElement.setAttribute("data-dragging", "1");
+  document.addEventListener("pointermove", handleQueueBarDragMove);
+  document.addEventListener("pointerup", handleQueueBarDragEnd);
+}
+
+function handleQueueBarDragMove(event) {
+  if (!isDraggingQueueBar || !queueBarRootElement) return;
+  
+  const deltaX = event.clientX - dragStartX;
+  const deltaY = event.clientY - dragStartY;
+  
+  let newBottom = dragStartBottom - deltaY;
+  let newRight = dragStartRight - deltaX;
+  
+  // Boundary constraints (5px safety margin from viewport edges)
+  const minMargin = 5;
+  const maxBottom = window.innerHeight - minMargin - 50; // 50px min height
+  const maxRight = window.innerWidth - minMargin - 50; // 50px min width
+  
+  newBottom = Math.max(minMargin, Math.min(newBottom, maxBottom));
+  newRight = Math.max(minMargin, Math.min(newRight, maxRight));
+  
+  queueBarRootElement.style.bottom = `${newBottom}px`;
+  queueBarRootElement.style.right = `${newRight}px`;
+  queueBarRootElement.style.left = "auto";
+}
+
+function handleQueueBarDragEnd(event) {
+  if (!isDraggingQueueBar) return;
+  
+  isDraggingQueueBar = false;
+  if (queueBarRootElement) {
+    queueBarRootElement.removeAttribute("data-dragging");
+  }
+  
+  document.removeEventListener("pointermove", handleQueueBarDragMove);
+  document.removeEventListener("pointerup", handleQueueBarDragEnd);
+}
+
+function handleQueueBarHeaderDoubleClick(event) {
+  const root = document.getElementById("rrw-queuebar-root");
+  if (!root) return;
+  
+  // Clear inline styles to snap back to preset position
+  root.style.bottom = "";
+  root.style.right = "";
+  root.style.left = "";
+}
+
 // ──── Queue Bar Context & Cache Management ────
 
 function clearQueueBarContextCache() {
@@ -599,6 +670,8 @@ function renderQueueBar(state) {
 
   const header = document.createElement("header");
   header.className = "rrw-queuebar-header";
+  header.addEventListener("pointerdown", handleQueueBarDragStart);
+  header.addEventListener("dblclick", handleQueueBarHeaderDoubleClick);
 
   const titleWrap = document.createElement("div");
   titleWrap.className = "rrw-queuebar-title-wrap";
