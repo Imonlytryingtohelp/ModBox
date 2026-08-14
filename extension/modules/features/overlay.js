@@ -673,9 +673,9 @@ function renderOverlay() {
               </label>
             </section>
 
-            <div class="rrw-sticky-footer">
-                ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
-                ${missingReasonMessage ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(missingReasonMessage)}</p>` : ""}
+            <div class="rrw-sticky-footer${hasIncompleteDropdowns || missingReasonMessage ? " rrw-sticky-footer--warn" : ""}">
+                ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
+                ${missingReasonMessage ? `<p class="rrw-validation-warning">${escapeHtml(missingReasonMessage)}</p>` : ""}
               <div class="rrw-actions">
                 ${thingType === "comment" ? `<button type="button" class="rrw-btn rrw-btn-danger" id="rrw-comment-nuke" ${submitting || !canAct ? "disabled" : ""}>Nuke Thread</button>` : ""}
                 ${overlayState.skipRedditRemove ? "" : `<button type="button" class="rrw-btn rrw-btn-secondary" id="rrw-approve" ${submitting || !canAct ? "disabled" : ""}>Approve</button>`}

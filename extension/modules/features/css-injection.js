@@ -1554,8 +1554,10 @@ function injectStyles() {
       top: 50%;
       left: 50%;
       width: min(680px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
       max-height: calc(100vh - 32px);
-      overflow: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
       transform: translate(-50%, -50%);
       background: var(--rrw-modal-bg);
       color: var(--rrw-text);
@@ -1667,6 +1669,24 @@ function injectStyles() {
       padding: 14px 16px 16px;
       display: grid;
       gap: 12px;
+      overflow-x: hidden;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+
+    .rrw-overlay-modal *,
+    .rrw-overlay-body *,
+    .rrw-fieldset,
+    .rrw-checklist,
+    .rrw-target-card,
+    .rrw-target-body,
+    .rrw-preview-panel,
+    .rrw-inline-usernote-panel,
+    .rrw-user-actions-panel {
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .rrw-tabs {
@@ -1705,11 +1725,27 @@ function injectStyles() {
       position: sticky;
       bottom: 0;
       display: grid;
-      gap: 6px;
+      gap: 4px;
+      width: 100%;
+      background: transparent;
+      border-top: none;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .rrw-sticky-footer--warn {
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
       border-top: 1px solid var(--rrw-soft-border);
-      margin: 4px -16px -16px;
-      padding: 12px 16px 16px;
+      padding-top: 8px;
+    }
+
+    .rrw-validation-warning {
+      margin: 0;
+      padding: 6px 0 0;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #d32f2f;
     }
 
     .rrw-target-card {
@@ -1737,6 +1773,13 @@ function injectStyles() {
       line-height: 1.35;
       color: var(--rrw-text);
       word-break: break-word;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+    }
+
+    .rrw-target-body *,
+    .rrw-target-body > * {
+      max-width: 100%;
     }
 
     .rrw-target-body--collapsed {
@@ -1803,8 +1846,14 @@ function injectStyles() {
       background: var(--rrw-field-bg);
       border-radius: 8px;
       padding: 8px;
-      overflow: auto;
-      white-space: pre;
+      overflow-x: hidden;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      max-width: 100%;
+      box-sizing: border-box;
+      min-width: 0;
     }
 
     .rrw-field {
@@ -1892,6 +1941,9 @@ function injectStyles() {
       max-height: 160px;
       overflow: auto;
       padding-right: 2px;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
 
     .rrw-preview-panel {
@@ -1910,6 +1962,17 @@ function injectStyles() {
       border-radius: 10px;
       background: var(--rrw-card-bg);
       padding: 10px 12px;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .rrw-inline-usernote-panel textarea,
+    .rrw-inline-usernote-panel .rrw-field,
+    .rrw-inline-usernote-panel .rrw-field select {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .rrw-user-actions-panel {
@@ -1963,8 +2026,12 @@ function injectStyles() {
       font-size: 0.8rem;
       line-height: 1.4;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
       word-break: break-word;
+      overflow-x: hidden;
       overflow-y: auto;
+      max-width: 100%;
+      box-sizing: border-box;
       max-height: none;
     }
 
@@ -1990,6 +2057,8 @@ function injectStyles() {
       text-align: left;
       line-height: 1.25;
       word-break: break-word;
+      overflow-wrap: anywhere;
+      max-width: 100%;
     }
 
     .rrw-field input,
@@ -2009,6 +2078,8 @@ function injectStyles() {
       display: flex !important;
       gap: 2px !important;
       flex-wrap: wrap !important;
+      width: 100%;
+      margin-top: 0 !important;
     }
 
     .rrw-actions--inline {

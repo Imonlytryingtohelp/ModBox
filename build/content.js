@@ -14409,9 +14409,13 @@ function injectStyles() {
 
       width: min(680px, calc(100vw - 32px));
 
+      max-width: calc(100vw - 32px);
+
       max-height: calc(100vh - 32px);
 
-      overflow: auto;
+      overflow-x: hidden;
+
+      overflow-y: auto;
 
       transform: translate(-50%, -50%);
 
@@ -14635,6 +14639,42 @@ function injectStyles() {
 
       gap: 12px;
 
+      overflow-x: hidden;
+
+      max-width: 100%;
+
+      min-width: 0;
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    .rrw-overlay-modal *,
+
+    .rrw-overlay-body *,
+
+    .rrw-fieldset,
+
+    .rrw-checklist,
+
+    .rrw-target-card,
+
+    .rrw-target-body,
+
+    .rrw-preview-panel,
+
+    .rrw-inline-usernote-panel,
+
+    .rrw-user-actions-panel {
+
+      max-width: 100%;
+
+      min-width: 0;
+
+      box-sizing: border-box;
+
     }
 
 
@@ -14711,15 +14751,47 @@ function injectStyles() {
 
       display: grid;
 
-      gap: 6px;
+      gap: 4px;
+
+      width: 100%;
+
+      background: transparent;
+
+      border-top: none;
+
+      margin: 0;
+
+      padding: 0;
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    .rrw-sticky-footer--warn {
 
       background: linear-gradient(to top, var(--rrw-footer-bg-top), var(--rrw-footer-bg-bottom));
 
       border-top: 1px solid var(--rrw-soft-border);
 
-      margin: 4px -16px -16px;
+      padding-top: 8px;
 
-      padding: 12px 16px 16px;
+    }
+
+
+
+    .rrw-validation-warning {
+
+      margin: 0;
+
+      padding: 6px 0 0;
+
+      font-size: 12px;
+
+      line-height: 1.35;
+
+      color: #d32f2f;
 
     }
 
@@ -14774,6 +14846,20 @@ function injectStyles() {
       color: var(--rrw-text);
 
       word-break: break-word;
+
+      overflow-wrap: anywhere;
+
+      max-width: 100%;
+
+    }
+
+
+
+    .rrw-target-body *,
+
+    .rrw-target-body > * {
+
+      max-width: 100%;
 
     }
 
@@ -14907,9 +14993,21 @@ function injectStyles() {
 
       padding: 8px;
 
-      overflow: auto;
+      overflow-x: hidden;
 
-      white-space: pre;
+      overflow-y: auto;
+
+      white-space: pre-wrap;
+
+      overflow-wrap: anywhere;
+
+      word-break: break-word;
+
+      max-width: 100%;
+
+      box-sizing: border-box;
+
+      min-width: 0;
 
     }
 
@@ -15085,6 +15183,12 @@ function injectStyles() {
 
       padding-right: 2px;
 
+      min-width: 0;
+
+      max-width: 100%;
+
+      overflow-wrap: anywhere;
+
     }
 
 
@@ -15120,6 +15224,28 @@ function injectStyles() {
       background: var(--rrw-card-bg);
 
       padding: 10px 12px;
+
+      width: 100%;
+
+      max-width: 100%;
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    .rrw-inline-usernote-panel textarea,
+
+    .rrw-inline-usernote-panel .rrw-field,
+
+    .rrw-inline-usernote-panel .rrw-field select {
+
+      width: 100%;
+
+      max-width: 100%;
+
+      box-sizing: border-box;
 
     }
 
@@ -15227,9 +15353,17 @@ function injectStyles() {
 
       white-space: pre-wrap;
 
+      overflow-wrap: anywhere;
+
       word-break: break-word;
 
+      overflow-x: hidden;
+
       overflow-y: auto;
+
+      max-width: 100%;
+
+      box-sizing: border-box;
 
       max-height: none;
 
@@ -15281,6 +15415,10 @@ function injectStyles() {
 
       word-break: break-word;
 
+      overflow-wrap: anywhere;
+
+      max-width: 100%;
+
     }
 
 
@@ -15318,6 +15456,10 @@ function injectStyles() {
       gap: 2px !important;
 
       flex-wrap: wrap !important;
+
+      width: 100%;
+
+      margin-top: 0 !important;
 
     }
 
@@ -33035,11 +33177,11 @@ function renderOverlay() {
 
 
 
-            <div class="rrw-sticky-footer">
+            <div class="rrw-sticky-footer${hasIncompleteDropdowns || missingReasonMessage ? " rrw-sticky-footer--warn" : ""}">
 
-                ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
+                ${hasIncompleteDropdowns ? `<p class="rrw-validation-warning">${escapeHtml(incompleteDropdownsMessage)}</p>` : ""}
 
-                ${missingReasonMessage ? `<p class="rrw-validation-warning" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px 0; border-top: 1px solid #e0e0e0; padding-top: 12px;">${escapeHtml(missingReasonMessage)}</p>` : ""}
+                ${missingReasonMessage ? `<p class="rrw-validation-warning">${escapeHtml(missingReasonMessage)}</p>` : ""}
 
               <div class="rrw-actions">
 
