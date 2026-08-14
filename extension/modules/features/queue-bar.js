@@ -87,19 +87,34 @@ let dragStartRight = 0;
 let queueBarRootElement = null;
 
 function handleQueueBarDragStart(event) {
+  if (!(event instanceof PointerEvent)) return;
   if (event.button !== 0) return; // Only left mouse button
+
+  const target = event.target;
+  if (target instanceof Element && target.closest("button, a, input, textarea, select, [role='button']")) {
+    return;
+  }
+
+  const dragHandle = target instanceof Element ? target.closest(".rrw-queuebar-drag-handle") : null;
+  if (!dragHandle) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
   isDraggingQueueBar = true;
   dragStartX = event.clientX;
   dragStartY = event.clientY;
-  
+
   queueBarRootElement = document.getElementById("rrw-queuebar-root");
   if (!queueBarRootElement) return;
-  
+
   const rect = queueBarRootElement.getBoundingClientRect();
   dragStartBottom = window.innerHeight - (rect.bottom);
   dragStartRight = window.innerWidth - (rect.right);
-  
+
   queueBarRootElement.setAttribute("data-dragging", "1");
+  queueBarRootElement.style.willChange = "right, bottom";
   document.addEventListener("pointermove", handleQueueBarDragMove);
   document.addEventListener("pointerup", handleQueueBarDragEnd);
 }
@@ -128,12 +143,13 @@ function handleQueueBarDragMove(event) {
 
 function handleQueueBarDragEnd(event) {
   if (!isDraggingQueueBar) return;
-  
+
   isDraggingQueueBar = false;
   if (queueBarRootElement) {
     queueBarRootElement.removeAttribute("data-dragging");
+    queueBarRootElement.style.willChange = "";
   }
-  
+
   document.removeEventListener("pointermove", handleQueueBarDragMove);
   document.removeEventListener("pointerup", handleQueueBarDragEnd);
 }
@@ -670,8 +686,13 @@ function renderQueueBar(state) {
 
   const header = document.createElement("header");
   header.className = "rrw-queuebar-header";
-  header.addEventListener("pointerdown", handleQueueBarDragStart);
   header.addEventListener("dblclick", handleQueueBarHeaderDoubleClick);
+
+  const dragHandle = document.createElement("div");
+  dragHandle.className = "rrw-queuebar-drag-handle";
+  dragHandle.title = "Drag queue bar";
+  dragHandle.setAttribute("aria-label", "Drag queue bar");
+  dragHandle.addEventListener("pointerdown", handleQueueBarDragStart);
 
   const titleWrap = document.createElement("div");
   titleWrap.className = "rrw-queuebar-title-wrap";
@@ -839,6 +860,8 @@ function renderQueueBar(state) {
       url: state.links?.unmoderated,
     },
   ];
+
+  header.appendChild(dragHandle);
 
   if (queueBarCollapsed) {
     const compactList = document.createElement("div");

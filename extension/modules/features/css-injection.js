@@ -87,6 +87,7 @@ function injectStyles() {
       right: var(--rrw-queuebar-right, 10px);
       left: var(--rrw-queuebar-left, auto);
       z-index: 0;
+      will-change: right, bottom;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
     }
 
@@ -135,12 +136,43 @@ function injectStyles() {
       justify-content: space-between;
       gap: 6px;
       padding: 0;
-      cursor: grab;
       user-select: none;
       -webkit-user-select: none;
     }
 
-    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-header {
+    .rrw-queuebar-drag-handle {
+      position: relative;
+      width: 18px;
+      min-width: 18px;
+      height: 38px;
+      border-radius: 7px;
+      border: 2px solid rgba(131, 154, 188, 0.8);
+      background: rgba(111, 133, 171, 0.10);
+      box-shadow: inset 0 0 0 1px rgba(160, 180, 212, 0.18);
+      cursor: grab;
+      flex: 0 0 auto;
+      align-self: center;
+      touch-action: none;
+    }
+
+    .rrw-queuebar-drag-handle::before {
+      content: "";
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      top: 8px;
+      bottom: 8px;
+      border-radius: 3px;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(146, 168, 204, 0.9) 0,
+        rgba(146, 168, 204, 0.9) 2px,
+        transparent 2px,
+        transparent 5px
+      );
+    }
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-drag-handle {
       cursor: grabbing;
     }
 

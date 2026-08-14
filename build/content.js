@@ -11475,6 +11475,8 @@ function injectStyles() {
 
       z-index: 0;
 
+      will-change: right, bottom;
+
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
     }
@@ -11571,8 +11573,6 @@ function injectStyles() {
 
       padding: 0;
 
-      cursor: grab;
-
       user-select: none;
 
       -webkit-user-select: none;
@@ -11581,7 +11581,71 @@ function injectStyles() {
 
 
 
-    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-header {
+    .rrw-queuebar-drag-handle {
+
+      position: relative;
+
+      width: 18px;
+
+      min-width: 18px;
+
+      height: 38px;
+
+      border-radius: 7px;
+
+      border: 2px solid rgba(131, 154, 188, 0.8);
+
+      background: rgba(111, 133, 171, 0.10);
+
+      box-shadow: inset 0 0 0 1px rgba(160, 180, 212, 0.18);
+
+      cursor: grab;
+
+      flex: 0 0 auto;
+
+      align-self: center;
+
+      touch-action: none;
+
+    }
+
+
+
+    .rrw-queuebar-drag-handle::before {
+
+      content: "";
+
+      position: absolute;
+
+      left: 4px;
+
+      right: 4px;
+
+      top: 8px;
+
+      bottom: 8px;
+
+      border-radius: 3px;
+
+      background: repeating-linear-gradient(
+
+        to bottom,
+
+        rgba(146, 168, 204, 0.9) 0,
+
+        rgba(146, 168, 204, 0.9) 2px,
+
+        transparent 2px,
+
+        transparent 5px
+
+      );
+
+    }
+
+
+
+    #rrw-queuebar-root[data-dragging="1"] .rrw-queuebar-drag-handle {
 
       cursor: grabbing;
 
@@ -26653,7 +26717,35 @@ let queueBarRootElement = null;
 
 function handleQueueBarDragStart(event) {
 
+  if (!(event instanceof PointerEvent)) return;
+
   if (event.button !== 0) return; // Only left mouse button
+
+
+
+  const target = event.target;
+
+  if (target instanceof Element && target.closest("button, a, input, textarea, select, [role='button']")) {
+
+    return;
+
+  }
+
+
+
+  const dragHandle = target instanceof Element ? target.closest(".rrw-queuebar-drag-handle") : null;
+
+  if (!dragHandle) {
+
+    return;
+
+  }
+
+
+
+  event.preventDefault();
+
+  event.stopPropagation();
 
   isDraggingQueueBar = true;
 
@@ -26661,13 +26753,13 @@ function handleQueueBarDragStart(event) {
 
   dragStartY = event.clientY;
 
-  
+
 
   queueBarRootElement = document.getElementById("rrw-queuebar-root");
 
   if (!queueBarRootElement) return;
 
-  
+
 
   const rect = queueBarRootElement.getBoundingClientRect();
 
@@ -26675,9 +26767,11 @@ function handleQueueBarDragStart(event) {
 
   dragStartRight = window.innerWidth - (rect.right);
 
-  
+
 
   queueBarRootElement.setAttribute("data-dragging", "1");
+
+  queueBarRootElement.style.willChange = "right, bottom";
 
   document.addEventListener("pointermove", handleQueueBarDragMove);
 
@@ -26735,7 +26829,7 @@ function handleQueueBarDragEnd(event) {
 
   if (!isDraggingQueueBar) return;
 
-  
+
 
   isDraggingQueueBar = false;
 
@@ -26743,9 +26837,11 @@ function handleQueueBarDragEnd(event) {
 
     queueBarRootElement.removeAttribute("data-dragging");
 
+    queueBarRootElement.style.willChange = "";
+
   }
 
-  
+
 
   document.removeEventListener("pointermove", handleQueueBarDragMove);
 
@@ -27819,9 +27915,19 @@ function renderQueueBar(state) {
 
   header.className = "rrw-queuebar-header";
 
-  header.addEventListener("pointerdown", handleQueueBarDragStart);
-
   header.addEventListener("dblclick", handleQueueBarHeaderDoubleClick);
+
+
+
+  const dragHandle = document.createElement("div");
+
+  dragHandle.className = "rrw-queuebar-drag-handle";
+
+  dragHandle.title = "Drag queue bar";
+
+  dragHandle.setAttribute("aria-label", "Drag queue bar");
+
+  dragHandle.addEventListener("pointerdown", handleQueueBarDragStart);
 
 
 
@@ -28156,6 +28262,10 @@ function renderQueueBar(state) {
     },
 
   ];
+
+
+
+  header.appendChild(dragHandle);
 
 
 
