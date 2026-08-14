@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.8.3 - Bug Fixes + Wiki Update
+
+- **Fixed** Queue bar can only be dragged from a dedicated drag area. Preventing box movement when clicking buttons. 
+- **Fixed** Post Preview module no longer breaks ModBox GUI if the post contains code-blocks.
+- **Wiki Update** Updated [wiki](https://github.com/Imonlytryingtohelp/ModBox/wiki) to include current feature set. 
+
 ## 1.8.2 - Queue Box Improvements
 
 - **Draggable Queue Bar** - ModBox Queue Bar can now be moved temporarily by clicking and dragging the header to reposition it out of the way of native Reddit buttons or other elements. The box stays in the new position until the page is refreshed or the header is double-clicked to snap back to the original preset position.
