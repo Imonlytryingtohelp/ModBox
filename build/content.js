@@ -31571,6 +31571,66 @@ function bindAboutPageEvents() {
 
 
 
+function convertMarkdownLinksToHtml(text) {
+
+  // Convert markdown links [text](url) to HTML <a> tags
+
+  // First, split text by markdown links to preserve non-link content
+
+  const parts = [];
+
+  let lastIndex = 0;
+
+  const linkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
+
+  let match;
+
+
+
+  while ((match = linkRegex.exec(text)) !== null) {
+
+    // Add text before the link (escaped)
+
+    if (match.index > lastIndex) {
+
+      parts.push(escapeHtml(text.substring(lastIndex, match.index)));
+
+    }
+
+    // Add the link as HTML
+
+    const linkText = match[1];
+
+    const url = match[2];
+
+    parts.push(
+
+      `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkText)}</a>`
+
+    );
+
+    lastIndex = linkRegex.lastIndex;
+
+  }
+
+
+
+  // Add remaining text (escaped)
+
+  if (lastIndex < text.length) {
+
+    parts.push(escapeHtml(text.substring(lastIndex)));
+
+  }
+
+
+
+  return parts.length > 0 ? parts.join("") : escapeHtml(text);
+
+}
+
+
+
 function renderAboutPage() {
 
   const state = aboutPageState;
@@ -31622,6 +31682,12 @@ function renderAboutPage() {
     .slice(0, 20) // Limit to 20 lines
 
     .join("\n");
+
+  
+
+  // Convert markdown links to HTML (preserves links, escapes other content)
+
+  formattedChangelog = convertMarkdownLinksToHtml(formattedChangelog);
 
 
 
@@ -31707,7 +31773,7 @@ function renderAboutPage() {
 
             <h3 class="rrw-about-page-changelog-title">Latest Changelog</h3>
 
-            <pre class="rrw-about-page-changelog-text">${escapeHtml(formattedChangelog)}</pre>
+            <div class="rrw-about-page-changelog-text"></div>
 
           </div>
 
@@ -31774,6 +31840,22 @@ function renderAboutPage() {
 
 
   bindAboutPageEvents();
+
+
+
+  // Set changelog content with HTML links
+
+  const changelogText = root.querySelector(".rrw-about-page-changelog-text");
+
+  if (changelogText) {
+
+    // Convert newlines to <br> tags for proper formatting
+
+    const formattedText = formattedChangelog.replace(/\n/g, "<br>");
+
+    changelogText.innerHTML = formattedText;
+
+  }
 
 }
 
