@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased] - More Bug Fixes
+
+- **Fixed** [~~Issue #3~~](https://github.com/Imonlytryingtohelp/ModBox/issues/3) About page now correctly displays links in changelogs. 
+- **Updated** About page changelog view now preserves markdown formatting. (Bold, italics, etc.)
+- **Updated** Playbook confirmation popup now warns when running a playbook with a ban step. 
+
 ## 1.8.3 - Bug Fixes + Wiki Update
 
 - **Fixed** Queue bar can only be dragged from a dedicated drag area. Preventing box movement when clicking buttons. 

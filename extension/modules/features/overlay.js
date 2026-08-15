@@ -213,6 +213,71 @@ function showCannedRepliesDropdown() {
   }, 0);
 }
 
+async function confirmPlaybookExecution(message) {
+  const root = ensureOverlayRoot();
+  let backdrop = root.querySelector(".rrw-playbook-confirm-backdrop");
+  let modal = root.querySelector(".rrw-playbook-confirm-modal");
+
+  if (!(backdrop instanceof HTMLElement)) {
+    backdrop = document.createElement("div");
+    backdrop.className = "rrw-playbook-confirm-backdrop";
+    backdrop.style.position = "fixed";
+    backdrop.style.inset = "0";
+    backdrop.style.background = "rgba(0, 0, 0, 0.45)";
+    backdrop.style.zIndex = "2147483646";
+    root.appendChild(backdrop);
+  }
+
+  if (!(modal instanceof HTMLElement)) {
+    modal = document.createElement("div");
+    modal.className = "rrw-playbook-confirm-modal";
+    modal.style.position = "fixed";
+    modal.style.left = "50%";
+    modal.style.top = "50%";
+    modal.style.transform = "translate(-50%, -50%)";
+    modal.style.width = "min(420px, calc(100vw - 32px))";
+    modal.style.background = "var(--rrw-modal-bg, rgba(248, 251, 255, 0.98))";
+    modal.style.color = "var(--rrw-text, #1d2432)";
+    modal.style.borderRadius = "12px";
+    modal.style.boxShadow = "0 18px 50px rgba(0, 0, 0, 0.25)";
+    modal.style.padding = "20px 20px 16px";
+    modal.style.zIndex = "2147483647";
+    modal.style.boxSizing = "border-box";
+    root.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div style="font-size:14px; font-weight:700; letter-spacing:0.02em; text-transform:uppercase; color:var(--rrw-text-muted, #53627a);">ModBox - Confirm Action</div>
+      <div style="font-size:15px; line-height:1.5; white-space:pre-wrap; color:var(--rrw-text, #1d2432);">${escapeHtml(message)}</div>
+      <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:4px;">
+        <button type="button" class="rrw-btn rrw-btn-secondary" data-playbook-confirm="cancel" style="min-width:120px; min-height:42px; font-size:14px; font-weight:700; letter-spacing:0.04em; line-height:1; text-transform:uppercase;">Cancel</button>
+        <button type="button" class="rrw-btn rrw-btn-primary" data-playbook-confirm="ok" style="min-width:120px; min-height:42px; font-size:14px; font-weight:700; letter-spacing:0.04em; line-height:1; text-transform:uppercase;">OK</button>
+      </div>
+    </div>
+  `;
+
+  return new Promise((resolve) => {
+    const onChoice = (event) => {
+      const choice = event.currentTarget?.getAttribute("data-playbook-confirm") || "cancel";
+      backdrop.remove();
+      modal.remove();
+      resolve(choice === "ok");
+    };
+
+    const buttons = modal.querySelectorAll("[data-playbook-confirm]");
+    buttons.forEach((button) => {
+      button.addEventListener("click", onChoice, { once: true });
+    });
+
+    backdrop.addEventListener("click", () => {
+      backdrop.remove();
+      modal.remove();
+      resolve(false);
+    }, { once: true });
+  });
+}
+
 function closeOverlay() {
   clearPreviewTimer();
   if (overlayState?.keydownHandler) {
@@ -222,7 +287,7 @@ function closeOverlay() {
   overlayState = null;
   const root = document.getElementById(OVERLAY_ROOT_ID);
   if (root instanceof HTMLElement) {
-    root.querySelectorAll(".rrw-overlay-modal, .rrw-overlay-backdrop").forEach((el) => el.remove());
+    root.querySelectorAll(".rrw-playbook-confirm-modal, .rrw-playbook-confirm-backdrop, .rrw-overlay-modal, .rrw-overlay-backdrop").forEach((el) => el.remove());
   }
 }
 
@@ -315,12 +380,14 @@ function renderOverlay() {
   if (!overlayState) {
     return;
   }
-    if (isPointerDown) {
-      deferredRenders.add("overlay");
-      return;
-    }
-
   const root = ensureOverlayRoot();
+  if (root.querySelector(".rrw-playbook-confirm-modal")) {
+    return;
+  }
+  if (isPointerDown) {
+    deferredRenders.add("overlay");
+    return;
+  }
   root.setAttribute("data-rrw-theme", resolveActiveTheme());
   const viewState = captureOverlayViewState(root);
 
@@ -2151,7 +2218,12 @@ function renderOverlay() {
 
     if (playbook.confirm) {
       const stepCount = Array.isArray(playbook.steps) ? playbook.steps.length : 0;
-      const ok = window.confirm(`Run playbook \"${playbook.title}\" with ${stepCount} step${stepCount === 1 ? "" : "s"}?`);
+      const containsBanStep = Array.isArray(playbook.steps)
+        && playbook.steps.some((step) => String(step?.type || "").trim().toLowerCase() === "ban_user");
+      const confirmMessage = containsBanStep
+        ? "This playbook contains a ban step, press “OK” to proceed"
+        : `Run playbook \"${playbook.title}\" with ${stepCount} step${stepCount === 1 ? "" : "s"}?`;
+      const ok = await confirmPlaybookExecution(confirmMessage);
       if (!ok) {
         return;
       }
