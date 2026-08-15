@@ -4248,12 +4248,39 @@ function injectStyles() {
       line-height: 1.6;
       color: var(--rrw-text);
       font-family: var(--rrw-font-family);
-      white-space: pre-wrap;
       word-break: break-word;
       max-height: 300px;
       overflow-y: auto;
       min-height: 0;
       flex: 1;
+    }
+
+    .rrw-about-page-changelog-text strong,
+    .rrw-about-page-changelog-text b {
+      font-weight: bold;
+    }
+
+    .rrw-about-page-changelog-text em,
+    .rrw-about-page-changelog-text i {
+      font-style: italic;
+    }
+
+    .rrw-about-page-changelog-text code {
+      background-color: rgba(0, 0, 0, 0.1);
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+
+    .rrw-about-page-changelog-text a {
+      color: var(--rrw-link-color, #0066cc);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .rrw-about-page-changelog-text a:hover {
+      color: var(--rrw-link-hover-color, #0052a3);
     }
 
     .rrw-about-page-footer {

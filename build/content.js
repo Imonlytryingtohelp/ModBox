@@ -19797,8 +19797,6 @@ function injectStyles() {
 
       font-family: var(--rrw-font-family);
 
-      white-space: pre-wrap;
-
       word-break: break-word;
 
       max-height: 300px;
@@ -19808,6 +19806,62 @@ function injectStyles() {
       min-height: 0;
 
       flex: 1;
+
+    }
+
+
+
+    .rrw-about-page-changelog-text strong,
+
+    .rrw-about-page-changelog-text b {
+
+      font-weight: bold;
+
+    }
+
+
+
+    .rrw-about-page-changelog-text em,
+
+    .rrw-about-page-changelog-text i {
+
+      font-style: italic;
+
+    }
+
+
+
+    .rrw-about-page-changelog-text code {
+
+      background-color: rgba(0, 0, 0, 0.1);
+
+      padding: 2px 4px;
+
+      border-radius: 3px;
+
+      font-family: monospace;
+
+      font-size: 0.9em;
+
+    }
+
+
+
+    .rrw-about-page-changelog-text a {
+
+      color: var(--rrw-link-color, #0066cc);
+
+      text-decoration: underline;
+
+      cursor: pointer;
+
+    }
+
+
+
+    .rrw-about-page-changelog-text a:hover {
+
+      color: var(--rrw-link-hover-color, #0052a3);
 
     }
 
@@ -31571,61 +31625,105 @@ function bindAboutPageEvents() {
 
 
 
-function convertMarkdownLinksToHtml(text) {
+function convertMarkdownToHtml(text) {
 
-  // Convert markdown links [text](url) to HTML <a> tags
+  // Use a data structure to store converted HTML and keep track of indices
 
-  // First, split text by markdown links to preserve non-link content
-
-  const parts = [];
-
-  let lastIndex = 0;
-
-  const linkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
-
-  let match;
+  const htmlParts = [];
 
 
 
-  while ((match = linkRegex.exec(text)) !== null) {
+  // Helper to create placeholders and store HTML
 
-    // Add text before the link (escaped)
+  function createPlaceholder(html) {
 
-    if (match.index > lastIndex) {
+    const index = htmlParts.length;
 
-      parts.push(escapeHtml(text.substring(lastIndex, match.index)));
+    htmlParts.push(html);
 
-    }
+    // Use a marker that won't conflict with markdown or HTML escaping
 
-    // Add the link as HTML
-
-    const linkText = match[1];
-
-    const url = match[2];
-
-    parts.push(
-
-      `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkText)}</a>`
-
-    );
-
-    lastIndex = linkRegex.lastIndex;
+    return `\u0001${index}\u0001`;
 
   }
 
 
 
-  // Add remaining text (escaped)
-
-  if (lastIndex < text.length) {
-
-    parts.push(escapeHtml(text.substring(lastIndex)));
-
-  }
+  let result = text;
 
 
 
-  return parts.length > 0 ? parts.join("") : escapeHtml(text);
+  // Convert bold: **text** or __text__ â†’ <strong>text</strong>
+
+  result = result.replace(/\*\*(.+?)\*\*/g, (match, content) => {
+
+    return createPlaceholder(`<strong>${escapeHtml(content)}</strong>`);
+
+  });
+
+  result = result.replace(/__(.+?)__/g, (match, content) => {
+
+    return createPlaceholder(`<strong>${escapeHtml(content)}</strong>`);
+
+  });
+
+
+
+  // Convert code: `text` â†’ <code>text</code>
+
+  result = result.replace(/`(.+?)`/g, (match, content) => {
+
+    return createPlaceholder(`<code>${escapeHtml(content)}</code>`);
+
+  });
+
+
+
+  // Convert italics: *text* or _text_ â†’ <em>text</em>
+
+  result = result.replace(/\*(.+?)\*/g, (match, content) => {
+
+    return createPlaceholder(`<em>${escapeHtml(content)}</em>`);
+
+  });
+
+  result = result.replace(/_(.+?)_/g, (match, content) => {
+
+    return createPlaceholder(`<em>${escapeHtml(content)}</em>`);
+
+  });
+
+
+
+  // Convert markdown links: [text](url) â†’ <a href="url">text</a>
+
+  result = result.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, linkText, url) => {
+
+    return createPlaceholder(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkText)}</a>`);
+
+  });
+
+
+
+  // Escape any remaining plain text
+
+  result = escapeHtml(result);
+
+
+
+  // Restore placeholders with their HTML content
+
+  // Use a function to avoid issues with $ in replacement strings
+
+  result = result.replace(/\u0001(\d+)\u0001/g, (match, index) => {
+
+    return htmlParts[parseInt(index, 10)] || match;
+
+  });
+
+
+
+  return result;
 
 }
 
@@ -31667,12 +31765,6 @@ function renderAboutPage() {
 
     .replace(/^#+\s*/gm, "") // Remove headers
 
-    .replace(/\*\*/g, "")     // Remove bold
-
-    .replace(/\*/g, "")       // Remove italics
-
-    .replace(/`/g, "")        // Remove code markers
-
     .split("\n")
 
     .map(line => line.trim())
@@ -31685,9 +31777,9 @@ function renderAboutPage() {
 
   
 
-  // Convert markdown links to HTML (preserves links, escapes other content)
+  // Convert markdown formatting and links to HTML (preserves links and formatting, escapes text)
 
-  formattedChangelog = convertMarkdownLinksToHtml(formattedChangelog);
+  formattedChangelog = convertMarkdownToHtml(formattedChangelog);
 
 
 

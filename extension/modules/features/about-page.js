@@ -134,34 +134,56 @@ function bindAboutPageEvents() {
   });
 }
 
-function convertMarkdownLinksToHtml(text) {
-  // Convert markdown links [text](url) to HTML <a> tags
-  // First, split text by markdown links to preserve non-link content
-  const parts = [];
-  let lastIndex = 0;
-  const linkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
-  let match;
+function convertMarkdownToHtml(text) {
+  // Use a data structure to store converted HTML and keep track of indices
+  const htmlParts = [];
 
-  while ((match = linkRegex.exec(text)) !== null) {
-    // Add text before the link (escaped)
-    if (match.index > lastIndex) {
-      parts.push(escapeHtml(text.substring(lastIndex, match.index)));
-    }
-    // Add the link as HTML
-    const linkText = match[1];
-    const url = match[2];
-    parts.push(
-      `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkText)}</a>`
-    );
-    lastIndex = linkRegex.lastIndex;
+  // Helper to create placeholders and store HTML
+  function createPlaceholder(html) {
+    const index = htmlParts.length;
+    htmlParts.push(html);
+    // Use a marker that won't conflict with markdown or HTML escaping
+    return `\u0001${index}\u0001`;
   }
 
-  // Add remaining text (escaped)
-  if (lastIndex < text.length) {
-    parts.push(escapeHtml(text.substring(lastIndex)));
-  }
+  let result = text;
 
-  return parts.length > 0 ? parts.join("") : escapeHtml(text);
+  // Convert bold: **text** or __text__ → <strong>text</strong>
+  result = result.replace(/\*\*(.+?)\*\*/g, (match, content) => {
+    return createPlaceholder(`<strong>${escapeHtml(content)}</strong>`);
+  });
+  result = result.replace(/__(.+?)__/g, (match, content) => {
+    return createPlaceholder(`<strong>${escapeHtml(content)}</strong>`);
+  });
+
+  // Convert code: `text` → <code>text</code>
+  result = result.replace(/`(.+?)`/g, (match, content) => {
+    return createPlaceholder(`<code>${escapeHtml(content)}</code>`);
+  });
+
+  // Convert italics: *text* or _text_ → <em>text</em>
+  result = result.replace(/\*(.+?)\*/g, (match, content) => {
+    return createPlaceholder(`<em>${escapeHtml(content)}</em>`);
+  });
+  result = result.replace(/_(.+?)_/g, (match, content) => {
+    return createPlaceholder(`<em>${escapeHtml(content)}</em>`);
+  });
+
+  // Convert markdown links: [text](url) → <a href="url">text</a>
+  result = result.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (match, linkText, url) => {
+    return createPlaceholder(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkText)}</a>`);
+  });
+
+  // Escape any remaining plain text
+  result = escapeHtml(result);
+
+  // Restore placeholders with their HTML content
+  // Use a function to avoid issues with $ in replacement strings
+  result = result.replace(/\u0001(\d+)\u0001/g, (match, index) => {
+    return htmlParts[parseInt(index, 10)] || match;
+  });
+
+  return result;
 }
 
 function renderAboutPage() {
@@ -182,17 +204,14 @@ function renderAboutPage() {
   let formattedChangelog = String(changelog).trim();
   formattedChangelog = formattedChangelog
     .replace(/^#+\s*/gm, "") // Remove headers
-    .replace(/\*\*/g, "")     // Remove bold
-    .replace(/\*/g, "")       // Remove italics
-    .replace(/`/g, "")        // Remove code markers
     .split("\n")
     .map(line => line.trim())
     .filter(line => line.length > 0)
     .slice(0, 20) // Limit to 20 lines
     .join("\n");
   
-  // Convert markdown links to HTML (preserves links, escapes other content)
-  formattedChangelog = convertMarkdownLinksToHtml(formattedChangelog);
+  // Convert markdown formatting and links to HTML (preserves links and formatting, escapes text)
+  formattedChangelog = convertMarkdownToHtml(formattedChangelog);
 
   const updateStatusHtml = isUpdateAvailable
     ? '<div class="rrw-about-page-update-available">Update available!</div>'
