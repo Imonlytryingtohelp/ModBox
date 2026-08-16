@@ -714,7 +714,7 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
     throw new Error("Missing subreddit, subject, or body for modmail");
   }
 
-  return requestJsonViaBackground("/api/mod/conversations", {
+  const result = await requestJsonViaBackground("/api/mod/conversations", {
     method: "POST",
     oauth: true,
     formData: true,
@@ -726,6 +726,17 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
       isAuthorHidden: String(Boolean(isAuthorHidden)),
     },
   });
+
+  const conversation = result?.conversation || result?.json?.conversation || result?.data?.conversation || null;
+  const conversationId = String(
+    conversation?.id || conversation?.conversation_id || result?.conversationId || result?.id || ""
+  ).trim();
+
+  if (!conversation || !conversationId) {
+    throw new Error("Reddit did not return a modmail conversation for this send request.");
+  }
+
+  return result;
 }
 
 async function archiveModmailConversationViaReddit(conversationId) {

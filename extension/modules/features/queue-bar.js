@@ -207,6 +207,33 @@ function persistQueueBarPositionPreference() {
 
 // ──── Queue Bar DOM Management ────
 
+function closeBotActionsPopup() {
+  if (!queueBarRoot) {
+    botActionsPopupState = null;
+    return;
+  }
+  const popup = queueBarRoot.querySelector(".rrw-queuebar-bot-popup");
+  if (popup) {
+    popup.remove();
+  }
+  botActionsPopupState = null;
+}
+
+function getBotActionSenderSubreddit(fallbackSubreddit = "") {
+  const pageSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));
+  const explicitSubreddit = normalizeSubreddit(fallbackSubreddit);
+
+  if (pageSubreddit) {
+    return pageSubreddit;
+  }
+
+  if (explicitSubreddit && explicitSubreddit.toLowerCase() !== "mod") {
+    return explicitSubreddit;
+  }
+
+  return explicitSubreddit || "mod";
+}
+
 function ensureQueueBarRoot() {
   if (queueBarRoot && queueBarRoot.isConnected) {
     return queueBarRoot;
@@ -219,11 +246,320 @@ function ensureQueueBarRoot() {
 }
 
 function clearQueueBar() {
+  closeBotActionsPopup();
   if (queueBarRoot?.parentElement) {
     queueBarRoot.parentElement.removeChild(queueBarRoot);
   }
   queueBarRoot = null;
   queueBarLastState = null;
+}
+
+function buildBotActionsPopupHtml() {
+  if (!botActionsPopupState) {
+    return "";
+  }
+
+  return `
+    <div class="rrw-queuebar-bot-popup__header">
+      <strong>Bot Actions</strong>
+      <button type="button" class="rrw-queuebar-bot-popup__close" aria-label="Close bot actions">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3L13 13M13 3L3 13" /></svg>
+      </button>
+    </div>
+    <div class="rrw-queuebar-bot-popup__toolbar">
+      <button type="button" class="rrw-queuebar-bot-popup__primary" data-bot-action-add="1">Add action</button>
+      <button type="button" class="rrw-queuebar-bot-popup__secondary" data-bot-action-save="1">Save</button>
+    </div>
+    ${botActionsPopupState.error ? `<div class="rrw-queuebar-bot-popup__error">${escapeHtml(botActionsPopupState.error)}</div>` : ""}
+    ${botActionsPopupState.status ? `<div class="rrw-queuebar-bot-popup__status">${escapeHtml(botActionsPopupState.status)}</div>` : ""}
+    <div class="rrw-queuebar-bot-action-grid">
+      ${(botActionsPopupState.config.actions || []).filter((action) => action.enabled !== false).length === 0
+        ? '<p class="rrw-queuebar-bot-popup__empty">No enabled bot actions configured for this subreddit.</p>'
+        : (botActionsPopupState.config.actions || []).map((action, index) => action.enabled === false ? '' : `
+            <div class="rrw-queuebar-bot-action-item" data-bot-action-index="${index}">
+              <div class="rrw-queuebar-bot-action-row">
+                <label>
+                  <span>Label</span>
+                  <input type="text" data-bot-action-field="label" data-bot-action-index="${index}" value="${escapeHtml(action.label || "")}" />
+                </label>
+                <button type="button" class="rrw-queuebar-bot-action-remove" data-bot-action-remove="${index}" title="Remove action">Remove</button>
+              </div>
+              <label>
+                <span>Recipient</span>
+                <input type="text" data-bot-action-field="recipient" data-bot-action-index="${index}" value="${escapeHtml(action.recipient || "")}" placeholder="username" />
+              </label>
+              <label>
+                <span>Subject</span>
+                <input type="text" data-bot-action-field="subject" data-bot-action-index="${index}" value="${escapeHtml(action.subject || "")}" placeholder="Bot command" />
+              </label>
+              <label>
+                <span>Body</span>
+                <textarea rows="3" data-bot-action-field="body" data-bot-action-index="${index}" placeholder="config-reload">${escapeHtml(action.body || "")}</textarea>
+              </label>
+              <label class="rrw-queuebar-bot-flag">
+                <input type="checkbox" data-bot-action-field="requires_post_id" data-bot-action-index="${index}" ${action.requires_post_id ? "checked" : ""} />
+                <span>Requires post ID</span>
+              </label>
+              <label class="rrw-queuebar-bot-flag">
+                <input type="checkbox" data-bot-action-field="enabled" data-bot-action-index="${index}" ${action.enabled !== false ? "checked" : ""} />
+                <span>Enabled</span>
+              </label>
+              <button type="button" class="rrw-queuebar-bot-action-send" data-bot-action-send="${index}">Send now</button>
+            </div>
+          `).join("")}
+    </div>
+  `;
+}
+
+function syncBotActionsPopupStateFromInputs(root) {
+  if (!botActionsPopupState?.config) {
+    return;
+  }
+
+  const popup = root.querySelector(".rrw-queuebar-bot-popup");
+  if (!popup) {
+    return;
+  }
+
+  const inputs = popup.querySelectorAll("[data-bot-action-index][data-bot-action-field]");
+  for (const input of inputs) {
+    const index = Number.parseInt(input.getAttribute("data-bot-action-index") || "", 10);
+    const field = String(input.getAttribute("data-bot-action-field") || "");
+    if (!Number.isFinite(index) || !field) {
+      continue;
+    }
+
+    const action = botActionsPopupState.config.actions[index];
+    if (!action) {
+      continue;
+    }
+
+    if (field === "enabled" || field === "requires_post_id") {
+      action[field] = Boolean(input.checked);
+    } else {
+      action[field] = String(input.value || "");
+    }
+  }
+}
+
+async function openBotActionsPopup(queueState, stateOverride = null) {
+  const root = ensureQueueBarRoot();
+  const subreddit = getBotActionSenderSubreddit(queueState?.subreddit || "");
+
+  // Save existing state before closing (to preserve edits)
+  const previousState = botActionsPopupState?.subreddit === subreddit ? botActionsPopupState : null;
+  closeBotActionsPopup();
+
+  // Only load from wiki if we don't have an existing popup state (preserve changes during editing)
+  let config;
+  if (previousState) {
+    config = previousState.config;
+  } else {
+    const initialConfig = await loadBotActionsFromWiki(subreddit || "mod");
+    config = normalizeBotActionsDoc(initialConfig, subreddit || "mod");
+  }
+
+  const nextState = stateOverride && typeof stateOverride === "object" ? stateOverride : {};
+  botActionsPopupState = {
+    subreddit,
+    config,
+    saving: false,
+    error: Object.prototype.hasOwnProperty.call(nextState, "error") ? nextState.error : (previousState?.error || ""),
+    status: Object.prototype.hasOwnProperty.call(nextState, "status") ? nextState.status : (previousState?.status || ""),
+  };
+
+  const popup = document.createElement("div");
+  popup.className = "rrw-queuebar-bot-popup";
+  popup.innerHTML = buildBotActionsPopupHtml();
+
+  popup.addEventListener("click", handleBotPopupClick);
+
+  popup.addEventListener("input", (event) => {
+    const target = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ? event.target : null;
+    if (!target || !botActionsPopupState?.config) {
+      return;
+    }
+    const index = Number.parseInt(target.getAttribute("data-bot-action-index") || "", 10);
+    const field = String(target.getAttribute("data-bot-action-field") || "");
+    if (!Number.isFinite(index) || !field) {
+      return;
+    }
+    const action = botActionsPopupState.config.actions[index];
+    if (!action) {
+      return;
+    }
+    if (field === "enabled" || field === "requires_post_id") {
+      action[field === "enabled" ? "enabled" : "requires_post_id"] = Boolean(target.checked);
+      return;
+    }
+    action[field] = String(target.value || "");
+  });
+
+  const shell = root.querySelector(".rrw-queuebar");
+  if (shell) {
+    shell.style.position = "relative";
+    shell.appendChild(popup);
+  }
+}
+
+function attachBotPopupHandlers(popup) {
+  // Remove any existing listeners by cloning and replacing
+  const newPopup = popup.cloneNode(true);
+  popup.parentNode?.replaceChild(newPopup, popup);
+  
+  newPopup.addEventListener("click", handleBotPopupClick);
+  newPopup.addEventListener("input", (event) => {
+    const target = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ? event.target : null;
+    if (!target || !botActionsPopupState?.config) {
+      return;
+    }
+    const index = Number.parseInt(target.getAttribute("data-bot-action-index") || "", 10);
+    const field = String(target.getAttribute("data-bot-action-field") || "");
+    if (!Number.isFinite(index) || !field) {
+      return;
+    }
+    const action = botActionsPopupState.config.actions[index];
+    if (!action) {
+      return;
+    }
+    if (field === "enabled" || field === "requires_post_id") {
+      action[field === "enabled" ? "enabled" : "requires_post_id"] = Boolean(target.checked);
+      return;
+    }
+    action[field] = String(target.value || "");
+  });
+}
+
+async function handleBotPopupClick(event) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) {
+    return;
+  }
+
+  if (target.closest("[data-bot-action-close]")) {
+    closeBotActionsPopup();
+    return;
+  }
+
+  if (target.closest(".rrw-queuebar-bot-popup__close")) {
+    closeBotActionsPopup();
+    return;
+  }
+
+  if (target.closest("[data-bot-action-add]")) {
+    const config = botActionsPopupState?.config || buildDefaultBotActionsConfig(botActionsPopupState?.subreddit || "");
+    config.actions.push(normalizeBotAction({
+      label: `Bot action ${config.actions.length + 1}`,
+      recipient: "",
+      subject: "",
+      body: "",
+      requires_post_id: false,
+      enabled: true,
+    }, config.actions.length));
+    botActionsPopupState = { ...botActionsPopupState, config, error: "", status: "" };
+    openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+    return;
+  }
+
+  if (target.closest("[data-bot-action-remove]")) {
+    const index = Number.parseInt(target.closest("[data-bot-action-remove]")?.getAttribute("data-bot-action-remove") || "", 10);
+    if (Number.isFinite(index) && botActionsPopupState?.config) {
+      botActionsPopupState.config.actions = botActionsPopupState.config.actions.filter((_, i) => i !== index);
+      botActionsPopupState.status = "Action removed.";
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+    }
+    return;
+  }
+
+  if (target.closest("[data-bot-action-send]")) {
+    const index = Number.parseInt(target.closest("[data-bot-action-send]")?.getAttribute("data-bot-action-send") || "", 10);
+    if (Number.isFinite(index) && botActionsPopupState?.config) {
+      const action = botActionsPopupState.config.actions[index];
+      if (action) {
+        try {
+          await executeBotAction(action, botActionsPopupState.subreddit);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true }, {
+            error: message,
+            status: "",
+          });
+        }
+      }
+    }
+    return;
+  }
+
+  if (target.closest("[data-bot-action-save]")) {
+    const config = botActionsPopupState?.config;
+    if (!config) {
+      return;
+    }
+    try {
+      botActionsPopupState.saving = true;
+      botActionsPopupState.error = "";
+      botActionsPopupState.status = "Saving bot actions...";
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+      await saveBotActionsToWiki(botActionsPopupState.subreddit, config, "updated bot actions via ModBox");
+      botActionsPopupState.status = "Bot actions saved to wiki.";
+      botActionsPopupState.saving = false;
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+    } catch (error) {
+      botActionsPopupState.saving = false;
+      botActionsPopupState.error = error instanceof Error ? error.message : String(error);
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+    }
+    return;
+  }
+}
+
+function executeBotAction(action, subreddit) {
+  return (async () => {
+    const cleanSubreddit = getBotActionSenderSubreddit(subreddit);
+    if (!cleanSubreddit) {
+      throw new Error("Missing subreddit for bot action");
+    }
+
+    const resolvedAction = normalizeBotAction(action, 0);
+    if (resolvedAction.enabled === false) {
+      throw new Error(`Bot action "${resolvedAction.label}" is disabled.`);
+    }
+
+    const recipient = String(resolvedAction.recipient || "").trim();
+    const subject = String(resolvedAction.subject || "").trim();
+    const body = String(resolvedAction.body || "").trim();
+    if (!subject || !body) {
+      throw new Error(`Bot action "${resolvedAction.label}" is missing a subject or body.`);
+    }
+
+    let finalSubject = subject || `${resolvedAction.label}`;
+    let finalBody = body || "";
+
+    if (resolvedAction.requires_post_id || /\{post_id\}/i.test(finalSubject) || /\{post_id\}/i.test(finalBody)) {
+      const postId = window.prompt(`Enter post ID for ${resolvedAction.label}:`, "");
+      if (postId == null || !String(postId).trim()) {
+        return null;
+      }
+      finalSubject = finalSubject.replace(/\{post_id\}/gi, String(postId).trim());
+      finalBody = finalBody.replace(/\{post_id\}/gi, String(postId).trim());
+    }
+
+    await sendModmailViaReddit({
+      subreddit: cleanSubreddit,
+      to: recipient || undefined,
+      subject: finalSubject,
+      body: finalBody,
+      isAuthorHidden: true,
+    });
+
+    if (botActionsPopupState) {
+      openBotActionsPopup({ subreddit: cleanSubreddit, enabled: true }, {
+        error: "",
+        status: `Sent ${resolvedAction.label}.`,
+      });
+    }
+    return true;
+  })();
 }
 
 // ──── Background Request Helpers ────
@@ -674,6 +1010,13 @@ function renderQueueBar(state) {
   }
 
   const root = ensureQueueBarRoot();
+  
+  // Preserve popup state before re-rendering to prevent it from closing or clearing live text
+  const wasPopupOpen = !!root.querySelector(".rrw-queuebar-bot-popup");
+  if (wasPopupOpen) {
+    syncBotActionsPopupStateFromInputs(root);
+  }
+  
   root.setAttribute("data-position", queueBarPosition || "bottom_right");
   root.replaceChildren();
 
@@ -710,6 +1053,27 @@ function renderQueueBar(state) {
 
   const headerActions = document.createElement("div");
   headerActions.className = "rrw-queuebar-header-actions";
+
+  const botBtn = document.createElement("button");
+  botBtn.type = "button";
+  botBtn.className = "rrw-queuebar-bot-btn";
+  botBtn.title = "Bot actions";
+  botBtn.setAttribute("aria-label", "Open bot actions");
+  botBtn.innerHTML = `
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="5" y="6" width="10" height="9" rx="2" />
+      <path d="M7 6V4.5A3 3 0 0 1 10 2a3 3 0 0 1 3 2.5V6" />
+      <path d="M8 10h.01M12 10h.01" />
+      <path d="M7 13h6" />
+      <path d="M10 9v2" />
+    </svg>
+  `;
+  botBtn.addEventListener("click", () => {
+    void openBotActionsPopup({
+      subreddit: state?.subreddit || normalizeSubreddit(parseSubredditFromPath(window.location.pathname)) || "mod",
+      enabled: true,
+    });
+  });
 
   const currentHost = String(window.location.hostname || "").toLowerCase();
   const showOldRedditButton = currentHost === "www.reddit.com" || currentHost === "sh.reddit.com";
@@ -948,7 +1312,32 @@ function renderQueueBar(state) {
         footer.textContent = state.error;
         footer.setAttribute("data-error", "1");
       } else if (Number.isFinite(state.updatedAt)) {
-        footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+        const footerSpan = document.createElement("span");
+        footerSpan.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+        footer.appendChild(footerSpan);
+        
+        // Add bot button to footer
+        const footerBotBtn = document.createElement("button");
+        footerBotBtn.type = "button";
+        footerBotBtn.className = "rrw-queuebar-bot-btn";
+        footerBotBtn.title = "Bot actions";
+        footerBotBtn.setAttribute("aria-label", "Open bot actions");
+        footerBotBtn.innerHTML = `
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="5" y="6" width="10" height="9" rx="2" />
+            <path d="M7 6V4.5A3 3 0 0 1 10 2a3 3 0 0 1 3 2.5V6" />
+            <path d="M8 10h.01M12 10h.01" />
+            <path d="M7 13h6" />
+            <path d="M10 9v2" />
+          </svg>
+        `;
+        footerBotBtn.addEventListener("click", () => {
+          void openBotActionsPopup({
+            subreddit: state?.subreddit || normalizeSubreddit(parseSubredditFromPath(window.location.pathname)) || "mod",
+            enabled: true,
+          });
+        });
+        footer.appendChild(footerBotBtn);
       } else {
         footer.textContent = `Queue status for ${state.links?.scopeLabel || "configured subreddit"}`;
       }
@@ -969,6 +1358,15 @@ function renderQueueBar(state) {
   }
 
   root.appendChild(shell);
+  
+  // Restore popup after render if it was open
+  if (wasPopupOpen && botActionsPopupState) {
+    const newPopup = document.createElement("div");
+    newPopup.className = "rrw-queuebar-bot-popup";
+    newPopup.innerHTML = buildBotActionsPopupHtml();
+    root.appendChild(newPopup);
+    attachBotPopupHandlers(newPopup);
+  }
 }
 
 // ──── Queue Bar Refresh & Polling ────

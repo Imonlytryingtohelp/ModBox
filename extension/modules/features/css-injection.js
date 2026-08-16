@@ -102,6 +102,7 @@ function injectStyles() {
     }
 
     .rrw-queuebar {
+      position: relative;
       pointer-events: auto;
       min-width: 252px;
       max-width: min(92vw, 340px);
@@ -212,6 +213,166 @@ function injectStyles() {
       display: inline-flex;
       align-items: center;
       gap: 6px;
+    }
+
+    .rrw-queuebar-bot-btn {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid rgba(84, 118, 173, 0.45);
+      background: rgba(30, 50, 77, 0.86);
+      color: #e6efff;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      line-height: 0;
+      padding: 4px 7px;
+      cursor: pointer;
+      min-width: 28px;
+      transition: background-color 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .rrw-queuebar-bot-btn svg,
+    .rrw-queuebar-bot-popup__close svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .rrw-queuebar-bot-btn:hover {
+      background: rgba(44, 73, 112, 0.92);
+      border-color: rgba(110, 151, 221, 0.62);
+    }
+
+    .rrw-queuebar-bot-popup {
+      position: absolute;
+      right: 0;
+      bottom: 40px;
+      width: min(360px, calc(100vw - 32px));
+      max-height: min(70vh, 520px);
+      overflow: auto;
+      border: 1px solid rgba(116, 145, 205, 0.5);
+      border-radius: 12px;
+      background: rgba(12, 20, 34, 0.98);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+      padding: 10px;
+      z-index: 10000;
+    }
+
+    .rrw-queuebar-bot-popup__header,
+    .rrw-queuebar-bot-popup__toolbar,
+    .rrw-queuebar-bot-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .rrw-queuebar-bot-popup__header {
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #b9d0ff;
+    }
+
+    .rrw-queuebar-bot-popup__close,
+    .rrw-queuebar-bot-popup__primary,
+    .rrw-queuebar-bot-popup__secondary,
+    .rrw-queuebar-bot-action-send,
+    .rrw-queuebar-bot-action-remove {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid rgba(122, 151, 201, 0.6);
+      background: rgba(28, 46, 70, 0.92);
+      color: #edf4ff;
+      border-radius: 8px;
+      padding: 5px 8px;
+      cursor: pointer;
+      font-size: 0.72rem;
+    }
+
+    .rrw-queuebar-bot-popup__close {
+      min-width: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 0;
+      padding: 4px 7px;
+    }
+
+    .rrw-queuebar-bot-popup__primary {
+      background: rgba(53, 92, 148, 0.95);
+    }
+
+    .rrw-queuebar-bot-popup__error,
+    .rrw-queuebar-bot-popup__status {
+      font-size: 0.72rem;
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin: 8px 0;
+    }
+
+    .rrw-queuebar-bot-popup__error {
+      background: rgba(120, 24, 24, 0.25);
+      color: #ffd1d1;
+    }
+
+    .rrw-queuebar-bot-popup__status {
+      background: rgba(24, 99, 72, 0.22);
+      color: #d4ffe8;
+    }
+
+    .rrw-queuebar-bot-action-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .rrw-queuebar-bot-action-item {
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid rgba(106, 133, 180, 0.35);
+      border-radius: 8px;
+      background: rgba(19, 31, 49, 0.82);
+    }
+
+    .rrw-queuebar-bot-action-item label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.7rem;
+      color: #dfeeff;
+    }
+
+    .rrw-queuebar-bot-action-item input,
+    .rrw-queuebar-bot-action-item textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid rgba(137, 167, 216, 0.42);
+      border-radius: 6px;
+      background: rgba(8, 12, 20, 0.46);
+      color: #edf4ff;
+      padding: 6px 8px;
+      font: inherit;
+    }
+
+    .rrw-queuebar-bot-flag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: #dfeeff;
+    }
+
+    .rrw-queuebar-bot-popup__empty {
+      margin: 6px 0 0;
+      font-size: 0.74rem;
+      color: #bfd3ff;
     }
 
     .rrw-queuebar-icon-btn {
@@ -402,6 +563,14 @@ function injectStyles() {
       border-top: 1px solid rgba(98, 133, 192, 0.26);
       padding-top: 7px;
       min-height: 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .rrw-queuebar-footer span {
+      flex: 1;
     }
 
     .rrw-queuebar-footer[data-error="1"] {
@@ -444,6 +613,17 @@ function injectStyles() {
     }
 
     html[data-rrw-theme="light"] .rrw-queuebar-icon-btn:hover {
+      background: rgba(220, 233, 255, 0.99);
+      border-color: rgba(127, 162, 204, 0.85);
+    }
+
+    html[data-rrw-theme="light"] .rrw-queuebar-bot-btn {
+      border-color: rgba(158, 182, 212, 0.78);
+      background: rgba(231, 241, 255, 0.98);
+      color: #2f4f78;
+    }
+
+    html[data-rrw-theme="light"] .rrw-queuebar-bot-btn:hover {
       background: rgba(220, 233, 255, 0.99);
       border-color: rgba(127, 162, 204, 0.85);
     }

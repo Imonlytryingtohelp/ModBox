@@ -101,6 +101,10 @@ const QUICK_ACTIONS_WIKI_PAGE = "modbox/quickactions";
 
 const QUICK_ACTIONS_WIKI_SCHEMA = "ModBox/quick-actions/v1";
 
+const BOT_ACTIONS_WIKI_PAGE = "modbox/botactions";
+
+const BOT_ACTIONS_WIKI_SCHEMA = "ModBox/bot-actions/v1";
+
 const PLAYBOOKS_WIKI_PAGE = "modbox/playbooks";
 
 const PLAYBOOKS_WIKI_SCHEMA = "ModBox/playbooks/v1";
@@ -276,6 +280,8 @@ let panelSettingsPromise = null;
 let usernotesEditorState = null;
 
 let removalConfigEditorState = null;
+
+let botActionsPopupState = null;
 
 const usernotesCache = new Map();
 
@@ -3665,7 +3671,7 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
 
 
 
-  return requestJsonViaBackground("/api/mod/conversations", {
+  const result = await requestJsonViaBackground("/api/mod/conversations", {
 
     method: "POST",
 
@@ -3688,6 +3694,28 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
     },
 
   });
+
+
+
+  const conversation = result?.conversation || result?.json?.conversation || result?.data?.conversation || null;
+
+  const conversationId = String(
+
+    conversation?.id || conversation?.conversation_id || result?.conversationId || result?.id || ""
+
+  ).trim();
+
+
+
+  if (!conversation || !conversationId) {
+
+    throw new Error("Reddit did not return a modmail conversation for this send request.");
+
+  }
+
+
+
+  return result;
 
 }
 
@@ -5968,6 +5996,278 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
   await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
 
   setInMemoryQuickActions(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+// ============================================================================
+
+// BOT ACTIONS LOADING/SAVING
+
+// ============================================================================
+
+
+
+function normalizeBotAction(action, index) {
+
+  const label = String(action?.label || action?.title || action?.name || `Bot action ${index + 1}`).trim() || `Bot action ${index + 1}`;
+
+  const recipient = String(action?.recipient || action?.to || "").trim();
+
+  const subject = String(action?.subject || "").trim();
+
+  const body = String(action?.body || "").trim();
+
+  const requiresPostId = Boolean(action?.requires_post_id ?? action?.requiresPostId ?? false);
+
+  const enabled = action?.enabled !== false;
+
+  return {
+
+    key: String(action?.key || action?.id || "").trim() || slugifyReasonKey(label, `bot-action-${index + 1}`),
+
+    label,
+
+    recipient,
+
+    subject,
+
+    body,
+
+    requires_post_id: requiresPostId,
+
+    enabled,
+
+    position: Number.isFinite(Number(action?.position)) ? Number(action.position) : (index + 1) * 10,
+
+  };
+
+}
+
+
+
+function normalizeBotActionsDoc(doc, subreddit) {
+
+  const fallback = buildDefaultBotActionsConfig(subreddit);
+
+  if (!doc || typeof doc !== "object") {
+
+    return fallback;
+
+  }
+
+  const actions = Array.isArray(doc.actions) ? doc.actions : [];
+
+  return {
+
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+
+    version: Number.isFinite(Number(doc.version)) ? Number(doc.version) : 1,
+
+    subreddit: normalizeSubreddit(subreddit || doc.subreddit || ""),
+
+    actions: actions
+
+      .map((action, index) => normalizeBotAction(action, index))
+
+      .filter((action) => action && (action.label || action.recipient || action.subject || action.body))
+
+      .sort((a, b) => (a.position || 0) - (b.position || 0)),
+
+  };
+
+}
+
+
+
+function buildDefaultBotActionsConfig(subreddit) {
+
+  return {
+
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+
+    version: 1,
+
+    subreddit: normalizeSubreddit(subreddit),
+
+    actions: [],
+
+  };
+
+}
+
+
+
+let inMemoryBotActionsCache = null;
+
+
+
+function getInMemoryBotActions(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryBotActionsCache) {
+
+    return null;
+
+  }
+
+  return inMemoryBotActionsCache.get(key) || null;
+
+}
+
+
+
+function setInMemoryBotActions(subreddit, config) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key) {
+
+    return;
+
+  }
+
+  if (!inMemoryBotActionsCache) {
+
+    inMemoryBotActionsCache = new Map();
+
+  }
+
+  inMemoryBotActionsCache.set(key, normalizeBotActionsDoc(config, subreddit));
+
+}
+
+
+
+function clearInMemoryBotActions(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryBotActionsCache) {
+
+    return;
+
+  }
+
+  inMemoryBotActionsCache.delete(key);
+
+}
+
+
+
+async function loadBotActionsFromWiki(subreddit) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    return buildDefaultBotActionsConfig("");
+
+  }
+
+  const cached = getInMemoryBotActions(cleanSubreddit);
+
+  if (cached) {
+
+    return cached;
+
+  }
+
+
+
+  let wikiPayload;
+
+  try {
+
+    wikiPayload = await requestJsonViaBackground(
+
+      `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${BOT_ACTIONS_WIKI_PAGE}.json?raw_json=1`,
+
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+
+    );
+
+  } catch (error) {
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+
+      return buildDefaultBotActionsConfig(cleanSubreddit);
+
+    }
+
+    throw error;
+
+  }
+
+
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+
+  if (!raw) {
+
+    return buildDefaultBotActionsConfig(cleanSubreddit);
+
+  }
+
+
+
+  let doc;
+
+  try {
+
+    doc = JSON.parse(raw);
+
+  } catch (error) {
+
+    throw new Error("Bot actions wiki page is not valid JSON");
+
+  }
+
+
+
+  const normalized = normalizeBotActionsDoc(doc, cleanSubreddit);
+
+  setInMemoryBotActions(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+async function saveBotActionsToWiki(subreddit, config, reason) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    throw new Error("Subreddit is required to save bot actions");
+
+  }
+
+
+
+  const normalized = normalizeBotActionsDoc(config, cleanSubreddit);
+
+  const payload = JSON.stringify(normalized, null, 2);
+
+  const params = new URLSearchParams();
+
+  params.set("content", payload);
+
+  params.set("page", BOT_ACTIONS_WIKI_PAGE);
+
+  params.set("reason", String(reason || "updated bot actions via ModBox"));
+
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+
+  setInMemoryBotActions(cleanSubreddit, normalized);
 
   return normalized;
 
@@ -11505,6 +11805,8 @@ function injectStyles() {
 
     .rrw-queuebar {
 
+      position: relative;
+
       pointer-events: auto;
 
       min-width: 252px;
@@ -11724,6 +12026,326 @@ function injectStyles() {
       align-items: center;
 
       gap: 6px;
+
+    }
+
+
+
+    .rrw-queuebar-bot-btn {
+
+      appearance: none;
+
+      -webkit-appearance: none;
+
+      border: 1px solid rgba(84, 118, 173, 0.45);
+
+      background: rgba(30, 50, 77, 0.86);
+
+      color: #e6efff;
+
+      border-radius: 7px;
+
+      font-size: 0.78rem;
+
+      line-height: 0;
+
+      padding: 4px 7px;
+
+      cursor: pointer;
+
+      min-width: 28px;
+
+      transition: background-color 0.2s, border-color 0.2s;
+
+      flex-shrink: 0;
+
+    }
+
+
+
+    .rrw-queuebar-bot-btn svg,
+
+    .rrw-queuebar-bot-popup__close svg {
+
+      width: 14px;
+
+      height: 14px;
+
+      display: block;
+
+      stroke: currentColor;
+
+      fill: none;
+
+      stroke-width: 1.8;
+
+      stroke-linecap: round;
+
+      stroke-linejoin: round;
+
+    }
+
+
+
+    .rrw-queuebar-bot-btn:hover {
+
+      background: rgba(44, 73, 112, 0.92);
+
+      border-color: rgba(110, 151, 221, 0.62);
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup {
+
+      position: absolute;
+
+      right: 0;
+
+      bottom: 40px;
+
+      width: min(360px, calc(100vw - 32px));
+
+      max-height: min(70vh, 520px);
+
+      overflow: auto;
+
+      border: 1px solid rgba(116, 145, 205, 0.5);
+
+      border-radius: 12px;
+
+      background: rgba(12, 20, 34, 0.98);
+
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+
+      padding: 10px;
+
+      z-index: 10000;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__header,
+
+    .rrw-queuebar-bot-popup__toolbar,
+
+    .rrw-queuebar-bot-action-row {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 8px;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__header {
+
+      margin-bottom: 10px;
+
+      font-size: 0.82rem;
+
+      letter-spacing: 0.04em;
+
+      text-transform: uppercase;
+
+      color: #b9d0ff;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__close,
+
+    .rrw-queuebar-bot-popup__primary,
+
+    .rrw-queuebar-bot-popup__secondary,
+
+    .rrw-queuebar-bot-action-send,
+
+    .rrw-queuebar-bot-action-remove {
+
+      appearance: none;
+
+      -webkit-appearance: none;
+
+      border: 1px solid rgba(122, 151, 201, 0.6);
+
+      background: rgba(28, 46, 70, 0.92);
+
+      color: #edf4ff;
+
+      border-radius: 8px;
+
+      padding: 5px 8px;
+
+      cursor: pointer;
+
+      font-size: 0.72rem;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__close {
+
+      min-width: 28px;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      line-height: 0;
+
+      padding: 4px 7px;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__primary {
+
+      background: rgba(53, 92, 148, 0.95);
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__error,
+
+    .rrw-queuebar-bot-popup__status {
+
+      font-size: 0.72rem;
+
+      border-radius: 6px;
+
+      padding: 6px 8px;
+
+      margin: 8px 0;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__error {
+
+      background: rgba(120, 24, 24, 0.25);
+
+      color: #ffd1d1;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__status {
+
+      background: rgba(24, 99, 72, 0.22);
+
+      color: #d4ffe8;
+
+    }
+
+
+
+    .rrw-queuebar-bot-action-grid {
+
+      display: grid;
+
+      gap: 10px;
+
+      margin-top: 8px;
+
+    }
+
+
+
+    .rrw-queuebar-bot-action-item {
+
+      display: grid;
+
+      gap: 7px;
+
+      padding: 8px;
+
+      border: 1px solid rgba(106, 133, 180, 0.35);
+
+      border-radius: 8px;
+
+      background: rgba(19, 31, 49, 0.82);
+
+    }
+
+
+
+    .rrw-queuebar-bot-action-item label {
+
+      display: grid;
+
+      gap: 4px;
+
+      font-size: 0.7rem;
+
+      color: #dfeeff;
+
+    }
+
+
+
+    .rrw-queuebar-bot-action-item input,
+
+    .rrw-queuebar-bot-action-item textarea {
+
+      width: 100%;
+
+      box-sizing: border-box;
+
+      border: 1px solid rgba(137, 167, 216, 0.42);
+
+      border-radius: 6px;
+
+      background: rgba(8, 12, 20, 0.46);
+
+      color: #edf4ff;
+
+      padding: 6px 8px;
+
+      font: inherit;
+
+    }
+
+
+
+    .rrw-queuebar-bot-flag {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 6px;
+
+      font-size: 0.72rem;
+
+      color: #dfeeff;
+
+    }
+
+
+
+    .rrw-queuebar-bot-popup__empty {
+
+      margin: 6px 0 0;
+
+      font-size: 0.74rem;
+
+      color: #bfd3ff;
 
     }
 
@@ -12105,6 +12727,22 @@ function injectStyles() {
 
       min-height: 1.2em;
 
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 10px;
+
+    }
+
+
+
+    .rrw-queuebar-footer span {
+
+      flex: 1;
+
     }
 
 
@@ -12188,6 +12826,28 @@ function injectStyles() {
 
 
     html[data-rrw-theme="light"] .rrw-queuebar-icon-btn:hover {
+
+      background: rgba(220, 233, 255, 0.99);
+
+      border-color: rgba(127, 162, 204, 0.85);
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queuebar-bot-btn {
+
+      border-color: rgba(158, 182, 212, 0.78);
+
+      background: rgba(231, 241, 255, 0.98);
+
+      color: #2f4f78;
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-queuebar-bot-btn:hover {
 
       background: rgba(220, 233, 255, 0.99);
 
@@ -27153,6 +27813,60 @@ function persistQueueBarPositionPreference() {
 
 
 
+function closeBotActionsPopup() {
+
+  if (!queueBarRoot) {
+
+    botActionsPopupState = null;
+
+    return;
+
+  }
+
+  const popup = queueBarRoot.querySelector(".rrw-queuebar-bot-popup");
+
+  if (popup) {
+
+    popup.remove();
+
+  }
+
+  botActionsPopupState = null;
+
+}
+
+
+
+function getBotActionSenderSubreddit(fallbackSubreddit = "") {
+
+  const pageSubreddit = normalizeSubreddit(parseSubredditFromPath(window.location.pathname));
+
+  const explicitSubreddit = normalizeSubreddit(fallbackSubreddit);
+
+
+
+  if (pageSubreddit) {
+
+    return pageSubreddit;
+
+  }
+
+
+
+  if (explicitSubreddit && explicitSubreddit.toLowerCase() !== "mod") {
+
+    return explicitSubreddit;
+
+  }
+
+
+
+  return explicitSubreddit || "mod";
+
+}
+
+
+
 function ensureQueueBarRoot() {
 
   if (queueBarRoot && queueBarRoot.isConnected) {
@@ -27177,6 +27891,8 @@ function ensureQueueBarRoot() {
 
 function clearQueueBar() {
 
+  closeBotActionsPopup();
+
   if (queueBarRoot?.parentElement) {
 
     queueBarRoot.parentElement.removeChild(queueBarRoot);
@@ -27186,6 +27902,622 @@ function clearQueueBar() {
   queueBarRoot = null;
 
   queueBarLastState = null;
+
+}
+
+
+
+function buildBotActionsPopupHtml() {
+
+  if (!botActionsPopupState) {
+
+    return "";
+
+  }
+
+
+
+  return `
+
+    <div class="rrw-queuebar-bot-popup__header">
+
+      <strong>Bot Actions</strong>
+
+      <button type="button" class="rrw-queuebar-bot-popup__close" aria-label="Close bot actions">
+
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3L13 13M13 3L3 13" /></svg>
+
+      </button>
+
+    </div>
+
+    <div class="rrw-queuebar-bot-popup__toolbar">
+
+      <button type="button" class="rrw-queuebar-bot-popup__primary" data-bot-action-add="1">Add action</button>
+
+      <button type="button" class="rrw-queuebar-bot-popup__secondary" data-bot-action-save="1">Save</button>
+
+    </div>
+
+    ${botActionsPopupState.error ? `<div class="rrw-queuebar-bot-popup__error">${escapeHtml(botActionsPopupState.error)}</div>` : ""}
+
+    ${botActionsPopupState.status ? `<div class="rrw-queuebar-bot-popup__status">${escapeHtml(botActionsPopupState.status)}</div>` : ""}
+
+    <div class="rrw-queuebar-bot-action-grid">
+
+      ${(botActionsPopupState.config.actions || []).filter((action) => action.enabled !== false).length === 0
+
+        ? '<p class="rrw-queuebar-bot-popup__empty">No enabled bot actions configured for this subreddit.</p>'
+
+        : (botActionsPopupState.config.actions || []).map((action, index) => action.enabled === false ? '' : `
+
+            <div class="rrw-queuebar-bot-action-item" data-bot-action-index="${index}">
+
+              <div class="rrw-queuebar-bot-action-row">
+
+                <label>
+
+                  <span>Label</span>
+
+                  <input type="text" data-bot-action-field="label" data-bot-action-index="${index}" value="${escapeHtml(action.label || "")}" />
+
+                </label>
+
+                <button type="button" class="rrw-queuebar-bot-action-remove" data-bot-action-remove="${index}" title="Remove action">Remove</button>
+
+              </div>
+
+              <label>
+
+                <span>Recipient</span>
+
+                <input type="text" data-bot-action-field="recipient" data-bot-action-index="${index}" value="${escapeHtml(action.recipient || "")}" placeholder="username" />
+
+              </label>
+
+              <label>
+
+                <span>Subject</span>
+
+                <input type="text" data-bot-action-field="subject" data-bot-action-index="${index}" value="${escapeHtml(action.subject || "")}" placeholder="Bot command" />
+
+              </label>
+
+              <label>
+
+                <span>Body</span>
+
+                <textarea rows="3" data-bot-action-field="body" data-bot-action-index="${index}" placeholder="config-reload">${escapeHtml(action.body || "")}</textarea>
+
+              </label>
+
+              <label class="rrw-queuebar-bot-flag">
+
+                <input type="checkbox" data-bot-action-field="requires_post_id" data-bot-action-index="${index}" ${action.requires_post_id ? "checked" : ""} />
+
+                <span>Requires post ID</span>
+
+              </label>
+
+              <label class="rrw-queuebar-bot-flag">
+
+                <input type="checkbox" data-bot-action-field="enabled" data-bot-action-index="${index}" ${action.enabled !== false ? "checked" : ""} />
+
+                <span>Enabled</span>
+
+              </label>
+
+              <button type="button" class="rrw-queuebar-bot-action-send" data-bot-action-send="${index}">Send now</button>
+
+            </div>
+
+          `).join("")}
+
+    </div>
+
+  `;
+
+}
+
+
+
+function syncBotActionsPopupStateFromInputs(root) {
+
+  if (!botActionsPopupState?.config) {
+
+    return;
+
+  }
+
+
+
+  const popup = root.querySelector(".rrw-queuebar-bot-popup");
+
+  if (!popup) {
+
+    return;
+
+  }
+
+
+
+  const inputs = popup.querySelectorAll("[data-bot-action-index][data-bot-action-field]");
+
+  for (const input of inputs) {
+
+    const index = Number.parseInt(input.getAttribute("data-bot-action-index") || "", 10);
+
+    const field = String(input.getAttribute("data-bot-action-field") || "");
+
+    if (!Number.isFinite(index) || !field) {
+
+      continue;
+
+    }
+
+
+
+    const action = botActionsPopupState.config.actions[index];
+
+    if (!action) {
+
+      continue;
+
+    }
+
+
+
+    if (field === "enabled" || field === "requires_post_id") {
+
+      action[field] = Boolean(input.checked);
+
+    } else {
+
+      action[field] = String(input.value || "");
+
+    }
+
+  }
+
+}
+
+
+
+async function openBotActionsPopup(queueState, stateOverride = null) {
+
+  const root = ensureQueueBarRoot();
+
+  const subreddit = getBotActionSenderSubreddit(queueState?.subreddit || "");
+
+
+
+  // Save existing state before closing (to preserve edits)
+
+  const previousState = botActionsPopupState?.subreddit === subreddit ? botActionsPopupState : null;
+
+  closeBotActionsPopup();
+
+
+
+  // Only load from wiki if we don't have an existing popup state (preserve changes during editing)
+
+  let config;
+
+  if (previousState) {
+
+    config = previousState.config;
+
+  } else {
+
+    const initialConfig = await loadBotActionsFromWiki(subreddit || "mod");
+
+    config = normalizeBotActionsDoc(initialConfig, subreddit || "mod");
+
+  }
+
+
+
+  const nextState = stateOverride && typeof stateOverride === "object" ? stateOverride : {};
+
+  botActionsPopupState = {
+
+    subreddit,
+
+    config,
+
+    saving: false,
+
+    error: Object.prototype.hasOwnProperty.call(nextState, "error") ? nextState.error : (previousState?.error || ""),
+
+    status: Object.prototype.hasOwnProperty.call(nextState, "status") ? nextState.status : (previousState?.status || ""),
+
+  };
+
+
+
+  const popup = document.createElement("div");
+
+  popup.className = "rrw-queuebar-bot-popup";
+
+  popup.innerHTML = buildBotActionsPopupHtml();
+
+
+
+  popup.addEventListener("click", handleBotPopupClick);
+
+
+
+  popup.addEventListener("input", (event) => {
+
+    const target = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ? event.target : null;
+
+    if (!target || !botActionsPopupState?.config) {
+
+      return;
+
+    }
+
+    const index = Number.parseInt(target.getAttribute("data-bot-action-index") || "", 10);
+
+    const field = String(target.getAttribute("data-bot-action-field") || "");
+
+    if (!Number.isFinite(index) || !field) {
+
+      return;
+
+    }
+
+    const action = botActionsPopupState.config.actions[index];
+
+    if (!action) {
+
+      return;
+
+    }
+
+    if (field === "enabled" || field === "requires_post_id") {
+
+      action[field === "enabled" ? "enabled" : "requires_post_id"] = Boolean(target.checked);
+
+      return;
+
+    }
+
+    action[field] = String(target.value || "");
+
+  });
+
+
+
+  const shell = root.querySelector(".rrw-queuebar");
+
+  if (shell) {
+
+    shell.style.position = "relative";
+
+    shell.appendChild(popup);
+
+  }
+
+}
+
+
+
+function attachBotPopupHandlers(popup) {
+
+  // Remove any existing listeners by cloning and replacing
+
+  const newPopup = popup.cloneNode(true);
+
+  popup.parentNode?.replaceChild(newPopup, popup);
+
+  
+
+  newPopup.addEventListener("click", handleBotPopupClick);
+
+  newPopup.addEventListener("input", (event) => {
+
+    const target = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ? event.target : null;
+
+    if (!target || !botActionsPopupState?.config) {
+
+      return;
+
+    }
+
+    const index = Number.parseInt(target.getAttribute("data-bot-action-index") || "", 10);
+
+    const field = String(target.getAttribute("data-bot-action-field") || "");
+
+    if (!Number.isFinite(index) || !field) {
+
+      return;
+
+    }
+
+    const action = botActionsPopupState.config.actions[index];
+
+    if (!action) {
+
+      return;
+
+    }
+
+    if (field === "enabled" || field === "requires_post_id") {
+
+      action[field === "enabled" ? "enabled" : "requires_post_id"] = Boolean(target.checked);
+
+      return;
+
+    }
+
+    action[field] = String(target.value || "");
+
+  });
+
+}
+
+
+
+async function handleBotPopupClick(event) {
+
+  const target = event.target instanceof Element ? event.target : null;
+
+  if (!target) {
+
+    return;
+
+  }
+
+
+
+  if (target.closest("[data-bot-action-close]")) {
+
+    closeBotActionsPopup();
+
+    return;
+
+  }
+
+
+
+  if (target.closest(".rrw-queuebar-bot-popup__close")) {
+
+    closeBotActionsPopup();
+
+    return;
+
+  }
+
+
+
+  if (target.closest("[data-bot-action-add]")) {
+
+    const config = botActionsPopupState?.config || buildDefaultBotActionsConfig(botActionsPopupState?.subreddit || "");
+
+    config.actions.push(normalizeBotAction({
+
+      label: `Bot action ${config.actions.length + 1}`,
+
+      recipient: "",
+
+      subject: "",
+
+      body: "",
+
+      requires_post_id: false,
+
+      enabled: true,
+
+    }, config.actions.length));
+
+    botActionsPopupState = { ...botActionsPopupState, config, error: "", status: "" };
+
+    openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+
+    return;
+
+  }
+
+
+
+  if (target.closest("[data-bot-action-remove]")) {
+
+    const index = Number.parseInt(target.closest("[data-bot-action-remove]")?.getAttribute("data-bot-action-remove") || "", 10);
+
+    if (Number.isFinite(index) && botActionsPopupState?.config) {
+
+      botActionsPopupState.config.actions = botActionsPopupState.config.actions.filter((_, i) => i !== index);
+
+      botActionsPopupState.status = "Action removed.";
+
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+
+    }
+
+    return;
+
+  }
+
+
+
+  if (target.closest("[data-bot-action-send]")) {
+
+    const index = Number.parseInt(target.closest("[data-bot-action-send]")?.getAttribute("data-bot-action-send") || "", 10);
+
+    if (Number.isFinite(index) && botActionsPopupState?.config) {
+
+      const action = botActionsPopupState.config.actions[index];
+
+      if (action) {
+
+        try {
+
+          await executeBotAction(action, botActionsPopupState.subreddit);
+
+        } catch (error) {
+
+          const message = error instanceof Error ? error.message : String(error);
+
+          openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true }, {
+
+            error: message,
+
+            status: "",
+
+          });
+
+        }
+
+      }
+
+    }
+
+    return;
+
+  }
+
+
+
+  if (target.closest("[data-bot-action-save]")) {
+
+    const config = botActionsPopupState?.config;
+
+    if (!config) {
+
+      return;
+
+    }
+
+    try {
+
+      botActionsPopupState.saving = true;
+
+      botActionsPopupState.error = "";
+
+      botActionsPopupState.status = "Saving bot actions...";
+
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+
+      await saveBotActionsToWiki(botActionsPopupState.subreddit, config, "updated bot actions via ModBox");
+
+      botActionsPopupState.status = "Bot actions saved to wiki.";
+
+      botActionsPopupState.saving = false;
+
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+
+    } catch (error) {
+
+      botActionsPopupState.saving = false;
+
+      botActionsPopupState.error = error instanceof Error ? error.message : String(error);
+
+      openBotActionsPopup({ subreddit: botActionsPopupState.subreddit, enabled: true });
+
+    }
+
+    return;
+
+  }
+
+}
+
+
+
+function executeBotAction(action, subreddit) {
+
+  return (async () => {
+
+    const cleanSubreddit = getBotActionSenderSubreddit(subreddit);
+
+    if (!cleanSubreddit) {
+
+      throw new Error("Missing subreddit for bot action");
+
+    }
+
+
+
+    const resolvedAction = normalizeBotAction(action, 0);
+
+    if (resolvedAction.enabled === false) {
+
+      throw new Error(`Bot action "${resolvedAction.label}" is disabled.`);
+
+    }
+
+
+
+    const recipient = String(resolvedAction.recipient || "").trim();
+
+    const subject = String(resolvedAction.subject || "").trim();
+
+    const body = String(resolvedAction.body || "").trim();
+
+    if (!subject || !body) {
+
+      throw new Error(`Bot action "${resolvedAction.label}" is missing a subject or body.`);
+
+    }
+
+
+
+    let finalSubject = subject || `${resolvedAction.label}`;
+
+    let finalBody = body || "";
+
+
+
+    if (resolvedAction.requires_post_id || /\{post_id\}/i.test(finalSubject) || /\{post_id\}/i.test(finalBody)) {
+
+      const postId = window.prompt(`Enter post ID for ${resolvedAction.label}:`, "");
+
+      if (postId == null || !String(postId).trim()) {
+
+        return null;
+
+      }
+
+      finalSubject = finalSubject.replace(/\{post_id\}/gi, String(postId).trim());
+
+      finalBody = finalBody.replace(/\{post_id\}/gi, String(postId).trim());
+
+    }
+
+
+
+    await sendModmailViaReddit({
+
+      subreddit: cleanSubreddit,
+
+      to: recipient || undefined,
+
+      subject: finalSubject,
+
+      body: finalBody,
+
+      isAuthorHidden: true,
+
+    });
+
+
+
+    if (botActionsPopupState) {
+
+      openBotActionsPopup({ subreddit: cleanSubreddit, enabled: true }, {
+
+        error: "",
+
+        status: `Sent ${resolvedAction.label}.`,
+
+      });
+
+    }
+
+    return true;
+
+  })();
 
 }
 
@@ -28087,6 +29419,20 @@ function renderQueueBar(state) {
 
   const root = ensureQueueBarRoot();
 
+  
+
+  // Preserve popup state before re-rendering to prevent it from closing or clearing live text
+
+  const wasPopupOpen = !!root.querySelector(".rrw-queuebar-bot-popup");
+
+  if (wasPopupOpen) {
+
+    syncBotActionsPopupStateFromInputs(root);
+
+  }
+
+  
+
   root.setAttribute("data-position", queueBarPosition || "bottom_right");
 
   root.replaceChildren();
@@ -28158,6 +29504,48 @@ function renderQueueBar(state) {
   const headerActions = document.createElement("div");
 
   headerActions.className = "rrw-queuebar-header-actions";
+
+
+
+  const botBtn = document.createElement("button");
+
+  botBtn.type = "button";
+
+  botBtn.className = "rrw-queuebar-bot-btn";
+
+  botBtn.title = "Bot actions";
+
+  botBtn.setAttribute("aria-label", "Open bot actions");
+
+  botBtn.innerHTML = `
+
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+
+      <rect x="5" y="6" width="10" height="9" rx="2" />
+
+      <path d="M7 6V4.5A3 3 0 0 1 10 2a3 3 0 0 1 3 2.5V6" />
+
+      <path d="M8 10h.01M12 10h.01" />
+
+      <path d="M7 13h6" />
+
+      <path d="M10 9v2" />
+
+    </svg>
+
+  `;
+
+  botBtn.addEventListener("click", () => {
+
+    void openBotActionsPopup({
+
+      subreddit: state?.subreddit || normalizeSubreddit(parseSubredditFromPath(window.location.pathname)) || "mod",
+
+      enabled: true,
+
+    });
+
+  });
 
 
 
@@ -28635,7 +30023,57 @@ function renderQueueBar(state) {
 
       } else if (Number.isFinite(state.updatedAt)) {
 
-        footer.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+        const footerSpan = document.createElement("span");
+
+        footerSpan.textContent = `Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+
+        footer.appendChild(footerSpan);
+
+        
+
+        // Add bot button to footer
+
+        const footerBotBtn = document.createElement("button");
+
+        footerBotBtn.type = "button";
+
+        footerBotBtn.className = "rrw-queuebar-bot-btn";
+
+        footerBotBtn.title = "Bot actions";
+
+        footerBotBtn.setAttribute("aria-label", "Open bot actions");
+
+        footerBotBtn.innerHTML = `
+
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+
+            <rect x="5" y="6" width="10" height="9" rx="2" />
+
+            <path d="M7 6V4.5A3 3 0 0 1 10 2a3 3 0 0 1 3 2.5V6" />
+
+            <path d="M8 10h.01M12 10h.01" />
+
+            <path d="M7 13h6" />
+
+            <path d="M10 9v2" />
+
+          </svg>
+
+        `;
+
+        footerBotBtn.addEventListener("click", () => {
+
+          void openBotActionsPopup({
+
+            subreddit: state?.subreddit || normalizeSubreddit(parseSubredditFromPath(window.location.pathname)) || "mod",
+
+            enabled: true,
+
+          });
+
+        });
+
+        footer.appendChild(footerBotBtn);
 
       } else {
 
@@ -28676,6 +30114,24 @@ function renderQueueBar(state) {
 
 
   root.appendChild(shell);
+
+  
+
+  // Restore popup after render if it was open
+
+  if (wasPopupOpen && botActionsPopupState) {
+
+    const newPopup = document.createElement("div");
+
+    newPopup.className = "rrw-queuebar-bot-popup";
+
+    newPopup.innerHTML = buildBotActionsPopupHtml();
+
+    root.appendChild(newPopup);
+
+    attachBotPopupHandlers(newPopup);
+
+  }
 
 }
 

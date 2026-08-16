@@ -20,6 +20,7 @@ let lastInteractedAt = 0;
 let panelSettingsPromise = null;
 let usernotesEditorState = null;
 let removalConfigEditorState = null;
+let botActionsPopupState = null;
 const usernotesCache = new Map();
 const usernoteTypeMetaCache = new Map();
 
