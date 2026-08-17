@@ -3663,9 +3663,21 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
 
   const cleanBody = String(body || "").trim();
 
-  if (!cleanSubreddit || !cleanSubject || !cleanBody) {
+  const isModeratorDiscussionTarget = /^(?:r\/|mod(?:erators?|team)?|mods?)$/i.test(cleanTo || "");
 
-    throw new Error("Missing subreddit, subject, or body for modmail");
+
+
+  if (!cleanSubreddit || !cleanTo || !cleanSubject || !cleanBody) {
+
+    throw new Error("Missing subreddit, recipient, subject, or body for modmail");
+
+  }
+
+
+
+  if (isModeratorDiscussionTarget) {
+
+    throw new Error("Modmail recipient must be a username, not a subreddit or moderator discussion target.");
 
   }
 
@@ -3683,7 +3695,7 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
 
       srName: cleanSubreddit,
 
-      to: cleanTo || undefined,
+      to: cleanTo,
 
       subject: cleanSubject,
 
@@ -11813,15 +11825,15 @@ function injectStyles() {
 
       max-width: min(92vw, 340px);
 
-      border: 1px solid rgba(58, 84, 129, 0.5);
+      border: 1px solid rgba(146, 170, 213, 0.7);
 
       border-radius: 12px;
 
-      background: linear-gradient(160deg, rgba(12, 20, 34, 0.97), rgba(16, 27, 44, 0.98));
+      background: linear-gradient(160deg, rgba(249, 252, 255, 0.98), rgba(238, 245, 255, 0.97));
 
-      box-shadow: 0 10px 26px rgba(5, 9, 14, 0.45);
+      box-shadow: 0 10px 26px rgba(88, 111, 145, 0.18);
 
-      color: #dbe9ff;
+      color: #21324a;
 
       display: grid;
 
@@ -11895,9 +11907,9 @@ function injectStyles() {
 
       border-radius: 7px;
 
-      border: 2px solid rgba(131, 154, 188, 0.8);
+      border: 2px solid rgba(132, 153, 187, 0.8);
 
-      background: rgba(111, 133, 171, 0.10);
+      background: rgba(228, 238, 255, 0.95);
 
       box-shadow: inset 0 0 0 1px rgba(160, 180, 212, 0.18);
 
@@ -11997,7 +12009,7 @@ function injectStyles() {
 
       text-transform: uppercase;
 
-      color: #a3c2fb;
+      color: #365d95;
 
     }
 
@@ -12007,7 +12019,7 @@ function injectStyles() {
 
       font-size: 0.75rem;
 
-      color: #d4e2ff;
+      color: #536b8c;
 
       white-space: nowrap;
 
@@ -12037,11 +12049,11 @@ function injectStyles() {
 
       -webkit-appearance: none;
 
-      border: 1px solid rgba(84, 118, 173, 0.45);
+      border: 1px solid rgba(142, 170, 214, 0.8);
 
-      background: rgba(30, 50, 77, 0.86);
+      background: rgba(232, 240, 255, 0.95);
 
-      color: #e6efff;
+      color: #243e63;
 
       border-radius: 7px;
 
@@ -12089,9 +12101,9 @@ function injectStyles() {
 
     .rrw-queuebar-bot-btn:hover {
 
-      background: rgba(44, 73, 112, 0.92);
+      background: rgba(220, 232, 255, 0.98);
 
-      border-color: rgba(110, 151, 221, 0.62);
+      border-color: rgba(95, 134, 196, 0.7);
 
     }
 
@@ -12099,29 +12111,33 @@ function injectStyles() {
 
     .rrw-queuebar-bot-popup {
 
-      position: absolute;
+      position: fixed;
 
-      right: 0;
+      top: 50%;
 
-      bottom: 40px;
+      left: 50%;
 
-      width: min(360px, calc(100vw - 32px));
+      transform: translate(-50%, -50%);
 
-      max-height: min(70vh, 520px);
+      width: min(680px, calc(100vw - 32px));
+
+      max-height: min(80vh, 700px);
 
       overflow: auto;
 
-      border: 1px solid rgba(116, 145, 205, 0.5);
+      border: 1px solid rgba(146, 170, 213, 0.7);
 
-      border-radius: 12px;
+      border-radius: 16px;
 
-      background: rgba(12, 20, 34, 0.98);
+      background: rgba(250, 252, 255, 0.98);
 
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+      box-shadow: 0 18px 42px rgba(98, 118, 154, 0.2);
 
-      padding: 10px;
+      padding: 14px 16px 16px;
 
-      z-index: 10000;
+      z-index: 10001;
+
+      color: #21324a;
 
     }
 
@@ -12155,7 +12171,17 @@ function injectStyles() {
 
       text-transform: uppercase;
 
-      color: #b9d0ff;
+      color: #2f4d79;
+
+      position: sticky;
+
+      top: 0;
+
+      background: rgba(250, 252, 255, 0.98);
+
+      z-index: 1;
+
+      padding-bottom: 8px;
 
     }
 
@@ -12175,11 +12201,11 @@ function injectStyles() {
 
       -webkit-appearance: none;
 
-      border: 1px solid rgba(122, 151, 201, 0.6);
+      border: 1px solid rgba(136, 162, 203, 0.7);
 
-      background: rgba(28, 46, 70, 0.92);
+      background: rgba(235, 243, 255, 0.98);
 
-      color: #edf4ff;
+      color: #21324a;
 
       border-radius: 8px;
 
@@ -12213,7 +12239,7 @@ function injectStyles() {
 
     .rrw-queuebar-bot-popup__primary {
 
-      background: rgba(53, 92, 148, 0.95);
+      background: rgba(214, 228, 255, 0.98);
 
     }
 
@@ -12237,9 +12263,9 @@ function injectStyles() {
 
     .rrw-queuebar-bot-popup__error {
 
-      background: rgba(120, 24, 24, 0.25);
+      background: rgba(255, 236, 239, 0.96);
 
-      color: #ffd1d1;
+      color: #8a2f3f;
 
     }
 
@@ -12247,9 +12273,9 @@ function injectStyles() {
 
     .rrw-queuebar-bot-popup__status {
 
-      background: rgba(24, 99, 72, 0.22);
+      background: rgba(228, 248, 235, 0.96);
 
-      color: #d4ffe8;
+      color: #24633e;
 
     }
 
@@ -12263,6 +12289,8 @@ function injectStyles() {
 
       margin-top: 8px;
 
+      align-content: start;
+
     }
 
 
@@ -12275,11 +12303,11 @@ function injectStyles() {
 
       padding: 8px;
 
-      border: 1px solid rgba(106, 133, 180, 0.35);
+      border: 1px solid rgba(133, 157, 196, 0.55);
 
       border-radius: 8px;
 
-      background: rgba(19, 31, 49, 0.82);
+      background: rgba(245, 249, 255, 0.94);
 
     }
 
@@ -12293,7 +12321,7 @@ function injectStyles() {
 
       font-size: 0.7rem;
 
-      color: #dfeeff;
+      color: #2b3f5a;
 
     }
 
@@ -12307,13 +12335,13 @@ function injectStyles() {
 
       box-sizing: border-box;
 
-      border: 1px solid rgba(137, 167, 216, 0.42);
+      border: 1px solid rgba(137, 167, 216, 0.5);
 
       border-radius: 6px;
 
-      background: rgba(8, 12, 20, 0.46);
+      background: rgba(255, 255, 255, 0.9);
 
-      color: #edf4ff;
+      color: #21324a;
 
       padding: 6px 8px;
 
@@ -12333,7 +12361,7 @@ function injectStyles() {
 
       font-size: 0.72rem;
 
-      color: #dfeeff;
+      color: #2b3f5a;
 
     }
 
@@ -12345,7 +12373,7 @@ function injectStyles() {
 
       font-size: 0.74rem;
 
-      color: #bfd3ff;
+      color: #48668f;
 
     }
 
@@ -27815,15 +27843,17 @@ function persistQueueBarPositionPreference() {
 
 function closeBotActionsPopup() {
 
-  if (!queueBarRoot) {
+  const overlayRoot = ensureOverlayRoot();
 
-    botActionsPopupState = null;
+  const backdrop = overlayRoot.querySelector(".rrw-bot-actions-backdrop");
 
-    return;
+  const popup = overlayRoot.querySelector(".rrw-bot-actions-modal");
+
+  if (backdrop) {
+
+    backdrop.remove();
 
   }
-
-  const popup = queueBarRoot.querySelector(".rrw-queuebar-bot-popup");
 
   if (popup) {
 
@@ -28085,21 +28115,17 @@ function syncBotActionsPopupStateFromInputs(root) {
 
 async function openBotActionsPopup(queueState, stateOverride = null) {
 
-  const root = ensureQueueBarRoot();
+  const overlayRoot = ensureOverlayRoot();
 
   const subreddit = getBotActionSenderSubreddit(queueState?.subreddit || "");
 
 
-
-  // Save existing state before closing (to preserve edits)
 
   const previousState = botActionsPopupState?.subreddit === subreddit ? botActionsPopupState : null;
 
   closeBotActionsPopup();
 
 
-
-  // Only load from wiki if we don't have an existing popup state (preserve changes during editing)
 
   let config;
 
@@ -28135,17 +28161,37 @@ async function openBotActionsPopup(queueState, stateOverride = null) {
 
 
 
+  const backdrop = document.createElement("div");
+
+  backdrop.className = "rrw-overlay-backdrop rrw-bot-actions-backdrop";
+
+  backdrop.addEventListener("click", (event) => {
+
+    if (event.target === backdrop) {
+
+      closeBotActionsPopup();
+
+    }
+
+  });
+
+
+
   const popup = document.createElement("div");
 
-  popup.className = "rrw-queuebar-bot-popup";
+  popup.className = "rrw-overlay-modal rrw-queuebar-bot-popup rrw-bot-actions-modal";
+
+  popup.setAttribute("role", "dialog");
+
+  popup.setAttribute("aria-modal", "true");
+
+  popup.setAttribute("aria-label", "Bot actions");
 
   popup.innerHTML = buildBotActionsPopupHtml();
 
 
 
   popup.addEventListener("click", handleBotPopupClick);
-
-
 
   popup.addEventListener("input", (event) => {
 
@@ -28189,15 +28235,9 @@ async function openBotActionsPopup(queueState, stateOverride = null) {
 
 
 
-  const shell = root.querySelector(".rrw-queuebar");
+  overlayRoot.appendChild(backdrop);
 
-  if (shell) {
-
-    shell.style.position = "relative";
-
-    shell.appendChild(popup);
-
-  }
+  overlayRoot.appendChild(popup);
 
 }
 
@@ -28455,9 +28495,17 @@ function executeBotAction(action, subreddit) {
 
     const body = String(resolvedAction.body || "").trim();
 
-    if (!subject || !body) {
+    const isModeratorDiscussionTarget = /^(?:r\/|mod(?:erators?|team)?|mods?)$/i.test(recipient || "");
 
-      throw new Error(`Bot action "${resolvedAction.label}" is missing a subject or body.`);
+    if (!recipient || !subject || !body) {
+
+      throw new Error(`Bot action "${resolvedAction.label}" is missing a recipient, subject, or body.`);
+
+    }
+
+    if (isModeratorDiscussionTarget) {
+
+      throw new Error(`Bot action "${resolvedAction.label}" must use a username recipient, not a subreddit or moderator discussion target.`);
 
     }
 
@@ -29423,7 +29471,7 @@ function renderQueueBar(state) {
 
   // Preserve popup state before re-rendering to prevent it from closing or clearing live text
 
-  const wasPopupOpen = !!root.querySelector(".rrw-queuebar-bot-popup");
+  const wasPopupOpen = Boolean(botActionsPopupState);
 
   if (wasPopupOpen) {
 
@@ -30117,19 +30165,25 @@ function renderQueueBar(state) {
 
   
 
-  // Restore popup after render if it was open
+  // Restore popup after render if it was open.
+
+  // Bot actions now use the shared overlay modal so they persist independently of the queue bar root.
 
   if (wasPopupOpen && botActionsPopupState) {
 
-    const newPopup = document.createElement("div");
+    void openBotActionsPopup({
 
-    newPopup.className = "rrw-queuebar-bot-popup";
+      subreddit: botActionsPopupState.subreddit,
 
-    newPopup.innerHTML = buildBotActionsPopupHtml();
+      enabled: true,
 
-    root.appendChild(newPopup);
+    }, {
 
-    attachBotPopupHandlers(newPopup);
+      error: botActionsPopupState.error,
+
+      status: botActionsPopupState.status,
+
+    });
 
   }
 

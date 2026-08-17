@@ -208,11 +208,12 @@ function persistQueueBarPositionPreference() {
 // ──── Queue Bar DOM Management ────
 
 function closeBotActionsPopup() {
-  if (!queueBarRoot) {
-    botActionsPopupState = null;
-    return;
+  const overlayRoot = ensureOverlayRoot();
+  const backdrop = overlayRoot.querySelector(".rrw-bot-actions-backdrop");
+  const popup = overlayRoot.querySelector(".rrw-bot-actions-modal");
+  if (backdrop) {
+    backdrop.remove();
   }
-  const popup = queueBarRoot.querySelector(".rrw-queuebar-bot-popup");
   if (popup) {
     popup.remove();
   }
@@ -343,14 +344,12 @@ function syncBotActionsPopupStateFromInputs(root) {
 }
 
 async function openBotActionsPopup(queueState, stateOverride = null) {
-  const root = ensureQueueBarRoot();
+  const overlayRoot = ensureOverlayRoot();
   const subreddit = getBotActionSenderSubreddit(queueState?.subreddit || "");
 
-  // Save existing state before closing (to preserve edits)
   const previousState = botActionsPopupState?.subreddit === subreddit ? botActionsPopupState : null;
   closeBotActionsPopup();
 
-  // Only load from wiki if we don't have an existing popup state (preserve changes during editing)
   let config;
   if (previousState) {
     config = previousState.config;
@@ -368,12 +367,22 @@ async function openBotActionsPopup(queueState, stateOverride = null) {
     status: Object.prototype.hasOwnProperty.call(nextState, "status") ? nextState.status : (previousState?.status || ""),
   };
 
+  const backdrop = document.createElement("div");
+  backdrop.className = "rrw-overlay-backdrop rrw-bot-actions-backdrop";
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) {
+      closeBotActionsPopup();
+    }
+  });
+
   const popup = document.createElement("div");
-  popup.className = "rrw-queuebar-bot-popup";
+  popup.className = "rrw-overlay-modal rrw-queuebar-bot-popup rrw-bot-actions-modal";
+  popup.setAttribute("role", "dialog");
+  popup.setAttribute("aria-modal", "true");
+  popup.setAttribute("aria-label", "Bot actions");
   popup.innerHTML = buildBotActionsPopupHtml();
 
   popup.addEventListener("click", handleBotPopupClick);
-
   popup.addEventListener("input", (event) => {
     const target = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ? event.target : null;
     if (!target || !botActionsPopupState?.config) {
@@ -395,11 +404,8 @@ async function openBotActionsPopup(queueState, stateOverride = null) {
     action[field] = String(target.value || "");
   });
 
-  const shell = root.querySelector(".rrw-queuebar");
-  if (shell) {
-    shell.style.position = "relative";
-    shell.appendChild(popup);
-  }
+  overlayRoot.appendChild(backdrop);
+  overlayRoot.appendChild(popup);
 }
 
 function attachBotPopupHandlers(popup) {
@@ -528,8 +534,12 @@ function executeBotAction(action, subreddit) {
     const recipient = String(resolvedAction.recipient || "").trim();
     const subject = String(resolvedAction.subject || "").trim();
     const body = String(resolvedAction.body || "").trim();
-    if (!subject || !body) {
-      throw new Error(`Bot action "${resolvedAction.label}" is missing a subject or body.`);
+    const isModeratorDiscussionTarget = /^(?:r\/|mod(?:erators?|team)?|mods?)$/i.test(recipient || "");
+    if (!recipient || !subject || !body) {
+      throw new Error(`Bot action "${resolvedAction.label}" is missing a recipient, subject, or body.`);
+    }
+    if (isModeratorDiscussionTarget) {
+      throw new Error(`Bot action "${resolvedAction.label}" must use a username recipient, not a subreddit or moderator discussion target.`);
     }
 
     let finalSubject = subject || `${resolvedAction.label}`;
@@ -1012,7 +1022,7 @@ function renderQueueBar(state) {
   const root = ensureQueueBarRoot();
   
   // Preserve popup state before re-rendering to prevent it from closing or clearing live text
-  const wasPopupOpen = !!root.querySelector(".rrw-queuebar-bot-popup");
+  const wasPopupOpen = Boolean(botActionsPopupState);
   if (wasPopupOpen) {
     syncBotActionsPopupStateFromInputs(root);
   }
@@ -1359,13 +1369,16 @@ function renderQueueBar(state) {
 
   root.appendChild(shell);
   
-  // Restore popup after render if it was open
+  // Restore popup after render if it was open.
+  // Bot actions now use the shared overlay modal so they persist independently of the queue bar root.
   if (wasPopupOpen && botActionsPopupState) {
-    const newPopup = document.createElement("div");
-    newPopup.className = "rrw-queuebar-bot-popup";
-    newPopup.innerHTML = buildBotActionsPopupHtml();
-    root.appendChild(newPopup);
-    attachBotPopupHandlers(newPopup);
+    void openBotActionsPopup({
+      subreddit: botActionsPopupState.subreddit,
+      enabled: true,
+    }, {
+      error: botActionsPopupState.error,
+      status: botActionsPopupState.status,
+    });
   }
 }
 

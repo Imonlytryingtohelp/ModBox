@@ -710,8 +710,14 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
   const cleanTo = to == null ? null : String(to || "").trim().replace(/^u\//i, "");
   const cleanSubject = String(subject || "").trim();
   const cleanBody = String(body || "").trim();
-  if (!cleanSubreddit || !cleanSubject || !cleanBody) {
-    throw new Error("Missing subreddit, subject, or body for modmail");
+  const isModeratorDiscussionTarget = /^(?:r\/|mod(?:erators?|team)?|mods?)$/i.test(cleanTo || "");
+
+  if (!cleanSubreddit || !cleanTo || !cleanSubject || !cleanBody) {
+    throw new Error("Missing subreddit, recipient, subject, or body for modmail");
+  }
+
+  if (isModeratorDiscussionTarget) {
+    throw new Error("Modmail recipient must be a username, not a subreddit or moderator discussion target.");
   }
 
   const result = await requestJsonViaBackground("/api/mod/conversations", {
@@ -720,7 +726,7 @@ async function sendModmailViaReddit({ subreddit, to, subject, body, isAuthorHidd
     formData: true,
     body: {
       srName: cleanSubreddit,
-      to: cleanTo || undefined,
+      to: cleanTo,
       subject: cleanSubject,
       body: cleanBody,
       isAuthorHidden: String(Boolean(isAuthorHidden)),

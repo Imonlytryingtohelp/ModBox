@@ -106,11 +106,11 @@ function injectStyles() {
       pointer-events: auto;
       min-width: 252px;
       max-width: min(92vw, 340px);
-      border: 1px solid rgba(58, 84, 129, 0.5);
+      border: 1px solid rgba(146, 170, 213, 0.7);
       border-radius: 12px;
-      background: linear-gradient(160deg, rgba(12, 20, 34, 0.97), rgba(16, 27, 44, 0.98));
-      box-shadow: 0 10px 26px rgba(5, 9, 14, 0.45);
-      color: #dbe9ff;
+      background: linear-gradient(160deg, rgba(249, 252, 255, 0.98), rgba(238, 245, 255, 0.97));
+      box-shadow: 0 10px 26px rgba(88, 111, 145, 0.18);
+      color: #21324a;
       display: grid;
       gap: 5px;
       padding: 6px;
@@ -147,8 +147,8 @@ function injectStyles() {
       min-width: 18px;
       height: 38px;
       border-radius: 7px;
-      border: 2px solid rgba(131, 154, 188, 0.8);
-      background: rgba(111, 133, 171, 0.10);
+      border: 2px solid rgba(132, 153, 187, 0.8);
+      background: rgba(228, 238, 255, 0.95);
       box-shadow: inset 0 0 0 1px rgba(160, 180, 212, 0.18);
       cursor: grab;
       flex: 0 0 auto;
@@ -198,12 +198,12 @@ function injectStyles() {
       font-size: 0.8rem;
       letter-spacing: 0.05em;
       text-transform: uppercase;
-      color: #a3c2fb;
+      color: #365d95;
     }
 
     .rrw-queuebar-subtitle {
       font-size: 0.75rem;
-      color: #d4e2ff;
+      color: #536b8c;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -218,9 +218,9 @@ function injectStyles() {
     .rrw-queuebar-bot-btn {
       appearance: none;
       -webkit-appearance: none;
-      border: 1px solid rgba(84, 118, 173, 0.45);
-      background: rgba(30, 50, 77, 0.86);
-      color: #e6efff;
+      border: 1px solid rgba(142, 170, 214, 0.8);
+      background: rgba(232, 240, 255, 0.95);
+      color: #243e63;
       border-radius: 7px;
       font-size: 0.78rem;
       line-height: 0;
@@ -244,23 +244,25 @@ function injectStyles() {
     }
 
     .rrw-queuebar-bot-btn:hover {
-      background: rgba(44, 73, 112, 0.92);
-      border-color: rgba(110, 151, 221, 0.62);
+      background: rgba(220, 232, 255, 0.98);
+      border-color: rgba(95, 134, 196, 0.7);
     }
 
     .rrw-queuebar-bot-popup {
-      position: absolute;
-      right: 0;
-      bottom: 40px;
-      width: min(360px, calc(100vw - 32px));
-      max-height: min(70vh, 520px);
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(680px, calc(100vw - 32px));
+      max-height: min(80vh, 700px);
       overflow: auto;
-      border: 1px solid rgba(116, 145, 205, 0.5);
-      border-radius: 12px;
-      background: rgba(12, 20, 34, 0.98);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
-      padding: 10px;
-      z-index: 10000;
+      border: 1px solid rgba(146, 170, 213, 0.7);
+      border-radius: 16px;
+      background: rgba(250, 252, 255, 0.98);
+      box-shadow: 0 18px 42px rgba(98, 118, 154, 0.2);
+      padding: 14px 16px 16px;
+      z-index: 10001;
+      color: #21324a;
     }
 
     .rrw-queuebar-bot-popup__header,
@@ -277,7 +279,12 @@ function injectStyles() {
       font-size: 0.82rem;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: #b9d0ff;
+      color: #2f4d79;
+      position: sticky;
+      top: 0;
+      background: rgba(250, 252, 255, 0.98);
+      z-index: 1;
+      padding-bottom: 8px;
     }
 
     .rrw-queuebar-bot-popup__close,
@@ -287,9 +294,9 @@ function injectStyles() {
     .rrw-queuebar-bot-action-remove {
       appearance: none;
       -webkit-appearance: none;
-      border: 1px solid rgba(122, 151, 201, 0.6);
-      background: rgba(28, 46, 70, 0.92);
-      color: #edf4ff;
+      border: 1px solid rgba(136, 162, 203, 0.7);
+      background: rgba(235, 243, 255, 0.98);
+      color: #21324a;
       border-radius: 8px;
       padding: 5px 8px;
       cursor: pointer;
@@ -306,7 +313,7 @@ function injectStyles() {
     }
 
     .rrw-queuebar-bot-popup__primary {
-      background: rgba(53, 92, 148, 0.95);
+      background: rgba(214, 228, 255, 0.98);
     }
 
     .rrw-queuebar-bot-popup__error,
@@ -318,45 +325,46 @@ function injectStyles() {
     }
 
     .rrw-queuebar-bot-popup__error {
-      background: rgba(120, 24, 24, 0.25);
-      color: #ffd1d1;
+      background: rgba(255, 236, 239, 0.96);
+      color: #8a2f3f;
     }
 
     .rrw-queuebar-bot-popup__status {
-      background: rgba(24, 99, 72, 0.22);
-      color: #d4ffe8;
+      background: rgba(228, 248, 235, 0.96);
+      color: #24633e;
     }
 
     .rrw-queuebar-bot-action-grid {
       display: grid;
       gap: 10px;
       margin-top: 8px;
+      align-content: start;
     }
 
     .rrw-queuebar-bot-action-item {
       display: grid;
       gap: 7px;
       padding: 8px;
-      border: 1px solid rgba(106, 133, 180, 0.35);
+      border: 1px solid rgba(133, 157, 196, 0.55);
       border-radius: 8px;
-      background: rgba(19, 31, 49, 0.82);
+      background: rgba(245, 249, 255, 0.94);
     }
 
     .rrw-queuebar-bot-action-item label {
       display: grid;
       gap: 4px;
       font-size: 0.7rem;
-      color: #dfeeff;
+      color: #2b3f5a;
     }
 
     .rrw-queuebar-bot-action-item input,
     .rrw-queuebar-bot-action-item textarea {
       width: 100%;
       box-sizing: border-box;
-      border: 1px solid rgba(137, 167, 216, 0.42);
+      border: 1px solid rgba(137, 167, 216, 0.5);
       border-radius: 6px;
-      background: rgba(8, 12, 20, 0.46);
-      color: #edf4ff;
+      background: rgba(255, 255, 255, 0.9);
+      color: #21324a;
       padding: 6px 8px;
       font: inherit;
     }
@@ -366,13 +374,13 @@ function injectStyles() {
       align-items: center;
       gap: 6px;
       font-size: 0.72rem;
-      color: #dfeeff;
+      color: #2b3f5a;
     }
 
     .rrw-queuebar-bot-popup__empty {
       margin: 6px 0 0;
       font-size: 0.74rem;
-      color: #bfd3ff;
+      color: #48668f;
     }
 
     .rrw-queuebar-icon-btn {
