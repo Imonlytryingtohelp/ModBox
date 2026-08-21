@@ -3467,7 +3467,25 @@ async function postCommentViaNativeSession(parentFullname, text) {
 
     if (!hasInvalidId) {
 
-      throw error;
+      try {
+
+        return await requestJsonViaBackground("/api/comment", {
+
+          method: "POST",
+
+          body: Object.fromEntries(params.entries()),
+
+          formData: true,
+
+          oauth: true,
+
+        });
+
+      } catch (oauthError) {
+
+        throw new Error(`${message}; OAuth fallback failed: ${getSafeErrorMessage(oauthError)}`);
+
+      }
 
     }
 

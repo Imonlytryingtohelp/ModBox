@@ -615,7 +615,16 @@ async function postCommentViaNativeSession(parentFullname, text) {
     const message = getSafeErrorMessage(error);
     const hasInvalidId = /INVALID_ID|specified id is invalid/i.test(message);
     if (!hasInvalidId) {
-      throw error;
+      try {
+        return await requestJsonViaBackground("/api/comment", {
+          method: "POST",
+          body: Object.fromEntries(params.entries()),
+          formData: true,
+          oauth: true,
+        });
+      } catch (oauthError) {
+        throw new Error(`${message}; OAuth fallback failed: ${getSafeErrorMessage(oauthError)}`);
+      }
     }
 
     const retryTargets = new Set();

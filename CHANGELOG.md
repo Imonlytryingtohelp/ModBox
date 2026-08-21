@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.8.5 - Quick Action Fix
+
+- **Fixed** Quick actions now use Reddit's authenticated OAuth API when the legacy modhash comment endpoint is unavailable.
+
 ## 1.8.4 - More Bug Fixes
 
 - **Fixed** [~~Issue #3~~](https://github.com/Imonlytryingtohelp/ModBox/issues/3) About page now correctly displays links in changelogs. 
