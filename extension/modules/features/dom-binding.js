@@ -634,11 +634,25 @@ function bindContainer(container) {
     return;
   }
 
+  const directActionHost = Array.from(container.children).find((child) => {
+    const slot = String(child.getAttribute("slot") || "").toLowerCase();
+    return slot === "commentactions" || slot === "postactions" || slot === "actions";
+  });
+  const postCreditBar = container.querySelector('[slot="credit-bar"]');
+  const postCreditBarInner = postCreditBar?.querySelector('[id^="feed-post-credit-bar-"]');
   const toolbarHost =
+    (directActionHost instanceof HTMLElement && directActionHost) ||
     container.querySelector('[data-testid="comment"]') ||
-    container.querySelector('[slot="actions"]') ||
-    container.querySelector("header") ||
-    container;
+    container.querySelector('[slot="commentActions"], [slot="postActions"], [slot="actions"]') ||
+    (postCreditBarInner instanceof HTMLElement && postCreditBarInner) ||
+    container.querySelector('[slot="commentMeta"], [slot="postMeta"], [slot="credit-bar"]') ||
+    container.querySelector("header");
+
+  if (!(toolbarHost instanceof HTMLElement)) {
+    console.log("[ModBox] No action-row host found for", container.tagName, "target", target);
+    container.dataset.rrwBound = "1";
+    return;
+  }
 
   const username = extractUsernameFromAuthorAnchor(authorAnchor);
   const subreddit =

@@ -38759,6 +38759,22 @@ window.preloadRepostChecker = preloadRepostChecker;
 
 
 
+function getBindableContainerSelector() {
+
+  const host = String(window.location.hostname || "").toLowerCase();
+
+  if (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") {
+
+    return "shreddit-post, shreddit-comment";
+
+  }
+
+  return BINDABLE_CONTAINER_SELECTOR;
+
+}
+
+
+
 function collectBindableContainersFromRoot(root, collector) {
 
   if (!(root instanceof Element)) {
@@ -38787,13 +38803,15 @@ function collectBindableContainersFromRoot(root, collector) {
 
 
 
-  if (root.matches(BINDABLE_CONTAINER_SELECTOR)) {
+  const selector = getBindableContainerSelector();
+
+  if (root.matches(selector)) {
 
     collector.add(root);
 
   }
 
-  root.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => collector.add(el));
+  root.querySelectorAll(selector).forEach((el) => collector.add(el));
 
 }
 
@@ -38801,7 +38819,7 @@ function collectBindableContainersFromRoot(root, collector) {
 
 function collectBindableContainersFromDocument(collector) {
 
-  document.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => collector.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => collector.add(el));
 
 }
 
@@ -39625,7 +39643,11 @@ function bindContainer(container) {
 
   const host = String(window.location.hostname || "").toLowerCase();
 
-  const useRedditActionRow = (host === "www.reddit.com" || host === "sh.reddit.com") && !isModmailPage();
+  const useRedditActionRow =
+
+    (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") &&
+
+    !isModmailPage();
 
   if (authorAnchor?.parentElement && !useRedditActionRow) {
 
@@ -39991,15 +40013,149 @@ function bindContainer(container) {
 
 
 
+  const directActionHost = Array.from(container.children).find((child) => {
+
+    const slot = String(child.getAttribute("slot") || "").toLowerCase();
+
+    return slot === "commentactions" || slot === "postactions" || slot === "actions";
+
+  });
+
+  const postCreditBar = container.querySelector('[slot="credit-bar"]');
+
+  const postCreditBarInner = postCreditBar?.querySelector('[id^="feed-post-credit-bar-"]');
+
   const toolbarHost =
+
+    (directActionHost instanceof HTMLElement && directActionHost) ||
 
     container.querySelector('[data-testid="comment"]') ||
 
-    container.querySelector('[slot="actions"]') ||
+    container.querySelector('[slot="commentActions"], [slot="postActions"], [slot="actions"]') ||
 
-    container.querySelector("header") ||
+    (postCreditBarInner instanceof HTMLElement && postCreditBarInner) ||
 
-    container;
+    container.querySelector('[slot="commentMeta"], [slot="postMeta"], [slot="credit-bar"]') ||
+
+    container.querySelector("header");
+
+
+
+  if (!(toolbarHost instanceof HTMLElement)) {
+
+    console.log("[ModBox] No action-row host found for", container.tagName, "target", target);
+
+    container.dataset.rrwBound = "1";
+
+    return;
+
+  }
+
+
+
+  const username = extractUsernameFromAuthorAnchor(authorAnchor);
+
+  const subreddit =
+
+    normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
+
+    parseSubredditFromPath(window.location.pathname);
+
+  let postId = parsePostIdFromPath(window.location.pathname);
+
+  if (!postId && typeof target === "string") {
+
+    const postIdMatch = String(target).match(/^t3_([a-z0-9]{5,})$/i);
+
+    if (postIdMatch) postId = postIdMatch[1];
+
+  }
+
+  const linkTarget = postId && subreddit
+
+    ? formatRedditUrl(subreddit, postId)
+
+    : formatRedditByIdUrl(extractFullnameFromAttributes(container)) || window.location.href;
+
+
+
+  const actionPillGroup = document.createElement("span");
+
+  actionPillGroup.className = "rrw-inline-group";
+
+
+
+  const usernotesChip = document.createElement("button");
+
+  usernotesChip.type = "button";
+
+  usernotesChip.className = "rrw-usernote-chip";
+
+  usernotesChip.textContent = "Loading note...";
+
+  actionPillGroup.appendChild(usernotesChip);
+
+
+
+  const historyButton = document.createElement("button");
+
+  historyButton.type = "button";
+
+  historyButton.className = "rrw-history-btn";
+
+  historyButton.textContent = "H";
+
+  historyButton.title = "Open brief user history";
+
+  attachButtonClickHandlers(historyButton, () => {
+
+    if (username) {
+
+      void openInlineHistoryPopup(historyButton, { username, subreddit });
+
+    }
+
+  });
+
+  if (username && historyButtonEnabled) {
+
+    actionPillGroup.appendChild(historyButton);
+
+  }
+
+
+
+  const profileButton = document.createElement("button");
+
+  profileButton.type = "button";
+
+  profileButton.className = PROFILE_BUTTON_CLASS;
+
+  profileButton.textContent = "P";
+
+  profileButton.title = "Open ModBox profile view";
+
+  attachButtonClickHandlers(profileButton, () => {
+
+    if (username) {
+
+      openProfileView(username, { listing: "overview", subreddit });
+
+    }
+
+  });
+
+  if (username) {
+
+    actionPillGroup.appendChild(profileButton);
+
+  }
+
+
+
+  actionPillGroup.appendChild(modlogButton);
+
+  actionPillGroup.appendChild(button);
 
 
 
@@ -40007,9 +40163,7 @@ function bindContainer(container) {
 
   if (taglineHost) {
 
-    modlogButton.classList.add("rrw-launch-btn-inline");
-
-    button.classList.add("rrw-launch-btn-inline", "rrw-launch-btn-inline--solo");
+    actionPillGroup.classList.add("rrw-launch-btn-inline");
 
     if (commentNukeButton) {
 
@@ -40027,9 +40181,9 @@ function bindContainer(container) {
 
     }
 
-    taglineHost.insertAdjacentElement("beforeend", modlogButton);
+    taglineHost.insertAdjacentElement("beforeend", actionPillGroup);
 
-    taglineHost.insertAdjacentElement("beforeend", button);
+    void setupInlineUsernoteChip(usernotesChip, { subreddit, username, link: linkTarget });
 
     container.dataset.rrwBound = "1";
 
@@ -40039,7 +40193,7 @@ function bindContainer(container) {
 
 
 
-  modlogButton.classList.add("rrw-launch-btn-inline");
+  actionPillGroup.classList.add("rrw-launch-btn-inline");
 
   if (commentNukeButton) {
 
@@ -40057,9 +40211,9 @@ function bindContainer(container) {
 
   }
 
-  toolbarHost.appendChild(modlogButton);
+  toolbarHost.appendChild(actionPillGroup);
 
-  toolbarHost.appendChild(button);
+  void setupInlineUsernoteChip(usernotesChip, { subreddit, username, link: linkTarget });
 
   container.dataset.rrwBound = "1";
 
@@ -40075,7 +40229,7 @@ function bindVisibleContainers() {
 
   const candidates = new Set();
 
-  document.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => candidates.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => candidates.add(el));
 
   console.log("[ModBox] bindVisibleContainers: found " + candidates.size + " containers");
 
@@ -40183,7 +40337,7 @@ function scheduleVisibleContainerBind(options = {}) {
 
             visibleContainerBindPendingRoots.add(node);
 
-            const nearestContainer = node.closest(BINDABLE_CONTAINER_SELECTOR);
+            const nearestContainer = node.closest(getBindableContainerSelector());
 
             if (nearestContainer instanceof Element) {
 
