@@ -412,6 +412,93 @@ function injectStyles() {
       animation: rrw-queuebar-fresh 2s ease forwards;
     }
 
+    /* New Reddit applies larger control defaults to injected buttons. Keep the
+       queue bar at the same compact density as its old Reddit layout. */
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar {
+      box-sizing: border-box;
+      width: min(340px, 92vw);
+      min-width: 0;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar[data-collapsed="1"],
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar[data-collapsed="1"] {
+      width: max-content;
+      max-width: 92vw;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar *,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar * {
+      box-sizing: border-box;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-icon-btn,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-icon-btn {
+      min-width: 26px;
+      min-height: 26px;
+      height: 26px;
+      padding: 3px 5px !important;
+      font-size: 0.78rem !important;
+      line-height: 1 !important;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-badge,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-badge {
+      min-height: 30px;
+      padding: 4px 5px !important;
+      font-size: 0.84rem !important;
+      line-height: 1.2 !important;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-secondary-link,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-secondary-link {
+      min-height: 28px;
+      padding: 4px 5px !important;
+      font-size: 0.74rem !important;
+      line-height: 1.2 !important;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-header,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-header {
+      align-items: center;
+      min-height: 30px;
+      gap: 4px;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-drag-handle,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-drag-handle {
+      width: 16px;
+      min-width: 16px;
+      height: 30px;
+      border-radius: 6px;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-title-wrap,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-title-wrap {
+      gap: 0;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-title,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-title {
+      font-size: 0.74rem;
+      line-height: 1.05;
+      white-space: nowrap;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-subtitle,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-subtitle {
+      font-size: 0.68rem;
+      line-height: 1.05;
+    }
+
+    html[data-rrw-site="www"] #rrw-queuebar-root .rrw-queuebar-header-actions,
+    html[data-rrw-site="sh"] #rrw-queuebar-root .rrw-queuebar-header-actions {
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
     @keyframes rrw-queuebar-fresh {
       0%, 60% { color: #4ade80; }
       100% { color: #9eb6df; }
