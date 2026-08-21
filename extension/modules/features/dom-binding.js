@@ -439,15 +439,9 @@ function bindContainer(container) {
   } else {
     console.log("[ModBox] bindContainer: found author anchor, binding container with target", target);
   }
-  if (authorAnchor?.parentElement) {
-    const host = String(window.location.hostname || "").toLowerCase();
-    // Skip inline pill buttons on Reddit hosts except when we're on Modmail pages
-    if ((host === "www.reddit.com" || host === "sh.reddit.com") && !isModmailPage()) {
-      console.log("[ModBox] Skipping inline pill buttons and Mod Actions on host:", host);
-      container.dataset.rrwBound = "1";
-      return;
-    }
-
+  const host = String(window.location.hostname || "").toLowerCase();
+  const useRedditActionRow = (host === "www.reddit.com" || host === "sh.reddit.com") && !isModmailPage();
+  if (authorAnchor?.parentElement && !useRedditActionRow) {
     if (authorAnchor.dataset.rrwInlineBound === "1") {
       container.dataset.rrwBound = "1";
       return;
@@ -615,6 +609,7 @@ function bindContainer(container) {
       container.dataset.rrwBound = "1";
       return;
     }
+
     insertAfterEl.insertAdjacentElement("afterend", inlineGroup);
     authorAnchor.dataset.rrwInlineBound = "1";
 
@@ -624,13 +619,6 @@ function bindContainer(container) {
       link: linkTarget,
     });
 
-    container.dataset.rrwBound = "1";
-    return;
-  }
-
-  const host = String(window.location.hostname || "").toLowerCase();
-  if (host === "www.reddit.com" || host === "sh.reddit.com") {
-    console.log("[ModBox] Skipping toolbar inline buttons on host:", host);
     container.dataset.rrwBound = "1";
     return;
   }
