@@ -704,6 +704,53 @@ function bindContainer(container) {
     actionPillGroup.appendChild(profileButton);
   }
 
+  const isSubmission = /^t3_[a-z0-9]{5,10}$/i.test(target) || getThingTypeFromFullname(target) === "submission";
+  let repostCheckerButton = null;
+  if (isSubmission && repostCheckerButtonEnabled) {
+    repostCheckerButton = document.createElement("button");
+    repostCheckerButton.type = "button";
+    repostCheckerButton.className = "rrw-repost-pill rrw-quick-actions-pill";
+    repostCheckerButton.textContent = "RC";
+    repostCheckerButton.title = "Open Repost Checker";
+    attachButtonClickHandlers(repostCheckerButton, () => {
+      if (username) {
+        const titleElement = container.querySelector("[slot='title'], h1, h2, h3, a[data-click-id='body']");
+        const currentTitle = titleElement ? String(titleElement.textContent || "").trim() : "";
+        void openRepostCheckerPopup(repostCheckerButton, {
+          username,
+          subreddit,
+          currentTitle,
+          currentUrl: linkTarget,
+          currentPostId: postId || "",
+        });
+      }
+    });
+    actionPillGroup.appendChild(repostCheckerButton);
+    if (username && window.preloadRepostChecker) {
+      const titleElement = container.querySelector("[slot='title'], h1, h2, h3, a[data-click-id='body']");
+      const currentTitle = titleElement ? String(titleElement.textContent || "").trim() : "";
+      void window.preloadRepostChecker(repostCheckerButton, {
+        username,
+        subreddit,
+        currentTitle,
+        currentUrl: linkTarget,
+        currentPostId: postId || "",
+      });
+    }
+  }
+
+  const quickActionsButton = document.createElement("button");
+  quickActionsButton.type = "button";
+  quickActionsButton.className = "rrw-quick-actions-pill";
+  quickActionsButton.textContent = "Q";
+  quickActionsButton.title = "Open quick actions panel";
+  quickActionsButton.dataset.rrwButtonTarget = target;
+  attachButtonClickHandlers(quickActionsButton, () => {
+    const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+    void openOverlay(btnTarget, { quickActionsOnlyMode: true, subreddit: itemSubreddit });
+  });
+  actionPillGroup.appendChild(quickActionsButton);
+
   actionPillGroup.appendChild(modlogButton);
   actionPillGroup.appendChild(button);
 

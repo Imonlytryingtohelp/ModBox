@@ -1044,9 +1044,9 @@ function injectStyles() {
       justify-content: center;
       font-weight: 700;
       letter-spacing: 0.01em;
-      border-color: #8a6d2c;
-      background: linear-gradient(180deg, #6b4f1f 0%, #4f3714 100%);
-      color: #fff8e6;
+      border-color: #355a91;
+      background: linear-gradient(180deg, #173a63 0%, #102a4a 100%);
+      color: #d8e9ff;
     }
 
     .rrw-repost-pill.rrw-repost-pill--available {
@@ -1062,6 +1062,14 @@ function injectStyles() {
     }
 
     #rrw-repost-checker-root {
+      --rrw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+      --rrw-modal-bg: rgba(248, 251, 255, 0.98);
+      --rrw-text: #21324a;
+      --rrw-border: rgba(152, 175, 208, 0.68);
+      --rrw-soft-border: rgba(168, 187, 214, 0.56);
+      --rrw-muted: #5f7797;
+      --rrw-link: #245eb8;
+      color-scheme: light;
       position: fixed;
       inset: 0;
       display: flex;
@@ -1070,6 +1078,23 @@ function injectStyles() {
       z-index: 2147483647;
       pointer-events: auto;
       font-family: var(--rrw-font-family);
+    }
+
+    html[data-rrw-theme="dark"] #rrw-repost-checker-root {
+      --rrw-modal-bg: rgba(12, 20, 34, 0.98);
+      --rrw-text: #e7f0ff;
+      --rrw-border: rgba(98, 133, 192, 0.52);
+      --rrw-soft-border: rgba(98, 133, 192, 0.4);
+      --rrw-muted: #9eb6df;
+      --rrw-link: #9bc2ff;
+      color-scheme: dark;
+    }
+
+    #rrw-repost-checker-root .rrw-usernotes-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 12, 22, 0.72);
+      z-index: 0;
     }
 
     .rrw-repost-checker-popup {

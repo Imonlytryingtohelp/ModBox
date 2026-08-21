@@ -13407,11 +13407,11 @@ function injectStyles() {
 
       letter-spacing: 0.01em;
 
-      border-color: #8a6d2c;
+      border-color: #355a91;
 
-      background: linear-gradient(180deg, #6b4f1f 0%, #4f3714 100%);
+      background: linear-gradient(180deg, #173a63 0%, #102a4a 100%);
 
-      color: #fff8e6;
+      color: #d8e9ff;
 
     }
 
@@ -13443,6 +13443,22 @@ function injectStyles() {
 
     #rrw-repost-checker-root {
 
+      --rrw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+      --rrw-modal-bg: rgba(248, 251, 255, 0.98);
+
+      --rrw-text: #21324a;
+
+      --rrw-border: rgba(152, 175, 208, 0.68);
+
+      --rrw-soft-border: rgba(168, 187, 214, 0.56);
+
+      --rrw-muted: #5f7797;
+
+      --rrw-link: #245eb8;
+
+      color-scheme: light;
+
       position: fixed;
 
       inset: 0;
@@ -13458,6 +13474,40 @@ function injectStyles() {
       pointer-events: auto;
 
       font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    html[data-rrw-theme="dark"] #rrw-repost-checker-root {
+
+      --rrw-modal-bg: rgba(12, 20, 34, 0.98);
+
+      --rrw-text: #e7f0ff;
+
+      --rrw-border: rgba(98, 133, 192, 0.52);
+
+      --rrw-soft-border: rgba(98, 133, 192, 0.4);
+
+      --rrw-muted: #9eb6df;
+
+      --rrw-link: #9bc2ff;
+
+      color-scheme: dark;
+
+    }
+
+
+
+    #rrw-repost-checker-root .rrw-usernotes-backdrop {
+
+      position: fixed;
+
+      inset: 0;
+
+      background: rgba(7, 12, 22, 0.72);
+
+      z-index: 0;
 
     }
 
@@ -40150,6 +40200,100 @@ function bindContainer(container) {
     actionPillGroup.appendChild(profileButton);
 
   }
+
+
+
+  const isSubmission = /^t3_[a-z0-9]{5,10}$/i.test(target) || getThingTypeFromFullname(target) === "submission";
+
+  let repostCheckerButton = null;
+
+  if (isSubmission && repostCheckerButtonEnabled) {
+
+    repostCheckerButton = document.createElement("button");
+
+    repostCheckerButton.type = "button";
+
+    repostCheckerButton.className = "rrw-repost-pill rrw-quick-actions-pill";
+
+    repostCheckerButton.textContent = "RC";
+
+    repostCheckerButton.title = "Open Repost Checker";
+
+    attachButtonClickHandlers(repostCheckerButton, () => {
+
+      if (username) {
+
+        const titleElement = container.querySelector("[slot='title'], h1, h2, h3, a[data-click-id='body']");
+
+        const currentTitle = titleElement ? String(titleElement.textContent || "").trim() : "";
+
+        void openRepostCheckerPopup(repostCheckerButton, {
+
+          username,
+
+          subreddit,
+
+          currentTitle,
+
+          currentUrl: linkTarget,
+
+          currentPostId: postId || "",
+
+        });
+
+      }
+
+    });
+
+    actionPillGroup.appendChild(repostCheckerButton);
+
+    if (username && window.preloadRepostChecker) {
+
+      const titleElement = container.querySelector("[slot='title'], h1, h2, h3, a[data-click-id='body']");
+
+      const currentTitle = titleElement ? String(titleElement.textContent || "").trim() : "";
+
+      void window.preloadRepostChecker(repostCheckerButton, {
+
+        username,
+
+        subreddit,
+
+        currentTitle,
+
+        currentUrl: linkTarget,
+
+        currentPostId: postId || "",
+
+      });
+
+    }
+
+  }
+
+
+
+  const quickActionsButton = document.createElement("button");
+
+  quickActionsButton.type = "button";
+
+  quickActionsButton.className = "rrw-quick-actions-pill";
+
+  quickActionsButton.textContent = "Q";
+
+  quickActionsButton.title = "Open quick actions panel";
+
+  quickActionsButton.dataset.rrwButtonTarget = target;
+
+  attachButtonClickHandlers(quickActionsButton, () => {
+
+    const btnTarget = quickActionsButton.dataset.rrwButtonTarget || target;
+
+    void openOverlay(btnTarget, { quickActionsOnlyMode: true, subreddit: itemSubreddit });
+
+  });
+
+  actionPillGroup.appendChild(quickActionsButton);
 
 
 
