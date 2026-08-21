@@ -10,6 +10,9 @@
 function getBindableContainerSelector() {
   const host = String(window.location.hostname || "").toLowerCase();
   if (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") {
+    if (isQueueListingPage()) {
+      return "mod-queue-list-item";
+    }
     return "shreddit-post, shreddit-comment";
   }
   return BINDABLE_CONTAINER_SELECTOR;
@@ -41,7 +44,7 @@ function collectBindableContainersFromDocument(collector) {
 }
 
 function isQueueListingPage(pathname = window.location.pathname) {
-  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
+  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)|\/mod\/(queue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
 }
 
 function isModmailConversationPage() {

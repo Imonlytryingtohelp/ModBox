@@ -1003,6 +1003,8 @@ function extractFullnameFromAttributes(container) {
 
     "data-comment-id",
 
+    "data-ks-item",
+
   ];
 
 
@@ -2119,7 +2121,7 @@ function isQueueListingPage(pathname = window.location.pathname) {
 
   const result = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(path) ||
 
-         /\/mod\/\w+\/queue(?:\/|$)/i.test(path);
+         /\/mod\/(?:\w+\/)?(queue|unmoderated|reports)(?:\/|$)/i.test(path);
 
   console.log("[ModBox] isQueueListingPage: pathname=", path, "result=", result);
 
@@ -39025,6 +39027,12 @@ function getBindableContainerSelector() {
 
   if (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") {
 
+    if (isQueueListingPage()) {
+
+      return "mod-queue-list-item";
+
+    }
+
     return "shreddit-post, shreddit-comment";
 
   }
@@ -39087,7 +39095,7 @@ function collectBindableContainersFromDocument(collector) {
 
 function isQueueListingPage(pathname = window.location.pathname) {
 
-  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
+  return /\/about\/(modqueue|unmoderated|reports)(?:\/|$)|\/mod\/(queue|unmoderated|reports)(?:\/|$)/i.test(String(pathname || ""));
 
 }
 
