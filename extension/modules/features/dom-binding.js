@@ -7,6 +7,14 @@
 
 // ──── Container Collection & Detection ────
 
+function getBindableContainerSelector() {
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") {
+    return "shreddit-post, shreddit-comment";
+  }
+  return BINDABLE_CONTAINER_SELECTOR;
+}
+
 function collectBindableContainersFromRoot(root, collector) {
   if (!(root instanceof Element)) {
     return;
@@ -21,14 +29,15 @@ function collectBindableContainersFromRoot(root, collector) {
     return;
   }
 
-  if (root.matches(BINDABLE_CONTAINER_SELECTOR)) {
+  const selector = getBindableContainerSelector();
+  if (root.matches(selector)) {
     collector.add(root);
   }
-  root.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => collector.add(el));
+  root.querySelectorAll(selector).forEach((el) => collector.add(el));
 }
 
 function collectBindableContainersFromDocument(collector) {
-  document.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => collector.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => collector.add(el));
 }
 
 function isQueueListingPage(pathname = window.location.pathname) {
@@ -440,7 +449,9 @@ function bindContainer(container) {
     console.log("[ModBox] bindContainer: found author anchor, binding container with target", target);
   }
   const host = String(window.location.hostname || "").toLowerCase();
-  const useRedditActionRow = (host === "www.reddit.com" || host === "sh.reddit.com") && !isModmailPage();
+  const useRedditActionRow =
+    (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") &&
+    !isModmailPage();
   if (authorAnchor?.parentElement && !useRedditActionRow) {
     if (authorAnchor.dataset.rrwInlineBound === "1") {
       container.dataset.rrwBound = "1";
@@ -629,10 +640,62 @@ function bindContainer(container) {
     container.querySelector("header") ||
     container;
 
+  const username = extractUsernameFromAuthorAnchor(authorAnchor);
+  const subreddit =
+    normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
+    parseSubredditFromPath(window.location.pathname);
+  let postId = parsePostIdFromPath(window.location.pathname);
+  if (!postId && typeof target === "string") {
+    const postIdMatch = String(target).match(/^t3_([a-z0-9]{5,})$/i);
+    if (postIdMatch) postId = postIdMatch[1];
+  }
+  const linkTarget = postId && subreddit
+    ? formatRedditUrl(subreddit, postId)
+    : formatRedditByIdUrl(extractFullnameFromAttributes(container)) || window.location.href;
+
+  const actionPillGroup = document.createElement("span");
+  actionPillGroup.className = "rrw-inline-group";
+
+  const usernotesChip = document.createElement("button");
+  usernotesChip.type = "button";
+  usernotesChip.className = "rrw-usernote-chip";
+  usernotesChip.textContent = "Loading note...";
+  actionPillGroup.appendChild(usernotesChip);
+
+  const historyButton = document.createElement("button");
+  historyButton.type = "button";
+  historyButton.className = "rrw-history-btn";
+  historyButton.textContent = "H";
+  historyButton.title = "Open brief user history";
+  attachButtonClickHandlers(historyButton, () => {
+    if (username) {
+      void openInlineHistoryPopup(historyButton, { username, subreddit });
+    }
+  });
+  if (username && historyButtonEnabled) {
+    actionPillGroup.appendChild(historyButton);
+  }
+
+  const profileButton = document.createElement("button");
+  profileButton.type = "button";
+  profileButton.className = PROFILE_BUTTON_CLASS;
+  profileButton.textContent = "P";
+  profileButton.title = "Open ModBox profile view";
+  attachButtonClickHandlers(profileButton, () => {
+    if (username) {
+      openProfileView(username, { listing: "overview", subreddit });
+    }
+  });
+  if (username) {
+    actionPillGroup.appendChild(profileButton);
+  }
+
+  actionPillGroup.appendChild(modlogButton);
+  actionPillGroup.appendChild(button);
+
   const taglineHost = container.querySelector(".entry .tagline");
   if (taglineHost) {
-    modlogButton.classList.add("rrw-launch-btn-inline");
-    button.classList.add("rrw-launch-btn-inline", "rrw-launch-btn-inline--solo");
+    actionPillGroup.classList.add("rrw-launch-btn-inline");
     if (commentNukeButton) {
       commentNukeButton.classList.add("rrw-launch-btn-inline");
       taglineHost.insertAdjacentElement("beforeend", commentNukeButton);
@@ -641,13 +704,13 @@ function bindContainer(container) {
       contextButton.classList.add("rrw-launch-btn-inline");
       taglineHost.insertAdjacentElement("beforeend", contextButton);
     }
-    taglineHost.insertAdjacentElement("beforeend", modlogButton);
-    taglineHost.insertAdjacentElement("beforeend", button);
+    taglineHost.insertAdjacentElement("beforeend", actionPillGroup);
+    void setupInlineUsernoteChip(usernotesChip, { subreddit, username, link: linkTarget });
     container.dataset.rrwBound = "1";
     return;
   }
 
-  modlogButton.classList.add("rrw-launch-btn-inline");
+  actionPillGroup.classList.add("rrw-launch-btn-inline");
   if (commentNukeButton) {
     commentNukeButton.classList.add("rrw-launch-btn-inline");
     toolbarHost.appendChild(commentNukeButton);
@@ -656,8 +719,8 @@ function bindContainer(container) {
     contextButton.classList.add("rrw-launch-btn-inline");
     toolbarHost.appendChild(contextButton);
   }
-  toolbarHost.appendChild(modlogButton);
-  toolbarHost.appendChild(button);
+  toolbarHost.appendChild(actionPillGroup);
+  void setupInlineUsernoteChip(usernotesChip, { subreddit, username, link: linkTarget });
   container.dataset.rrwBound = "1";
 }
 
@@ -665,7 +728,7 @@ function bindContainer(container) {
 
 function bindVisibleContainers() {
   const candidates = new Set();
-  document.querySelectorAll(BINDABLE_CONTAINER_SELECTOR).forEach((el) => candidates.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => candidates.add(el));
   console.log("[ModBox] bindVisibleContainers: found " + candidates.size + " containers");
   candidates.forEach((container) => bindContainer(container));
   scheduleQueueToolsBind();
@@ -719,7 +782,7 @@ function scheduleVisibleContainerBind(options = {}) {
               return;
             }
             visibleContainerBindPendingRoots.add(node);
-            const nearestContainer = node.closest(BINDABLE_CONTAINER_SELECTOR);
+            const nearestContainer = node.closest(getBindableContainerSelector());
             if (nearestContainer instanceof Element) {
               visibleContainerBindPendingRoots.add(nearestContainer);
             }
