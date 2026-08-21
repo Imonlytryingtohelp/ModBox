@@ -13549,7 +13549,43 @@ function injectStyles() {
 
     .rrw-repost-table { width: 100%; border-collapse: collapse; }
 
-    .rrw-repost-table th, .rrw-repost-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rrw-soft-border); }
+    .rrw-repost-table th,
+
+    .rrw-repost-table td {
+
+      padding: 8px 10px;
+
+      text-align: left;
+
+      border-bottom: 1px solid var(--rrw-soft-border);
+
+      color: var(--rrw-text);
+
+    }
+
+
+
+    #rrw-repost-checker-root .rrw-repost-table th {
+
+      background: rgba(226, 236, 249, 0.96);
+
+      color: #21324a;
+
+      font-weight: 700;
+
+    }
+
+
+
+    html[data-rrw-theme="dark"] #rrw-repost-checker-root .rrw-repost-table th {
+
+      background: rgba(21, 38, 62, 0.96);
+
+      color: #e7f0ff;
+
+    }
+
+
 
     .rrw-repost-row--match td { background: rgba(255,190,80,0.12); }
 
@@ -40147,34 +40183,6 @@ function bindContainer(container) {
 
 
 
-  const historyButton = document.createElement("button");
-
-  historyButton.type = "button";
-
-  historyButton.className = "rrw-history-btn";
-
-  historyButton.textContent = "H";
-
-  historyButton.title = "Open brief user history";
-
-  attachButtonClickHandlers(historyButton, () => {
-
-    if (username) {
-
-      void openInlineHistoryPopup(historyButton, { username, subreddit });
-
-    }
-
-  });
-
-  if (username && historyButtonEnabled) {
-
-    actionPillGroup.appendChild(historyButton);
-
-  }
-
-
-
   const profileButton = document.createElement("button");
 
   profileButton.type = "button";
@@ -40194,12 +40202,6 @@ function bindContainer(container) {
     }
 
   });
-
-  if (username) {
-
-    actionPillGroup.appendChild(profileButton);
-
-  }
 
 
 
@@ -40273,6 +40275,18 @@ function bindContainer(container) {
 
 
 
+  if (username) {
+
+    actionPillGroup.appendChild(profileButton);
+
+  }
+
+
+
+  actionPillGroup.appendChild(modlogButton);
+
+
+
   const quickActionsButton = document.createElement("button");
 
   quickActionsButton.type = "button";
@@ -40296,8 +40310,6 @@ function bindContainer(container) {
   actionPillGroup.appendChild(quickActionsButton);
 
 
-
-  actionPillGroup.appendChild(modlogButton);
 
   actionPillGroup.appendChild(button);
 

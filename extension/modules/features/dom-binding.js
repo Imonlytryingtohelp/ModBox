@@ -676,20 +676,6 @@ function bindContainer(container) {
   usernotesChip.textContent = "Loading note...";
   actionPillGroup.appendChild(usernotesChip);
 
-  const historyButton = document.createElement("button");
-  historyButton.type = "button";
-  historyButton.className = "rrw-history-btn";
-  historyButton.textContent = "H";
-  historyButton.title = "Open brief user history";
-  attachButtonClickHandlers(historyButton, () => {
-    if (username) {
-      void openInlineHistoryPopup(historyButton, { username, subreddit });
-    }
-  });
-  if (username && historyButtonEnabled) {
-    actionPillGroup.appendChild(historyButton);
-  }
-
   const profileButton = document.createElement("button");
   profileButton.type = "button";
   profileButton.className = PROFILE_BUTTON_CLASS;
@@ -700,9 +686,6 @@ function bindContainer(container) {
       openProfileView(username, { listing: "overview", subreddit });
     }
   });
-  if (username) {
-    actionPillGroup.appendChild(profileButton);
-  }
 
   const isSubmission = /^t3_[a-z0-9]{5,10}$/i.test(target) || getThingTypeFromFullname(target) === "submission";
   let repostCheckerButton = null;
@@ -739,6 +722,12 @@ function bindContainer(container) {
     }
   }
 
+  if (username) {
+    actionPillGroup.appendChild(profileButton);
+  }
+
+  actionPillGroup.appendChild(modlogButton);
+
   const quickActionsButton = document.createElement("button");
   quickActionsButton.type = "button";
   quickActionsButton.className = "rrw-quick-actions-pill";
@@ -751,7 +740,6 @@ function bindContainer(container) {
   });
   actionPillGroup.appendChild(quickActionsButton);
 
-  actionPillGroup.appendChild(modlogButton);
   actionPillGroup.appendChild(button);
 
   const taglineHost = container.querySelector(".entry .tagline");

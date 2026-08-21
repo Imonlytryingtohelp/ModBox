@@ -1115,7 +1115,25 @@ function injectStyles() {
     .rrw-repost-body { padding: 12px 14px 14px; }
 
     .rrw-repost-table { width: 100%; border-collapse: collapse; }
-    .rrw-repost-table th, .rrw-repost-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rrw-soft-border); }
+    .rrw-repost-table th,
+    .rrw-repost-table td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--rrw-soft-border);
+      color: var(--rrw-text);
+    }
+
+    #rrw-repost-checker-root .rrw-repost-table th {
+      background: rgba(226, 236, 249, 0.96);
+      color: #21324a;
+      font-weight: 700;
+    }
+
+    html[data-rrw-theme="dark"] #rrw-repost-checker-root .rrw-repost-table th {
+      background: rgba(21, 38, 62, 0.96);
+      color: #e7f0ff;
+    }
+
     .rrw-repost-row--match td { background: rgba(255,190,80,0.12); }
     .rrw-repost-row--removed td { color: var(--rrw-muted); opacity: 0.8; }
 
