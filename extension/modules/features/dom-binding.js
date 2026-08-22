@@ -11,11 +11,21 @@ function getBindableContainerSelector() {
   const host = String(window.location.hostname || "").toLowerCase();
   if (host === "www.reddit.com" || host === "new.reddit.com" || host === "sh.reddit.com") {
     if (isQueueListingPage()) {
-      return "mod-queue-list-item";
+      return "mod-queue-list-item, shreddit-post, shreddit-comment";
     }
     return "shreddit-post, shreddit-comment";
   }
   return BINDABLE_CONTAINER_SELECTOR;
+}
+
+function isNestedQueueContentContainer(container) {
+  if (!(container instanceof Element)) {
+    return false;
+  }
+  return Boolean(
+    container.matches("shreddit-post, shreddit-comment") &&
+    container.closest("mod-queue-list-item")
+  );
 }
 
 function collectBindableContainersFromRoot(root, collector) {
@@ -33,14 +43,22 @@ function collectBindableContainersFromRoot(root, collector) {
   }
 
   const selector = getBindableContainerSelector();
-  if (root.matches(selector)) {
+  if (root.matches(selector) && !isNestedQueueContentContainer(root)) {
     collector.add(root);
   }
-  root.querySelectorAll(selector).forEach((el) => collector.add(el));
+  root.querySelectorAll(selector).forEach((el) => {
+    if (!isNestedQueueContentContainer(el)) {
+      collector.add(el);
+    }
+  });
 }
 
 function collectBindableContainersFromDocument(collector) {
-  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => collector.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => {
+    if (!isNestedQueueContentContainer(el)) {
+      collector.add(el);
+    }
+  });
 }
 
 function isQueueListingPage(pathname = window.location.pathname) {
@@ -469,7 +487,8 @@ function bindContainer(container) {
     const username = extractUsernameFromAuthorAnchor(authorAnchor);
     const subreddit =
       normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
-      parseSubredditFromPath(window.location.pathname);
+      parseSubredditFromPath(window.location.pathname) ||
+      containerSubreddit;
     let postId = parsePostIdFromPath(window.location.pathname);
     if (!postId && typeof target === 'string') {
       const m = String(target).match(/^t3_([a-z0-9]{5,})$/i);
@@ -660,7 +679,8 @@ function bindContainer(container) {
   const username = extractUsernameFromAuthorAnchor(authorAnchor);
   const subreddit =
     normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
-    parseSubredditFromPath(window.location.pathname);
+    parseSubredditFromPath(window.location.pathname) ||
+    containerSubreddit;
   let postId = parsePostIdFromPath(window.location.pathname);
   if (!postId && typeof target === "string") {
     const postIdMatch = String(target).match(/^t3_([a-z0-9]{5,})$/i);
@@ -835,7 +855,7 @@ function scheduleVisibleContainerBind(options = {}) {
             }
             visibleContainerBindPendingRoots.add(node);
             const nearestContainer = node.closest(getBindableContainerSelector());
-            if (nearestContainer instanceof Element) {
+            if (nearestContainer instanceof Element && !isNestedQueueContentContainer(nearestContainer)) {
               visibleContainerBindPendingRoots.add(nearestContainer);
             }
           }

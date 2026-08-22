@@ -39029,7 +39029,7 @@ function getBindableContainerSelector() {
 
     if (isQueueListingPage()) {
 
-      return "mod-queue-list-item";
+      return "mod-queue-list-item, shreddit-post, shreddit-comment";
 
     }
 
@@ -39038,6 +39038,26 @@ function getBindableContainerSelector() {
   }
 
   return BINDABLE_CONTAINER_SELECTOR;
+
+}
+
+
+
+function isNestedQueueContentContainer(container) {
+
+  if (!(container instanceof Element)) {
+
+    return false;
+
+  }
+
+  return Boolean(
+
+    container.matches("shreddit-post, shreddit-comment") &&
+
+    container.closest("mod-queue-list-item")
+
+  );
 
 }
 
@@ -39073,13 +39093,21 @@ function collectBindableContainersFromRoot(root, collector) {
 
   const selector = getBindableContainerSelector();
 
-  if (root.matches(selector)) {
+  if (root.matches(selector) && !isNestedQueueContentContainer(root)) {
 
     collector.add(root);
 
   }
 
-  root.querySelectorAll(selector).forEach((el) => collector.add(el));
+  root.querySelectorAll(selector).forEach((el) => {
+
+    if (!isNestedQueueContentContainer(el)) {
+
+      collector.add(el);
+
+    }
+
+  });
 
 }
 
@@ -39087,7 +39115,15 @@ function collectBindableContainersFromRoot(root, collector) {
 
 function collectBindableContainersFromDocument(collector) {
 
-  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => collector.add(el));
+  document.querySelectorAll(getBindableContainerSelector()).forEach((el) => {
+
+    if (!isNestedQueueContentContainer(el)) {
+
+      collector.add(el);
+
+    }
+
+  });
 
 }
 
@@ -39945,7 +39981,9 @@ function bindContainer(container) {
 
       normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
 
-      parseSubredditFromPath(window.location.pathname);
+      parseSubredditFromPath(window.location.pathname) ||
+
+      containerSubreddit;
 
     let postId = parsePostIdFromPath(window.location.pathname);
 
@@ -40327,7 +40365,9 @@ function bindContainer(container) {
 
     normalizeSubreddit(container.getAttribute("data-subreddit") || "") ||
 
-    parseSubredditFromPath(window.location.pathname);
+    parseSubredditFromPath(window.location.pathname) ||
+
+    containerSubreddit;
 
   let postId = parsePostIdFromPath(window.location.pathname);
 
@@ -40677,7 +40717,7 @@ function scheduleVisibleContainerBind(options = {}) {
 
             const nearestContainer = node.closest(getBindableContainerSelector());
 
-            if (nearestContainer instanceof Element) {
+            if (nearestContainer instanceof Element && !isNestedQueueContentContainer(nearestContainer)) {
 
               visibleContainerBindPendingRoots.add(nearestContainer);
 
