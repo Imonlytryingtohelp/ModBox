@@ -113,6 +113,7 @@ function extractFullnameFromAttributes(container) {
     "data-post-id",
     "comment-id",
     "data-comment-id",
+    "data-ks-item",
   ];
 
   for (const attr of attrCandidates) {
@@ -671,7 +672,7 @@ function extractModlogEntriesFromPayload(payload) {
 function isQueueListingPage(pathname = window.location.pathname) {
   const path = String(pathname || "");
   const result = /\/about\/(modqueue|unmoderated|reports)(?:\/|$)/i.test(path) ||
-         /\/mod\/\w+\/queue(?:\/|$)/i.test(path);
+         /\/mod\/(?:\w+\/)?(queue|unmoderated|reports)(?:\/|$)/i.test(path);
   console.log("[ModBox] isQueueListingPage: pathname=", path, "result=", result);
   return result;
 }

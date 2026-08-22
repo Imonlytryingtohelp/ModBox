@@ -13,6 +13,7 @@
   "permissions": ["storage", "cookies"],
   "host_permissions": [
     "https://www.reddit.com/*",
+    "https://new.reddit.com/*",
     "https://old.reddit.com/*",
     "https://sh.reddit.com/*",
     "https://mod.reddit.com/*",
@@ -35,6 +36,7 @@
     {
       "matches": [
         "https://www.reddit.com/*",
+        "https://new.reddit.com/*",
         "https://old.reddit.com/*",
         "https://sh.reddit.com/*"
       ],
@@ -47,6 +49,7 @@
       "resources": ["assets/modbox-logo.svg"],
       "matches": [
         "https://www.reddit.com/*",
+        "https://new.reddit.com/*",
         "https://old.reddit.com/*",
         "https://sh.reddit.com/*"
       ]
