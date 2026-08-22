@@ -10511,6 +10511,16 @@ function renderInlineUsernoteChip(chip, payload) {
 
     chip.title = "No usernotes found. Click to add one.";
 
+    chip.removeAttribute("aria-label");
+
+    chip.removeAttribute("data-note-type");
+
+    chip.style.removeProperty("--rrw-pill-bg");
+
+    chip.style.removeProperty("--rrw-pill-border");
+
+    chip.style.removeProperty("--rrw-pill-text");
+
     chip.dataset.hasNotes = "0";
 
     return;
@@ -10535,15 +10545,29 @@ function renderInlineUsernoteChip(chip, payload) {
 
   };
 
+  const latestTypeLabel = String(typeMeta.labels[latestType.toLowerCase()] || latestType);
+
+  const typePalette = getNoteTypePalette(latestType, typeMeta.colors);
+
   const countMarkup = additionalCount > 0
 
     ? `<span class="rrw-usernote-count">(+${additionalCount})</span>`
 
     : "";
 
-  chip.innerHTML = `${renderNoteTypeBadge(latestType, "rrw-note-type-pill rrw-note-type-pill--compact", typeMeta)}<span class="rrw-usernote-inline-text">${escapeHtml(latestText || "View note")}</span>${countMarkup}`;
+  chip.style.setProperty("--rrw-pill-bg", typePalette.bg);
 
-  chip.title = `[${latestType}] ${latest?.note || "View usernotes"}`;
+  chip.style.setProperty("--rrw-pill-border", typePalette.border);
+
+  chip.style.setProperty("--rrw-pill-text", typePalette.text);
+
+  chip.innerHTML = `<span class="rrw-usernote-inline-text">${escapeHtml(latestText || "View note")}</span>${countMarkup}`;
+
+  chip.title = `${latestTypeLabel}: ${latest?.note || "View usernotes"}`;
+
+  chip.setAttribute("aria-label", chip.title);
+
+  chip.dataset.noteType = latestType;
 
   chip.dataset.hasNotes = "1";
 
@@ -11499,6 +11523,70 @@ function injectStyles() {
 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
 
+      font-size: 16px;
+
+      line-height: 1.2;
+
+    }
+
+
+
+    #rrw-queuebar-root .rrw-queuebar,
+
+    #rrw-queuebar-root .rrw-queuebar *,
+
+    #rrw-queuebar-root .rrw-queuebar *::before,
+
+    #rrw-queuebar-root .rrw-queuebar *::after {
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    #rrw-queuebar-root .rrw-queuebar,
+
+    #rrw-queuebar-root .rrw-queuebar section,
+
+    #rrw-queuebar-root .rrw-queuebar header,
+
+    #rrw-queuebar-root .rrw-queuebar div,
+
+    #rrw-queuebar-root .rrw-queuebar strong,
+
+    #rrw-queuebar-root .rrw-queuebar span {
+
+      margin: 0;
+
+    }
+
+
+
+    #rrw-queuebar-root .rrw-queuebar button {
+
+      appearance: none;
+
+      -webkit-appearance: none;
+
+      font-family: inherit;
+
+      font-size: inherit;
+
+      line-height: inherit;
+
+      margin: 0;
+
+    }
+
+
+
+    #rrw-queuebar-root .rrw-queuebar svg {
+
+      max-width: none;
+
+      vertical-align: middle;
+
     }
 
 
@@ -11548,6 +11636,10 @@ function injectStyles() {
       padding: 6px;
 
       backdrop-filter: blur(2px);
+
+      font-size: 13px;
+
+      line-height: 1.2;
 
     }
 
@@ -13265,13 +13357,19 @@ function injectStyles() {
 
       margin: 0;
 
-      max-width: none;
+      max-width: 170px;
 
       display: inline-flex;
 
       align-items: center;
 
       gap: 1px;
+
+      border-color: var(--rrw-pill-border, #355a91);
+
+      background: var(--rrw-pill-bg, linear-gradient(180deg, #173a63 0%, #102a4a 100%));
+
+      color: var(--rrw-pill-text, #d8e9ff);
 
     }
 
@@ -13281,15 +13379,15 @@ function injectStyles() {
 
       min-width: 0;
 
-      max-width: none;
+      max-width: 140px;
 
       font-weight: 600;
 
       white-space: nowrap;
 
-      overflow: visible;
+      overflow: hidden;
 
-      text-overflow: clip;
+      text-overflow: ellipsis;
 
     }
 
@@ -13478,6 +13576,56 @@ function injectStyles() {
       background: linear-gradient(180deg, #ffe8e8 0%, #ffd8d8 100%) !important;
 
       color: #9a4a4a !important;
+
+    }
+
+
+
+    .rrw-usernote-chip[data-has-notes="1"] {
+
+      border-color: var(--rrw-pill-border);
+
+      background: var(--rrw-pill-bg);
+
+      color: var(--rrw-pill-text);
+
+      outline: 1px solid var(--rrw-pill-border);
+
+      outline-offset: -1px;
+
+      box-shadow: inset 0 0 0 1px var(--rrw-pill-border);
+
+    }
+
+
+
+    .rrw-usernote-chip[data-has-notes="1"]:hover {
+
+      border-color: var(--rrw-pill-border);
+
+      background: var(--rrw-pill-bg);
+
+      color: var(--rrw-pill-text);
+
+    }
+
+
+
+    html[data-rrw-theme="light"] .rrw-usernote-chip[data-has-notes="1"],
+
+    html[data-rrw-theme="light"] .rrw-usernote-chip[data-has-notes="1"]:hover {
+
+      border-color: var(--rrw-pill-border);
+
+      background: var(--rrw-pill-bg);
+
+      color: var(--rrw-pill-text);
+
+      outline: 1px solid var(--rrw-pill-border);
+
+      outline-offset: -1px;
+
+      box-shadow: inset 0 0 0 1px var(--rrw-pill-border);
 
     }
 

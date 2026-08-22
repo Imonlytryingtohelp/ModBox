@@ -1266,6 +1266,11 @@ function renderInlineUsernoteChip(chip, payload) {
   if (!notes.length) {
     chip.textContent = "N";
     chip.title = "No usernotes found. Click to add one.";
+    chip.removeAttribute("aria-label");
+    chip.removeAttribute("data-note-type");
+    chip.style.removeProperty("--rrw-pill-bg");
+    chip.style.removeProperty("--rrw-pill-border");
+    chip.style.removeProperty("--rrw-pill-text");
     chip.dataset.hasNotes = "0";
     return;
   }
@@ -1278,11 +1283,18 @@ function renderInlineUsernoteChip(chip, payload) {
     colors: payload?.note_type_colors && typeof payload.note_type_colors === "object" ? payload.note_type_colors : {},
     labels: payload?.note_type_labels && typeof payload.note_type_labels === "object" ? payload.note_type_labels : {},
   };
+  const latestTypeLabel = String(typeMeta.labels[latestType.toLowerCase()] || latestType);
+  const typePalette = getNoteTypePalette(latestType, typeMeta.colors);
   const countMarkup = additionalCount > 0
     ? `<span class="rrw-usernote-count">(+${additionalCount})</span>`
     : "";
-  chip.innerHTML = `${renderNoteTypeBadge(latestType, "rrw-note-type-pill rrw-note-type-pill--compact", typeMeta)}<span class="rrw-usernote-inline-text">${escapeHtml(latestText || "View note")}</span>${countMarkup}`;
-  chip.title = `[${latestType}] ${latest?.note || "View usernotes"}`;
+  chip.style.setProperty("--rrw-pill-bg", typePalette.bg);
+  chip.style.setProperty("--rrw-pill-border", typePalette.border);
+  chip.style.setProperty("--rrw-pill-text", typePalette.text);
+  chip.innerHTML = `<span class="rrw-usernote-inline-text">${escapeHtml(latestText || "View note")}</span>${countMarkup}`;
+  chip.title = `${latestTypeLabel}: ${latest?.note || "View usernotes"}`;
+  chip.setAttribute("aria-label", chip.title);
+  chip.dataset.noteType = latestType;
   chip.dataset.hasNotes = "1";
 }
 
