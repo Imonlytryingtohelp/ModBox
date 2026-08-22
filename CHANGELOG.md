@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.9.0 - Reddit Compatibility & UI Improvements
+
+- **Re-added** Support for ModBox on `reddit.com`/`sh.reddit.com`. This should be considered a BETA feature for now. Any bugs should be reported on github.
+ - Pill buttons are now displayed without breaking reddit's CSS on large comment trees. 
+ - Pill buttons are correctly displayed on posts in the shreddit queues. 
+- **Changed** Modbox Queues CSS for a more uniform display between old.reddit and shreddit. 
+- **Changed** Note pill button is more compact. Note type is now shown by background colour.
+- **Changed** CSS styling of various GUIs for a more uniform display between old.reddit and shreddit.
+
 ## 1.8.5 - Quick Action Fix
 
 - **Fixed** Quick actions now use Reddit's authenticated OAuth API when the legacy modhash comment endpoint is unavailable.
