@@ -19891,6 +19891,36 @@ function injectStyles() {
 
 
 
+    .rrw-about-page-website-link {
+
+      margin-left: auto;
+
+      margin-right: 12px;
+
+      color: var(--rrw-link, #245eb8);
+
+      font-size: 0.82rem;
+
+      font-weight: 600;
+
+      font-family: var(--rrw-font-family);
+
+      text-decoration: none;
+
+      white-space: nowrap;
+
+    }
+
+
+
+    .rrw-about-page-website-link:hover {
+
+      text-decoration: underline;
+
+    }
+
+
+
     .rrw-about-page-close {
 
       display: flex;
@@ -32230,6 +32260,24 @@ function renderAboutPage() {
         <header class="rrw-about-page-header">
 
           <h2 class="rrw-about-page-title">About ModBox</h2>
+
+          <a
+
+            class="rrw-about-page-website-link"
+
+            href="https://modbox.fyi"
+
+            target="_blank"
+
+            rel="noopener noreferrer"
+
+            title="Visit the ModBox website"
+
+          >
+
+            modbox.fyi
+
+          </a>
 
           ${aboutPageState?.linkGeneratorEnabled ? `
 

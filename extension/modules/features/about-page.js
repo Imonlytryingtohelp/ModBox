@@ -223,6 +223,15 @@ function renderAboutPage() {
       <div class="rrw-about-page">
         <header class="rrw-about-page-header">
           <h2 class="rrw-about-page-title">About ModBox</h2>
+          <a
+            class="rrw-about-page-website-link"
+            href="https://modbox.fyi"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Visit the ModBox website"
+          >
+            modbox.fyi
+          </a>
           ${aboutPageState?.linkGeneratorEnabled ? `
             <button 
               type="button" 

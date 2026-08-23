@@ -4273,6 +4273,21 @@ function injectStyles() {
       font-family: var(--rrw-font-family);
     }
 
+    .rrw-about-page-website-link {
+      margin-left: auto;
+      margin-right: 12px;
+      color: var(--rrw-link, #245eb8);
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: var(--rrw-font-family);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .rrw-about-page-website-link:hover {
+      text-decoration: underline;
+    }
+
     .rrw-about-page-close {
       display: flex;
       align-items: center;
