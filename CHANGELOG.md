@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.9.1 - Website Launch 
+
+- **Added** https://modbox.fyi link on about page. 
+  - Site contains readme and wiki, as well as release history and known bugs. 
+
 ## 1.9.0 - Reddit Compatibility & UI Improvements
 
 - **Re-added** Support for ModBox on `reddit.com`/`sh.reddit.com`. This should be considered a BETA feature for now. Any bugs should be reported on github.
