@@ -144,7 +144,7 @@ function renderRepostCheckerPopup() {
     return `
       <tr class="${rowClass}">
         <td>${flair || "-"}</td>
-        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${String(data.id || '')}`, preferredRedditLinkHost))}" target="_blank" rel="noreferrer">${title}</a>${removedSuffix}</td>
+        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${String(data.id || '')}`, state.linkHost))}" target="_blank" rel="noreferrer">${title}</a>${removedSuffix}</td>
         <td>${score}</td>
         <td>${age}</td>
       </tr>
@@ -276,6 +276,13 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
   const currentPostId = String(context.currentPostId || '').trim();
   if (!username || !subreddit) return;
 
+  let linkHost = preferredRedditLinkHost;
+  try {
+    const stored = await ext.storage.sync.get([QUEUE_BAR_LINK_HOST_KEY]);
+    linkHost = normalizeQueueBarLinkHost(stored?.[QUEUE_BAR_LINK_HOST_KEY], linkHost);
+  } catch {
+  }
+
   repostCheckerState = {
     triggerEl,
     username,
@@ -283,6 +290,7 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
     currentTitle,
     currentUrl,
     currentPostId,
+    linkHost,
     loading: true,
     error: null,
     entries: [],

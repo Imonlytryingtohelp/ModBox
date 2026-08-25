@@ -24811,6 +24811,24 @@ function renderRemovalConfigEditor() {
 
               </label>
 
+              <label class="rrw-field">
+
+                <span>Reddit link host</span>
+
+                <select data-ext-setting="queue_bar_link_host">
+
+                  <option value="extension_preference" ${extensionSettings.queue_bar_link_host === "extension_preference" ? "selected" : ""}>Follow current Reddit host</option>
+
+                  <option value="old_reddit" ${extensionSettings.queue_bar_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>
+
+                  <option value="new_reddit" ${extensionSettings.queue_bar_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
+
+                </select>
+
+                <small class="rrw-muted rrw-config-help">Controls the Reddit host used by links opened from ModBox.</small>
+
+              </label>
+
             </div>
 
           </div>
@@ -24952,24 +24970,6 @@ function renderRemovalConfigEditor() {
               </select>
 
               <small class="rrw-muted rrw-config-help">Used only when scope is Specific moderated subreddit.</small>
-
-            </label>
-
-            <label class="rrw-field">
-
-              <span>Target host for queue bar links</span>
-
-              <select data-ext-setting="queue_bar_link_host">
-
-                <option value="extension_preference" ${extensionSettings.queue_bar_link_host === "extension_preference" ? "selected" : ""}>Follow current Reddit host</option>
-
-                <option value="old_reddit" ${extensionSettings.queue_bar_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>
-
-                <option value="new_reddit" ${extensionSettings.queue_bar_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
-
-              </select>
-
-              <small class="rrw-muted rrw-config-help">When following current Reddit host, this controls whether old Reddit is preferred.</small>
 
             </label>
 
@@ -38703,7 +38703,7 @@ function renderRepostCheckerPopup() {
 
         <td>${flair || "-"}</td>
 
-        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${String(data.id || '')}`, preferredRedditLinkHost))}" target="_blank" rel="noreferrer">${title}</a>${removedSuffix}</td>
+        <td><a href="${escapeHtml(buildRedditUrl(`/r/${state.subreddit}/comments/${String(data.id || '')}`, state.linkHost))}" target="_blank" rel="noreferrer">${title}</a>${removedSuffix}</td>
 
         <td>${score}</td>
 
@@ -38967,6 +38967,20 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
 
 
 
+  let linkHost = preferredRedditLinkHost;
+
+  try {
+
+    const stored = await ext.storage.sync.get([QUEUE_BAR_LINK_HOST_KEY]);
+
+    linkHost = normalizeQueueBarLinkHost(stored?.[QUEUE_BAR_LINK_HOST_KEY], linkHost);
+
+  } catch {
+
+  }
+
+
+
   repostCheckerState = {
 
     triggerEl,
@@ -38980,6 +38994,8 @@ async function openRepostCheckerPopup(triggerEl, context = {}) {
     currentUrl,
 
     currentPostId,
+
+    linkHost,
 
     loading: true,
 
