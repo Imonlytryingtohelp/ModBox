@@ -40,7 +40,7 @@ function renderRemovalConfigEditor() {
 
   const state = removalConfigEditorState;
   const modboxLogoUrl = chrome.runtime.getURL("assets/modbox-logo.svg");
-  const activeTab = ["extension_settings", "quick_actions", "playbooks"].includes(state.activeTab)
+  const activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(state.activeTab)
     ? state.activeTab
     : "reasons";
   const config = state.config;
@@ -180,6 +180,7 @@ function renderRemovalConfigEditor() {
       <button type="button" class="rrw-removal-config-tab ${activeTab === "reasons" ? "is-active" : ""}" data-config-tab="reasons" role="tab" aria-selected="${activeTab === "reasons" ? "true" : "false"}">Removal Reasons</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "quick_actions" ? "is-active" : ""}" data-config-tab="quick_actions" role="tab" aria-selected="${activeTab === "quick_actions" ? "true" : "false"}">Quick Actions</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "playbooks" ? "is-active" : ""}" data-config-tab="playbooks" role="tab" aria-selected="${activeTab === "playbooks" ? "true" : "false"}">Playbooks</button>
+      <button type="button" class="rrw-removal-config-tab ${activeTab === "note_types" ? "is-active" : ""}" data-config-tab="note_types" role="tab" aria-selected="${activeTab === "note_types" ? "true" : "false"}">Note Types</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "extension_settings" ? "is-active" : ""}" data-config-tab="extension_settings" role="tab" aria-selected="${activeTab === "extension_settings" ? "true" : "false"}">Extension Settings</button>
     </div>
 
@@ -797,6 +798,45 @@ function renderRemovalConfigEditor() {
             }
           </div>
         </section>
+      ` : activeTab === "note_types" ? `
+        ${state.noteTypesError ? `<div class="rrw-error">${escapeHtml(state.noteTypesError)}</div>` : ""}
+        ${state.noteTypesStatus ? `<div class="rrw-success">${escapeHtml(state.noteTypesStatus)}</div>` : ""}
+        ${state.noteTypesLoading ? `<p class="rrw-muted">Loading note types from Toolbox...</p>` : ""}
+        <section class="rrw-config-section">
+          <div class="rrw-config-toolbar">
+            <div>
+              <h3>Toolbox note types</h3>
+              <p class="rrw-muted">${state.noteTypes?.length || 0} configured &middot; wiki/${TOOLBOX_WIKI_PAGE}</p>
+            </div>
+            <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-config-add-note-type" ${state.noteTypesLoading ? "disabled" : ""}>Add type</button>
+          </div>
+          <div class="rrw-config-reason-list">
+            ${(state.noteTypes || []).length === 0
+              ? '<div class="rrw-preview-panel"><p class="rrw-muted">No note types configured yet.</p></div>'
+              : (state.noteTypes || []).map((type, index) => `
+                <article class="rrw-config-reason-card" data-note-type-index="${index}">
+                  <div class="rrw-config-grid">
+                    <label class="rrw-field">
+                      <span>Key</span>
+                      <input type="text" data-note-type-index="${index}" data-note-type-field="key" value="${escapeHtml(type.key)}" placeholder="internal-key" />
+                    </label>
+                    <label class="rrw-field">
+                      <span>Label</span>
+                      <input type="text" data-note-type-index="${index}" data-note-type-field="text" value="${escapeHtml(type.text)}" placeholder="Display label" />
+                    </label>
+                    <label class="rrw-field">
+                      <span>Color</span>
+                      <input type="text" data-note-type-index="${index}" data-note-type-field="color" value="${escapeHtml(type.color)}" placeholder="#4caf50 or green" />
+                    </label>
+                    <div class="rrw-field">
+                      <span>&nbsp;</span>
+                      <button type="button" class="rrw-btn rrw-btn-danger" data-note-type-delete="${index}">Delete</button>
+                    </div>
+                  </div>
+                </article>
+              `).join("")}
+          </div>
+        </section>
       ` : `
         ${state.extensionSettingsError ? `<div class="rrw-error">${escapeHtml(state.extensionSettingsError)}</div>` : ""}
         ${state.extensionSettingsStatus ? `<div class="rrw-success">${escapeHtml(state.extensionSettingsStatus)}</div>` : ""}
@@ -954,13 +994,13 @@ function renderRemovalConfigEditor() {
     </div>
 
     <footer class="rrw-removal-config-footer">
-      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "playbooks" ? `
+      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "playbooks" || activeTab === "note_types" ? `
         <label class="rrw-field rrw-removal-config-note">
           <span>Wiki revision note</span>
           <input
             type="text"
             id="rrw-config-save-note"
-            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : (state.saveNote || ""))}"
+            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : activeTab === "note_types" ? (state.noteTypesSaveNote || "") : (state.saveNote || ""))}"
             placeholder="Optional revision note"
           />
         </label>
@@ -971,11 +1011,11 @@ function renderRemovalConfigEditor() {
           type="button"
           class="rrw-btn rrw-btn-primary"
           id="rrw-config-save"
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : state.extensionSettingsSaving) ? "disabled" : ""}
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving) ? "disabled" : ""}
         >
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : state.extensionSettingsSaving)
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving)
             ? "Saving..."
-            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "playbooks" ? "Save playbooks" : "Save settings")}
+            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "playbooks" ? "Save playbooks" : activeTab === "note_types" ? "Save note types" : "Save settings")}
         </button>
       </div>
     </footer>
@@ -1035,7 +1075,7 @@ function renderRemovalConfigEditor() {
         return;
       }
       const nextTab = String(event.currentTarget.getAttribute("data-config-tab") || "");
-      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "playbooks"].includes(nextTab) ? nextTab : "reasons";
+      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(nextTab) ? nextTab : "reasons";
       removalConfigEditorState.error = "";
       removalConfigEditorState.status = "";
       renderRemovalConfigEditor();
@@ -1055,6 +1095,52 @@ function renderRemovalConfigEditor() {
     void loadRemovalConfigEditorFlairTemplates(true);
   });
 
+  modal.querySelector("#rrw-config-add-note-type")?.addEventListener("click", () => {
+    if (!removalConfigEditorState) {
+      return;
+    }
+    const index = removalConfigEditorState.noteTypes.length;
+    removalConfigEditorState.noteTypes.push({
+      key: `note-type-${index + 1}`,
+      text: `Note Type ${index + 1}`,
+      color: "",
+    });
+    removalConfigEditorState.noteTypesStatus = "";
+    renderRemovalConfigEditor();
+  });
+
+  modal.querySelectorAll("[data-note-type-field]").forEach((element) => {
+    element.addEventListener("input", (event) => {
+      if (!removalConfigEditorState) {
+        return;
+      }
+      const index = Number.parseInt(event.currentTarget.getAttribute("data-note-type-index") || "", 10);
+      const field = String(event.currentTarget.getAttribute("data-note-type-field") || "");
+      const type = removalConfigEditorState.noteTypes?.[index];
+      if (!type || !["key", "text", "color"].includes(field)) {
+        return;
+      }
+      type[field] = String(event.target.value || "");
+      if (field === "key") {
+        type[field] = type[field].trim().toLowerCase();
+      }
+    });
+  });
+
+  modal.querySelectorAll("[data-note-type-delete]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      if (!removalConfigEditorState) {
+        return;
+      }
+      const index = Number.parseInt(event.currentTarget.getAttribute("data-note-type-delete") || "", 10);
+      if (!Number.isFinite(index)) {
+        return;
+      }
+      removalConfigEditorState.noteTypes.splice(index, 1);
+      renderRemovalConfigEditor();
+    });
+  });
+
   const saveNoteInput = modal.querySelector("#rrw-config-save-note");
   if (saveNoteInput instanceof HTMLInputElement) {
     saveNoteInput.addEventListener("input", (event) => {
@@ -1065,6 +1151,8 @@ function renderRemovalConfigEditor() {
         removalConfigEditorState.quickActionsSaveNote = String(event.target.value || "");
       } else if (removalConfigEditorState.activeTab === "playbooks") {
         removalConfigEditorState.playbooksSaveNote = String(event.target.value || "");
+      } else if (removalConfigEditorState.activeTab === "note_types") {
+        removalConfigEditorState.noteTypesSaveNote = String(event.target.value || "");
       } else {
         removalConfigEditorState.saveNote = String(event.target.value || "");
       }
@@ -1974,6 +2062,36 @@ function renderRemovalConfigEditor() {
       } finally {
         if (removalConfigEditorState) {
           removalConfigEditorState.playbooksSaving = false;
+          renderRemovalConfigEditor();
+        }
+      }
+      return;
+    }
+
+    if (removalConfigEditorState.activeTab === "note_types") {
+      try {
+        removalConfigEditorState.noteTypesSaving = true;
+        removalConfigEditorState.noteTypesError = "";
+        removalConfigEditorState.noteTypesStatus = "";
+        renderRemovalConfigEditor();
+        const saved = await saveToolboxUsernoteTypesToWiki(
+          removalConfigEditorState.subreddit,
+          removalConfigEditorState.noteTypes,
+          String(removalConfigEditorState.noteTypesSaveNote || "").trim(),
+        );
+        if (removalConfigEditorState) {
+          removalConfigEditorState.noteTypes = saved;
+          removalConfigEditorState.noteTypesSaveNote = "";
+          removalConfigEditorState.noteTypesStatus = "Note types saved to Toolbox wiki.";
+          usernoteTypeMetaCache.delete(usernoteTypeMetaCacheKey(removalConfigEditorState.subreddit));
+        }
+      } catch (error) {
+        if (removalConfigEditorState) {
+          removalConfigEditorState.noteTypesError = error instanceof Error ? error.message : String(error);
+        }
+      } finally {
+        if (removalConfigEditorState) {
+          removalConfigEditorState.noteTypesSaving = false;
           renderRemovalConfigEditor();
         }
       }

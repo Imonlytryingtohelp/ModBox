@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file.
 - **Fixed** Repost Checker title links now respect the configured Reddit link host.
 - **Changed** Moved the Reddit link host setting to General settings and renamed it to better describe its extension-wide purpose.
 - **Added** bug report link to About page. 
+- **Added** dedicated Note Types settings tab for adding, editing, and deleting Toolbox usernote types.
 
 ## 1.9.1 - Website Launch 
 

@@ -637,6 +637,12 @@ async function openRemovalConfigEditor(context) {
     playbooksSaveNote: "",
     playbooksNoteTypes: collectUsernoteTypes ? collectUsernoteTypes(null, defaultPlaybookUsernoteMeta) : {},
     playbooksNoteTypeLabels: defaultPlaybookUsernoteMeta?.labels && typeof defaultPlaybookUsernoteMeta.labels === "object" ? defaultPlaybookUsernoteMeta.labels : {},
+    noteTypes: [],
+    noteTypesLoading: true,
+    noteTypesSaving: false,
+    noteTypesError: "",
+    noteTypesStatus: "",
+    noteTypesSaveNote: "",
     playbooksCollapsed: {},
     playbookStepCollapsed: {},
     toolboxDrafts: {},
@@ -706,6 +712,21 @@ async function openRemovalConfigEditor(context) {
     })
     .catch(() => {
       // silently fail, keep defaults
+    });
+
+  void loadToolboxUsernoteTypesFromWiki(removalConfigEditorState.subreddit)
+    .then((data) => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.noteTypes = Array.isArray(data?.usernoteColors) ? data.usernoteColors : [];
+    })
+    .catch((error) => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.noteTypesError = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.noteTypesLoading = false;
+      renderRemovalConfigEditor();
     });
 
   if (!removalConfigEditorState.flairTemplates.length) {

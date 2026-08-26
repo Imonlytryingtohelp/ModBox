@@ -1131,6 +1131,96 @@ async function savePlaybooksToWiki(subreddit, config, reason) {
 }
 
 // ============================================================================
+// TOOLBOX USERNOTE TYPES
+// ============================================================================
+
+function normalizeToolboxUsernoteType(row, index = 0) {
+  const fallbackKey = `note-type-${index + 1}`;
+  const key = String(row?.key || fallbackKey).trim().toLowerCase();
+  return {
+    key: key || fallbackKey,
+    color: String(row?.color || "").trim(),
+    text: String(row?.text || key || fallbackKey).trim() || key || fallbackKey,
+  };
+}
+
+function normalizeToolboxUsernoteTypes(rows) {
+  const seen = new Set();
+  return (Array.isArray(rows) ? rows : []).map((row, index) => normalizeToolboxUsernoteType(row, index))
+    .filter((row) => {
+      if (seen.has(row.key)) {
+        return false;
+      }
+      seen.add(row.key);
+      return true;
+    });
+}
+
+async function loadToolboxUsernoteTypesFromWiki(subreddit) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to load Toolbox usernote types");
+  }
+
+  let wikiPayload;
+  try {
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(
+        `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${TOOLBOX_WIKI_PAGE}.json?raw_json=1`,
+        { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      ),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+      return { usernoteColors: [], toolboxConfig: {} };
+    }
+    throw error;
+  }
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+  if (!raw) {
+    return { usernoteColors: [], toolboxConfig: {} };
+  }
+
+  let toolboxConfig;
+  try {
+    toolboxConfig = JSON.parse(raw);
+  } catch {
+    throw new Error("Toolbox wiki page is not valid JSON");
+  }
+  if (!toolboxConfig || typeof toolboxConfig !== "object" || Array.isArray(toolboxConfig)) {
+    throw new Error("Toolbox wiki page must contain a JSON object");
+  }
+
+  return {
+    usernoteColors: normalizeToolboxUsernoteTypes(toolboxConfig.usernoteColors),
+    toolboxConfig,
+  };
+}
+
+async function saveToolboxUsernoteTypesToWiki(subreddit, types, reason) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to save Toolbox usernote types");
+  }
+
+  const loaded = await loadToolboxUsernoteTypesFromWiki(cleanSubreddit);
+  const toolboxConfig = {
+    ...(loaded.toolboxConfig || {}),
+    usernoteColors: normalizeToolboxUsernoteTypes(types),
+  };
+  const payload = JSON.stringify(toolboxConfig, null, 2);
+  const params = new URLSearchParams();
+  params.set("content", payload);
+  params.set("page", TOOLBOX_WIKI_PAGE);
+  params.set("reason", String(reason || "updated Toolbox usernote types via ModBox"));
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+  return toolboxConfig.usernoteColors;
+}
+
+// ============================================================================
 // TOOLBOX IMPORT
 // ============================================================================
 
