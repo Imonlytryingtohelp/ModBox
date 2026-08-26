@@ -20539,9 +20539,57 @@ function injectStyles() {
 
 
 
+    .rrw-about-page-copy-status {
+
+      min-height: 1.2em;
+
+      margin-top: 8px;
+
+      color: var(--rrw-text);
+
+      font-size: 0.78rem;
+
+      line-height: 1.4;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-bug-report-output {
+
+      width: 100%;
+
+      min-height: 150px;
+
+      margin-top: 12px;
+
+      padding: 10px;
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 6px;
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      color: var(--rrw-text);
+
+      font: 0.78rem/1.5 monospace;
+
+      resize: vertical;
+
+      box-sizing: border-box;
+
+    }
+
+
+
     .rrw-about-page-footer {
 
       display: flex;
+
+      flex-wrap: wrap;
 
       gap: 12px;
 
@@ -32479,6 +32527,200 @@ function getAboutPageDownloadUrl(updateStatus) {
 
 
 
+function getAboutBrowserInfo() {
+
+  const userAgent = String(globalThis.navigator?.userAgent || "");
+
+  const browserMatch = userAgent.match(/Edg\/([\d.]+)/i)
+
+    || userAgent.match(/Firefox\/([\d.]+)/i)
+
+    || userAgent.match(/Chrome\/([\d.]+)/i)
+
+    || userAgent.match(/Chromium\/([\d.]+)/i)
+
+    || userAgent.match(/Version\/([\d.]+).*Safari\//i);
+
+  let name = "Unknown";
+
+  if (/Edg\//i.test(userAgent)) name = "Microsoft Edge";
+
+  else if (/Firefox\//i.test(userAgent)) name = "Firefox";
+
+  else if (/Chrome\//i.test(userAgent)) name = "Google Chrome";
+
+  else if (/Chromium\//i.test(userAgent)) name = "Chromium";
+
+  else if (/Safari\//i.test(userAgent)) name = "Safari";
+
+
+
+  let operatingSystem = String(globalThis.navigator?.platform || "Unknown");
+
+  if (/Windows/i.test(userAgent)) operatingSystem = "Windows";
+
+  else if (/Android/i.test(userAgent)) operatingSystem = "Android";
+
+  else if (/(iPhone|iPad|iPod)/i.test(userAgent)) operatingSystem = "iOS";
+
+  else if (/Mac OS X/i.test(userAgent)) operatingSystem = "macOS";
+
+  else if (/Linux/i.test(userAgent)) operatingSystem = "Linux";
+
+
+
+  return {
+
+    browser: browserMatch ? `${name} ${browserMatch[1]}` : name,
+
+    operatingSystem,
+
+  };
+
+}
+
+
+
+function getAboutPageContext() {
+
+  const path = String(globalThis.location?.pathname || "");
+
+  if (/\/about\/(modqueue|unmoderated|reports)/i.test(path)) return "moderation queue";
+
+  if (/\/comments\//i.test(path)) return "post or comment page";
+
+  if (/\/r\/[^/]+/i.test(path)) return "subreddit page";
+
+  return "other Reddit page";
+
+}
+
+
+
+function buildAboutBugReport(installedVersion) {
+
+  const browserInfo = getAboutBrowserInfo();
+
+  const host = String(globalThis.location?.hostname || "Unknown");
+
+  return [
+
+    "ModBox Bug Report Information",
+
+    "",
+
+    `ModBox version: ${String(installedVersion || "Unknown")}`,
+
+    `Browser: ${browserInfo.browser}`,
+
+    `Operating system: ${browserInfo.operatingSystem}`,
+
+    `Reddit host: ${host}`,
+
+    `Page context: ${getAboutPageContext()}`,
+
+    `Detected UI: ${/old\.reddit\.com/i.test(host) ? "old Reddit" : /sh\.reddit\.com/i.test(host) ? "Shreddit" : "Reddit"}`,
+
+    `Generated: ${new Date().toISOString()}`,
+
+    "",
+
+    "What happened:",
+
+    "",
+
+    "Steps to reproduce:",
+
+    "",
+
+    "Expected behavior:",
+
+    "",
+
+  ].join("\n");
+
+}
+
+
+
+async function copyAboutBugReport() {
+
+  const statusEl = document.querySelector("[data-about-copy-status]");
+
+  const report = buildAboutBugReport(aboutPageState?.installedVersion);
+
+  let copied = false;
+
+  try {
+
+    if (globalThis.navigator?.clipboard?.writeText) {
+
+      await globalThis.navigator.clipboard.writeText(report);
+
+      copied = true;
+
+    }
+
+  } catch {
+
+    copied = false;
+
+  }
+
+
+
+  if (!copied) {
+
+    const fallback = document.createElement("textarea");
+
+    fallback.className = "rrw-about-page-bug-report-output";
+
+    fallback.value = report;
+
+    fallback.setAttribute("aria-label", "Bug report information");
+
+    document.querySelector(".rrw-about-page-body")?.appendChild(fallback);
+
+    fallback.focus();
+
+    fallback.select();
+
+    try {
+
+      copied = document.execCommand("copy");
+
+    } catch {
+
+      copied = false;
+
+    }
+
+    if (copied) {
+
+      fallback.remove();
+
+    }
+
+  }
+
+
+
+  if (statusEl) {
+
+    statusEl.textContent = copied
+
+      ? "Bug report information copied to clipboard."
+
+      : "Copy failed. The report is shown below; select and copy it manually.";
+
+    statusEl.className = `rrw-about-page-copy-status${copied ? "" : " rrw-about-page-check-status--error"}`;
+
+  }
+
+}
+
+
+
 function bindAboutPageEvents() {
 
   const root = document.getElementById("rrw-about-page-root");
@@ -32512,6 +32754,20 @@ function bindAboutPageEvents() {
       e.preventDefault();
 
       void performUpdateCheckFromAboutPage();
+
+    });
+
+  });
+
+
+
+  root.querySelectorAll('[data-about-copy-bug-report="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      void copyAboutBugReport();
 
     });
 
@@ -32843,6 +33099,8 @@ function renderAboutPage() {
 
           </p>
 
+          <div class="rrw-about-page-copy-status" data-about-copy-status></div>
+
         </div>
 
 
@@ -32878,6 +33136,20 @@ function renderAboutPage() {
           >
 
             Check for Update
+
+          </button>
+
+          <button
+
+            type="button"
+
+            class="rrw-about-page-check-btn"
+
+            data-about-copy-bug-report="1"
+
+          >
+
+            Copy Bug Report Info
 
           </button>
 

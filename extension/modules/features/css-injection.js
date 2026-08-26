@@ -4507,8 +4507,32 @@ function injectStyles() {
       color: var(--rrw-link-hover-color, #0052a3);
     }
 
+    .rrw-about-page-copy-status {
+      min-height: 1.2em;
+      margin-top: 8px;
+      color: var(--rrw-text);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      font-family: var(--rrw-font-family);
+    }
+
+    .rrw-about-page-bug-report-output {
+      width: 100%;
+      min-height: 150px;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+      border-radius: 6px;
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+      color: var(--rrw-text);
+      font: 0.78rem/1.5 monospace;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
     .rrw-about-page-footer {
       display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       padding: 20px 26px;
       background: var(--rrw-footer-bg-top, rgba(245, 250, 255, 0.98));
