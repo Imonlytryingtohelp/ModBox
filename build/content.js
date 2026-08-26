@@ -20325,6 +20325,40 @@ function injectStyles() {
 
 
 
+    .rrw-about-page-bug-report {
+
+      margin: 0;
+
+      color: var(--rrw-muted, #5f7797);
+
+      font-size: 0.8rem;
+
+      line-height: 1.5;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-bug-report a {
+
+      color: var(--rrw-link-color, #0066cc);
+
+      text-decoration: underline;
+
+    }
+
+
+
+    .rrw-about-page-bug-report a:hover {
+
+      color: var(--rrw-link-hover-color, #0052a3);
+
+    }
+
+
+
     .rrw-about-page-footer {
 
       display: flex;
@@ -32344,6 +32378,12 @@ function renderAboutPage() {
             <div class="rrw-about-page-changelog-text"></div>
 
           </div>
+
+          <p class="rrw-about-page-bug-report">
+
+            Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
+
+          </p>
 
         </div>
 

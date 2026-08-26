@@ -265,6 +265,9 @@ function renderAboutPage() {
             <h3 class="rrw-about-page-changelog-title">Latest Changelog</h3>
             <div class="rrw-about-page-changelog-text"></div>
           </div>
+          <p class="rrw-about-page-bug-report">
+            Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
+          </p>
         </div>
 
         <footer class="rrw-about-page-footer">

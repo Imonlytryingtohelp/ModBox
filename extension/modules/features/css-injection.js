@@ -4490,6 +4490,23 @@ function injectStyles() {
       color: var(--rrw-link-hover-color, #0052a3);
     }
 
+    .rrw-about-page-bug-report {
+      margin: 0;
+      color: var(--rrw-muted, #5f7797);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      font-family: var(--rrw-font-family);
+    }
+
+    .rrw-about-page-bug-report a {
+      color: var(--rrw-link-color, #0066cc);
+      text-decoration: underline;
+    }
+
+    .rrw-about-page-bug-report a:hover {
+      color: var(--rrw-link-hover-color, #0052a3);
+    }
+
     .rrw-about-page-footer {
       display: flex;
       gap: 12px;
