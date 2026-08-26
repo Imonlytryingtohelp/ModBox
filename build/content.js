@@ -20381,15 +20381,13 @@ function injectStyles() {
 
     .rrw-about-page-changelog {
 
-      margin: 0 0 20px 0;
+      margin: 0 0 24px 0;
 
       display: flex;
 
       flex-direction: column;
 
-      min-height: 0;
-
-      flex: 1;
+      flex: 0 0 auto;
 
     }
 
@@ -20437,13 +20435,15 @@ function injectStyles() {
 
       word-break: break-word;
 
+      min-height: 120px;
+
       max-height: 300px;
 
       overflow-y: auto;
 
-      min-height: 0;
+      white-space: normal;
 
-      flex: 1;
+      flex: 0 0 auto;
 
     }
 
@@ -20587,9 +20587,9 @@ function injectStyles() {
 
     .rrw-about-page-footer {
 
-      display: flex;
+      display: grid;
 
-      flex-wrap: wrap;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
 
       gap: 12px;
 
@@ -20625,7 +20625,11 @@ function injectStyles() {
 
       transition: all 0.2s ease;
 
-      white-space: nowrap;
+      white-space: normal;
+
+      line-height: 1.2;
+
+      min-width: 0;
 
       background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
 
