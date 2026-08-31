@@ -2,14 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
-## 1.9.2 - Bug Fixes
+## 1.10.0 - Note Types Editor + Bug Fixes
 
-- **Fixed** Repost Checker title links now respect the configured Reddit link host.
+- **Added** dedicated Note Types settings tab for adding, editing, and deleting usernote types.
+- **Added** "Copy Bug Report Info" button to about page. Clicking it automatically adds relevant info to your clipboard, for pasting in a bug report. 
+- **Added** bug report link to About page.
 - **Changed** Moved the Reddit link host setting to General settings and renamed it to better describe its extension-wide purpose.
-- **Added** bug report link to About page. 
-- **Added** dedicated Note Types settings tab for adding, editing, and deleting Toolbox usernote types.
+- **Fixed** Repost Checker title links now respect the configured Reddit link host.
 - **Fixed** About page button labels overflowing and changelog content crowding the bug-report link.
-- **Fixed** Note-type usernote pills now open the notes editor/viewer instead of incorrectly routing to the removal reasons GUI when the note type is set to NOTE.
+- **Fixed** Note-type usernote pills now open the notes editor/viewer instead of incorrectly routing to the removal reasons GUI when the note type is set to NOTE, or the note contains "remove".
 
 ## 1.9.1 - Website Launch 
 
