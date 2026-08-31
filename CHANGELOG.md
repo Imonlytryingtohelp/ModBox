@@ -2,12 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
-## 1.9.2 - Link Host Preference Fix
+## 1.9.2 - Bug Fixes
 
 - **Fixed** Repost Checker title links now respect the configured Reddit link host.
 - **Changed** Moved the Reddit link host setting to General settings and renamed it to better describe its extension-wide purpose.
 - **Added** bug report link to About page. 
 - **Added** dedicated Note Types settings tab for adding, editing, and deleting Toolbox usernote types.
+- **Fixed** About page button labels overflowing and changelog content crowding the bug-report link.
+- **Fixed** Note-type usernote pills now open the notes editor/viewer instead of incorrectly routing to the removal reasons GUI when the note type is set to NOTE.
 
 ## 1.9.1 - Website Launch 
 

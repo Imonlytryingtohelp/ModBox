@@ -191,6 +191,10 @@ function isNativeRemoveControl(control) {
     return false;
   }
 
+  if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill, .rrw-comment-nuke-btn")) {
+    return false;
+  }
+
   const tag = String(control.tagName || "").toLowerCase();
   if (tag !== "button" && tag !== "a") {
     return false;
@@ -281,6 +285,9 @@ function bindNativeRemoveInterceptor() {
       }
 
       if (control.classList.contains("rrw-comment-nuke-btn")) {
+        return;
+      }
+      if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill")) {
         return;
       }
 

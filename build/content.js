@@ -169,6 +169,8 @@ const BACKGROUND_REQUEST_TIMEOUT_MS = 30000;
 
 const BACKGROUND_REQUEST_WIKI_TIMEOUT_MS = 12000; // Shorter timeout for wiki pages
 
+const BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS = 30000;
+
 const BACKGROUND_REQUEST_CRITICAL_TIMEOUT_MS = 15000; // Slightly longer for critical ops
 
 const BACKGROUND_REQUEST_SCHEDULER_MAX_CONCURRENCY = 3; // Increased from 2 for better parallelism
@@ -280,6 +282,8 @@ let removalConfigEditorState = null;
 const usernotesCache = new Map();
 
 const usernoteTypeMetaCache = new Map();
+
+const usernoteMutationQueues = new Map();
 
 
 
@@ -5405,7 +5409,7 @@ function deflateUsernotesDoc(notes, version = 6) {
 
 
 
-async function loadSubredditUsernotesFromWiki(subreddit) {
+async function loadSubredditUsernotesFromWiki(subreddit, forceFresh = false) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -5425,15 +5429,15 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
 
       `/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`,
 
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
 
       { 
 
-        cacheTtlMs: 0,
+        cacheTtlMs: forceFresh ? 0 : USERNOTES_CACHE_TTL_MS,
 
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
 
-        dedupe: false
+        dedupe: !forceFresh
 
       }
 
@@ -8275,6 +8279,36 @@ function normalizeUsernoteUsername(value) {
 
 
 
+function enqueueUsernoteMutation(subreddit, task) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  const previous = usernoteMutationQueues.get(key) || Promise.resolve();
+
+  const current = previous
+
+    .catch(() => {})
+
+    .then(task)
+
+    .finally(() => {
+
+      if (usernoteMutationQueues.get(key) === current) {
+
+        usernoteMutationQueues.delete(key);
+
+      }
+
+    });
+
+  usernoteMutationQueues.set(key, current);
+
+  return current;
+
+}
+
+
+
 // â”€â”€â”€â”€ Native Modnotes Integration & Deduplication â”€â”€â”€â”€
 
 
@@ -8645,7 +8679,7 @@ async function fetchToolboxUsernoteTypeMetaViaReddit(subreddit) {
 
       `/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`,
 
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
 
       { 
 
@@ -9415,7 +9449,7 @@ async function deleteUsernoteViaReddit(subreddit, username, noteId) {
 
 
 
-async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+async function addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -9447,7 +9481,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   try {
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9521,7 +9555,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9583,7 +9617,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   if (!results.toolbox.success && !results.native.success) {
 
-    throw new Error(`Failed to create note in both systems: Toolbox: ${results.toolbox.error}, Native: ${results.native.error}`);
+    throw new Error(`Failed to create Toolbox note: ${results.toolbox.error || "Unknown error"}`);
 
   }
 
@@ -9595,7 +9629,21 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
 
 
-async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+
+  return enqueueUsernoteMutation(
+
+    subreddit,
+
+    () => addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType, link, redditId),
+
+  );
+
+}
+
+
+
+async function deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource = null) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -9637,7 +9685,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
     try {
 
-      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
       const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9717,7 +9765,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9788,6 +9836,20 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
 
   return results;
+
+}
+
+
+
+async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+
+  return enqueueUsernoteMutation(
+
+    subreddit,
+
+    () => deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource),
+
+  );
 
 }
 
@@ -21139,6 +21201,14 @@ function isNativeRemoveControl(control) {
 
 
 
+  if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill, .rrw-comment-nuke-btn")) {
+
+    return false;
+
+  }
+
+
+
   const tag = String(control.tagName || "").toLowerCase();
 
   if (tag !== "button" && tag !== "a") {
@@ -21318,6 +21388,12 @@ function bindNativeRemoveInterceptor() {
 
 
       if (control.classList.contains("rrw-comment-nuke-btn")) {
+
+        return;
+
+      }
+
+      if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill")) {
 
         return;
 

@@ -58,6 +58,21 @@ function normalizeUsernoteUsername(value) {
   return cleaned;
 }
 
+function enqueueUsernoteMutation(subreddit, task) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  const previous = usernoteMutationQueues.get(key) || Promise.resolve();
+  const current = previous
+    .catch(() => {})
+    .then(task)
+    .finally(() => {
+      if (usernoteMutationQueues.get(key) === current) {
+        usernoteMutationQueues.delete(key);
+      }
+    });
+  usernoteMutationQueues.set(key, current);
+  return current;
+}
+
 // ──── Native Modnotes Integration & Deduplication ────
 
 function isNoteTextSimilar(text1, text2, minSimilarity = 0.85) {
@@ -243,7 +258,7 @@ async function fetchToolboxUsernoteTypeMetaViaReddit(subreddit) {
   try {
     payload = await requestJsonViaBackgroundScheduled(
       `/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`,
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
       { 
         cacheTtlMs: USERNOTE_TYPE_META_CACHE_TTL_MS,
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
@@ -628,7 +643,7 @@ async function deleteUsernoteViaReddit(subreddit, username, noteId) {
 
 // ──── Dual-System Write Operations (Toolbox + Native) ────
 
-async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+async function addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
   const cleanSubreddit = normalizeSubreddit(subreddit);
   const cleanUser = normalizeUsernoteUsername(username);
   const text = String(noteText || "").trim();
@@ -644,7 +659,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   // Write to Toolbox (Modbox)
   try {
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
     const existingNotes = resolved.entry?.notes ? resolved.entry.notes.map((row) => ({ ...row })) : [];
     const modUsername = await getCurrentRedditUsername();
@@ -681,7 +696,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
   // Fetch updated notes to return
   try {
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
     const toolboxNotes = resolved.entry?.notes || [];
     
@@ -712,13 +727,20 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   // If both failed, throw error
   if (!results.toolbox.success && !results.native.success) {
-    throw new Error(`Failed to create note in both systems: Toolbox: ${results.toolbox.error}, Native: ${results.native.error}`);
+    throw new Error(`Failed to create Toolbox note: ${results.toolbox.error || "Unknown error"}`);
   }
 
   return results;
 }
 
-async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+  return enqueueUsernoteMutation(
+    subreddit,
+    () => addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType, link, redditId),
+  );
+}
+
+async function deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource = null) {
   const cleanSubreddit = normalizeSubreddit(subreddit);
   const cleanUser = normalizeUsernoteUsername(username);
   const targetId = String(noteId || "").trim();
@@ -739,7 +761,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
   // Delete from Toolbox if applicable
   if (deleteFromToolbox) {
     try {
-      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
       const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
       if (!resolved.entry) {
         throw new Error("No notes found for user");
@@ -779,7 +801,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
   // Fetch updated notes to return
   try {
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
     const toolboxNotes = resolved.entry?.notes || [];
     
@@ -815,6 +837,13 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
   }
 
   return results;
+}
+
+async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+  return enqueueUsernoteMutation(
+    subreddit,
+    () => deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource),
+  );
 }
 
 async function fetchUsernotes(subreddit, username, forceRefresh = false) {
