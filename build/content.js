@@ -20365,7 +20365,7 @@ function injectStyles() {
 
       flex-direction: column;
 
-      gap: 8px;
+      gap: 4px;
 
       margin-bottom: 22px;
 
@@ -20380,6 +20380,40 @@ function injectStyles() {
       text-align: center;
 
       font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-bug-report {
+
+      margin: 0;
+
+      color: var(--rrw-muted, #5f7797);
+
+      font-size: 0.78rem;
+
+      line-height: 1.3;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-bug-report a {
+
+      color: var(--rrw-link-color, #0066cc);
+
+      text-decoration: underline;
+
+    }
+
+
+
+    .rrw-about-page-bug-report a:hover {
+
+      color: var(--rrw-link-hover-color, #0052a3);
 
     }
 
@@ -20443,13 +20477,15 @@ function injectStyles() {
 
     .rrw-about-page-changelog {
 
-      margin: 0 0 24px 0;
+      margin: 0 0 12px 0;
 
       display: flex;
 
       flex-direction: column;
 
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+
+      min-height: 0;
 
     }
 
@@ -20499,13 +20535,13 @@ function injectStyles() {
 
       min-height: 120px;
 
-      max-height: 300px;
+      max-height: min(42vh, 420px);
 
       overflow-y: auto;
 
       white-space: normal;
 
-      flex: 0 0 auto;
+      flex: 1 1 auto;
 
     }
 
@@ -20560,40 +20596,6 @@ function injectStyles() {
 
 
     .rrw-about-page-changelog-text a:hover {
-
-      color: var(--rrw-link-hover-color, #0052a3);
-
-    }
-
-
-
-    .rrw-about-page-bug-report {
-
-      margin: 0;
-
-      color: var(--rrw-muted, #5f7797);
-
-      font-size: 0.8rem;
-
-      line-height: 1.5;
-
-      font-family: var(--rrw-font-family);
-
-    }
-
-
-
-    .rrw-about-page-bug-report a {
-
-      color: var(--rrw-link-color, #0066cc);
-
-      text-decoration: underline;
-
-    }
-
-
-
-    .rrw-about-page-bug-report a:hover {
 
       color: var(--rrw-link-hover-color, #0052a3);
 
@@ -33043,7 +33045,7 @@ function renderAboutPage() {
 
 
 
-  // Format changelog - clean markdown and limit lines
+  // Format changelog - clean markdown without arbitrary truncation; keep scrollable text.
 
   let formattedChangelog = String(changelog).trim();
 
@@ -33056,8 +33058,6 @@ function renderAboutPage() {
     .map(line => line.trim())
 
     .filter(line => line.length > 0)
-
-    .slice(0, 20) // Limit to 20 lines
 
     .join("\n");
 
@@ -33161,6 +33161,12 @@ function renderAboutPage() {
 
             <div class="rrw-about-page-check-status" data-about-check-status></div>
 
+            <p class="rrw-about-page-bug-report">
+
+              Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
+
+            </p>
+
           </div>
 
 
@@ -33172,12 +33178,6 @@ function renderAboutPage() {
             <div class="rrw-about-page-changelog-text"></div>
 
           </div>
-
-          <p class="rrw-about-page-bug-report">
-
-            Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
-
-          </p>
 
           <div class="rrw-about-page-copy-status" data-about-copy-status></div>
 

@@ -4389,7 +4389,7 @@ function injectStyles() {
     .rrw-about-page-status {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
       margin-bottom: 22px;
       padding: 14px 16px;
       background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
@@ -4397,6 +4397,23 @@ function injectStyles() {
       border-radius: 8px;
       text-align: center;
       font-family: var(--rrw-font-family);
+    }
+
+    .rrw-about-page-bug-report {
+      margin: 0;
+      color: var(--rrw-muted, #5f7797);
+      font-size: 0.78rem;
+      line-height: 1.3;
+      font-family: var(--rrw-font-family);
+    }
+
+    .rrw-about-page-bug-report a {
+      color: var(--rrw-link-color, #0066cc);
+      text-decoration: underline;
+    }
+
+    .rrw-about-page-bug-report a:hover {
+      color: var(--rrw-link-hover-color, #0052a3);
     }
 
     .rrw-about-page-update-available {
@@ -4428,10 +4445,11 @@ function injectStyles() {
     }
 
     .rrw-about-page-changelog {
-      margin: 0 0 24px 0;
+      margin: 0 0 12px 0;
       display: flex;
       flex-direction: column;
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .rrw-about-page-changelog-title {
@@ -4456,10 +4474,10 @@ function injectStyles() {
       font-family: var(--rrw-font-family);
       word-break: break-word;
       min-height: 120px;
-      max-height: 300px;
+      max-height: min(42vh, 420px);
       overflow-y: auto;
       white-space: normal;
-      flex: 0 0 auto;
+      flex: 1 1 auto;
     }
 
     .rrw-about-page-changelog-text strong,
@@ -4487,23 +4505,6 @@ function injectStyles() {
     }
 
     .rrw-about-page-changelog-text a:hover {
-      color: var(--rrw-link-hover-color, #0052a3);
-    }
-
-    .rrw-about-page-bug-report {
-      margin: 0;
-      color: var(--rrw-muted, #5f7797);
-      font-size: 0.8rem;
-      line-height: 1.5;
-      font-family: var(--rrw-font-family);
-    }
-
-    .rrw-about-page-bug-report a {
-      color: var(--rrw-link-color, #0066cc);
-      text-decoration: underline;
-    }
-
-    .rrw-about-page-bug-report a:hover {
       color: var(--rrw-link-hover-color, #0052a3);
     }
 

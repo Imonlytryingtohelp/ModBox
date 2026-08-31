@@ -304,14 +304,13 @@ function renderAboutPage() {
   const downloadUrl = state.downloadUrl || "";
   const isUpdateAvailable = state.isUpdateAvailable || false;
 
-  // Format changelog - clean markdown and limit lines
+  // Format changelog - clean markdown without arbitrary truncation; keep scrollable text.
   let formattedChangelog = String(changelog).trim();
   formattedChangelog = formattedChangelog
     .replace(/^#+\s*/gm, "") // Remove headers
     .split("\n")
     .map(line => line.trim())
     .filter(line => line.length > 0)
-    .slice(0, 20) // Limit to 20 lines
     .join("\n");
   
   // Convert markdown formatting and links to HTML (preserves links and formatting, escapes text)
@@ -363,15 +362,15 @@ function renderAboutPage() {
           <div class="rrw-about-page-status">
             ${updateStatusHtml}
             <div class="rrw-about-page-check-status" data-about-check-status></div>
+            <p class="rrw-about-page-bug-report">
+              Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
+            </p>
           </div>
 
           <div class="rrw-about-page-changelog">
             <h3 class="rrw-about-page-changelog-title">Latest Changelog</h3>
             <div class="rrw-about-page-changelog-text"></div>
           </div>
-          <p class="rrw-about-page-bug-report">
-            Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
-          </p>
           <div class="rrw-about-page-copy-status" data-about-copy-status></div>
         </div>
 
