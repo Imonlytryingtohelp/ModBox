@@ -22,6 +22,7 @@ let usernotesEditorState = null;
 let removalConfigEditorState = null;
 const usernotesCache = new Map();
 const usernoteTypeMetaCache = new Map();
+const usernoteMutationQueues = new Map();
 
 // Allowed launch subreddits caching
 let allowedLaunchSubredditsPromise = null;

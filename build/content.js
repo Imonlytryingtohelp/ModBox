@@ -169,6 +169,8 @@ const BACKGROUND_REQUEST_TIMEOUT_MS = 30000;
 
 const BACKGROUND_REQUEST_WIKI_TIMEOUT_MS = 12000; // Shorter timeout for wiki pages
 
+const BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS = 30000;
+
 const BACKGROUND_REQUEST_CRITICAL_TIMEOUT_MS = 15000; // Slightly longer for critical ops
 
 const BACKGROUND_REQUEST_SCHEDULER_MAX_CONCURRENCY = 3; // Increased from 2 for better parallelism
@@ -280,6 +282,8 @@ let removalConfigEditorState = null;
 const usernotesCache = new Map();
 
 const usernoteTypeMetaCache = new Map();
+
+const usernoteMutationQueues = new Map();
 
 
 
@@ -5405,7 +5409,7 @@ function deflateUsernotesDoc(notes, version = 6) {
 
 
 
-async function loadSubredditUsernotesFromWiki(subreddit) {
+async function loadSubredditUsernotesFromWiki(subreddit, forceFresh = false) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -5425,15 +5429,15 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
 
       `/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`,
 
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
 
       { 
 
-        cacheTtlMs: 0,
+        cacheTtlMs: forceFresh ? 0 : USERNOTES_CACHE_TTL_MS,
 
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
 
-        dedupe: false
+        dedupe: !forceFresh
 
       }
 
@@ -8275,6 +8279,36 @@ function normalizeUsernoteUsername(value) {
 
 
 
+function enqueueUsernoteMutation(subreddit, task) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  const previous = usernoteMutationQueues.get(key) || Promise.resolve();
+
+  const current = previous
+
+    .catch(() => {})
+
+    .then(task)
+
+    .finally(() => {
+
+      if (usernoteMutationQueues.get(key) === current) {
+
+        usernoteMutationQueues.delete(key);
+
+      }
+
+    });
+
+  usernoteMutationQueues.set(key, current);
+
+  return current;
+
+}
+
+
+
 // â”€â”€â”€â”€ Native Modnotes Integration & Deduplication â”€â”€â”€â”€
 
 
@@ -8645,7 +8679,7 @@ async function fetchToolboxUsernoteTypeMetaViaReddit(subreddit) {
 
       `/r/${cleanSubreddit}/wiki/toolbox.json?raw_json=1`,
 
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
 
       { 
 
@@ -9415,7 +9449,7 @@ async function deleteUsernoteViaReddit(subreddit, username, noteId) {
 
 
 
-async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+async function addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -9447,7 +9481,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   try {
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9521,7 +9555,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9583,7 +9617,7 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
   if (!results.toolbox.success && !results.native.success) {
 
-    throw new Error(`Failed to create note in both systems: Toolbox: ${results.toolbox.error}, Native: ${results.native.error}`);
+    throw new Error(`Failed to create Toolbox note: ${results.toolbox.error || "Unknown error"}`);
 
   }
 
@@ -9595,7 +9629,21 @@ async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType
 
 
 
-async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+async function addUsernoteViaBothSystems(subreddit, username, noteText, noteType = "none", link = "", redditId = null) {
+
+  return enqueueUsernoteMutation(
+
+    subreddit,
+
+    () => addUsernoteViaBothSystemsUnlocked(subreddit, username, noteText, noteType, link, redditId),
+
+  );
+
+}
+
+
+
+async function deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource = null) {
 
   const cleanSubreddit = normalizeSubreddit(subreddit);
 
@@ -9637,7 +9685,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
     try {
 
-      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+      const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
       const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9717,7 +9765,7 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
     const typeMeta = await fetchToolboxUsernoteTypeMetaViaReddit(cleanSubreddit);
 
-    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit);
+    const notesDoc = await loadSubredditUsernotesFromWiki(cleanSubreddit, true);
 
     const resolved = resolveMergedUserEntry(notesDoc, cleanUser);
 
@@ -9788,6 +9836,20 @@ async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSou
 
 
   return results;
+
+}
+
+
+
+async function deleteUsernoteViaBothSystems(subreddit, username, noteId, noteSource = null) {
+
+  return enqueueUsernoteMutation(
+
+    subreddit,
+
+    () => deleteUsernoteViaBothSystemsUnlocked(subreddit, username, noteId, noteSource),
+
+  );
 
 }
 
@@ -20381,15 +20443,13 @@ function injectStyles() {
 
     .rrw-about-page-changelog {
 
-      margin: 0 0 20px 0;
+      margin: 0 0 24px 0;
 
       display: flex;
 
       flex-direction: column;
 
-      min-height: 0;
-
-      flex: 1;
+      flex: 0 0 auto;
 
     }
 
@@ -20437,13 +20497,15 @@ function injectStyles() {
 
       word-break: break-word;
 
+      min-height: 120px;
+
       max-height: 300px;
 
       overflow-y: auto;
 
-      min-height: 0;
+      white-space: normal;
 
-      flex: 1;
+      flex: 0 0 auto;
 
     }
 
@@ -20539,9 +20601,57 @@ function injectStyles() {
 
 
 
+    .rrw-about-page-copy-status {
+
+      min-height: 1.2em;
+
+      margin-top: 8px;
+
+      color: var(--rrw-text);
+
+      font-size: 0.78rem;
+
+      line-height: 1.4;
+
+      font-family: var(--rrw-font-family);
+
+    }
+
+
+
+    .rrw-about-page-bug-report-output {
+
+      width: 100%;
+
+      min-height: 150px;
+
+      margin-top: 12px;
+
+      padding: 10px;
+
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+
+      border-radius: 6px;
+
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+
+      color: var(--rrw-text);
+
+      font: 0.78rem/1.5 monospace;
+
+      resize: vertical;
+
+      box-sizing: border-box;
+
+    }
+
+
+
     .rrw-about-page-footer {
 
-      display: flex;
+      display: grid;
+
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
 
       gap: 12px;
 
@@ -20577,7 +20687,11 @@ function injectStyles() {
 
       transition: all 0.2s ease;
 
-      white-space: nowrap;
+      white-space: normal;
+
+      line-height: 1.2;
+
+      min-width: 0;
 
       background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
 
@@ -21087,6 +21201,14 @@ function isNativeRemoveControl(control) {
 
 
 
+  if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill, .rrw-comment-nuke-btn")) {
+
+    return false;
+
+  }
+
+
+
   const tag = String(control.tagName || "").toLowerCase();
 
   if (tag !== "button" && tag !== "a") {
@@ -21266,6 +21388,12 @@ function bindNativeRemoveInterceptor() {
 
 
       if (control.classList.contains("rrw-comment-nuke-btn")) {
+
+        return;
+
+      }
+
+      if (control.closest(".rrw-usernote-chip, .rrw-profile-btn, .rrw-history-btn, .rrw-repost-pill, .rrw-quick-actions-pill")) {
 
         return;
 
@@ -32479,6 +32607,200 @@ function getAboutPageDownloadUrl(updateStatus) {
 
 
 
+function getAboutBrowserInfo() {
+
+  const userAgent = String(globalThis.navigator?.userAgent || "");
+
+  const browserMatch = userAgent.match(/Edg\/([\d.]+)/i)
+
+    || userAgent.match(/Firefox\/([\d.]+)/i)
+
+    || userAgent.match(/Chrome\/([\d.]+)/i)
+
+    || userAgent.match(/Chromium\/([\d.]+)/i)
+
+    || userAgent.match(/Version\/([\d.]+).*Safari\//i);
+
+  let name = "Unknown";
+
+  if (/Edg\//i.test(userAgent)) name = "Microsoft Edge";
+
+  else if (/Firefox\//i.test(userAgent)) name = "Firefox";
+
+  else if (/Chrome\//i.test(userAgent)) name = "Google Chrome";
+
+  else if (/Chromium\//i.test(userAgent)) name = "Chromium";
+
+  else if (/Safari\//i.test(userAgent)) name = "Safari";
+
+
+
+  let operatingSystem = String(globalThis.navigator?.platform || "Unknown");
+
+  if (/Windows/i.test(userAgent)) operatingSystem = "Windows";
+
+  else if (/Android/i.test(userAgent)) operatingSystem = "Android";
+
+  else if (/(iPhone|iPad|iPod)/i.test(userAgent)) operatingSystem = "iOS";
+
+  else if (/Mac OS X/i.test(userAgent)) operatingSystem = "macOS";
+
+  else if (/Linux/i.test(userAgent)) operatingSystem = "Linux";
+
+
+
+  return {
+
+    browser: browserMatch ? `${name} ${browserMatch[1]}` : name,
+
+    operatingSystem,
+
+  };
+
+}
+
+
+
+function getAboutPageContext() {
+
+  const path = String(globalThis.location?.pathname || "");
+
+  if (/\/about\/(modqueue|unmoderated|reports)/i.test(path)) return "moderation queue";
+
+  if (/\/comments\//i.test(path)) return "post or comment page";
+
+  if (/\/r\/[^/]+/i.test(path)) return "subreddit page";
+
+  return "other Reddit page";
+
+}
+
+
+
+function buildAboutBugReport(installedVersion) {
+
+  const browserInfo = getAboutBrowserInfo();
+
+  const host = String(globalThis.location?.hostname || "Unknown");
+
+  return [
+
+    "ModBox Bug Report Information",
+
+    "",
+
+    `ModBox version: ${String(installedVersion || "Unknown")}`,
+
+    `Browser: ${browserInfo.browser}`,
+
+    `Operating system: ${browserInfo.operatingSystem}`,
+
+    `Reddit host: ${host}`,
+
+    `Page context: ${getAboutPageContext()}`,
+
+    `Detected UI: ${/old\.reddit\.com/i.test(host) ? "old Reddit" : /sh\.reddit\.com/i.test(host) ? "Shreddit" : "Reddit"}`,
+
+    `Generated: ${new Date().toISOString()}`,
+
+    "",
+
+    "What happened:",
+
+    "",
+
+    "Steps to reproduce:",
+
+    "",
+
+    "Expected behavior:",
+
+    "",
+
+  ].join("\n");
+
+}
+
+
+
+async function copyAboutBugReport() {
+
+  const statusEl = document.querySelector("[data-about-copy-status]");
+
+  const report = buildAboutBugReport(aboutPageState?.installedVersion);
+
+  let copied = false;
+
+  try {
+
+    if (globalThis.navigator?.clipboard?.writeText) {
+
+      await globalThis.navigator.clipboard.writeText(report);
+
+      copied = true;
+
+    }
+
+  } catch {
+
+    copied = false;
+
+  }
+
+
+
+  if (!copied) {
+
+    const fallback = document.createElement("textarea");
+
+    fallback.className = "rrw-about-page-bug-report-output";
+
+    fallback.value = report;
+
+    fallback.setAttribute("aria-label", "Bug report information");
+
+    document.querySelector(".rrw-about-page-body")?.appendChild(fallback);
+
+    fallback.focus();
+
+    fallback.select();
+
+    try {
+
+      copied = document.execCommand("copy");
+
+    } catch {
+
+      copied = false;
+
+    }
+
+    if (copied) {
+
+      fallback.remove();
+
+    }
+
+  }
+
+
+
+  if (statusEl) {
+
+    statusEl.textContent = copied
+
+      ? "Bug report information copied to clipboard."
+
+      : "Copy failed. The report is shown below; select and copy it manually.";
+
+    statusEl.className = `rrw-about-page-copy-status${copied ? "" : " rrw-about-page-check-status--error"}`;
+
+  }
+
+}
+
+
+
 function bindAboutPageEvents() {
 
   const root = document.getElementById("rrw-about-page-root");
@@ -32512,6 +32834,20 @@ function bindAboutPageEvents() {
       e.preventDefault();
 
       void performUpdateCheckFromAboutPage();
+
+    });
+
+  });
+
+
+
+  root.querySelectorAll('[data-about-copy-bug-report="1"]').forEach((btn) => {
+
+    btn.addEventListener("click", (e) => {
+
+      e.preventDefault();
+
+      void copyAboutBugReport();
 
     });
 
@@ -32843,6 +33179,8 @@ function renderAboutPage() {
 
           </p>
 
+          <div class="rrw-about-page-copy-status" data-about-copy-status></div>
+
         </div>
 
 
@@ -32878,6 +33216,20 @@ function renderAboutPage() {
           >
 
             Check for Update
+
+          </button>
+
+          <button
+
+            type="button"
+
+            class="rrw-about-page-check-btn"
+
+            data-about-copy-bug-report="1"
+
+          >
+
+            Copy Bug Report Info
 
           </button>
 

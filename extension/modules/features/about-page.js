@@ -86,6 +86,103 @@ function getAboutPageDownloadUrl(updateStatus) {
   return "https://github.com/Imonlytryingtohelp/ModBox/releases";
 }
 
+function getAboutBrowserInfo() {
+  const userAgent = String(globalThis.navigator?.userAgent || "");
+  const browserMatch = userAgent.match(/Edg\/([\d.]+)/i)
+    || userAgent.match(/Firefox\/([\d.]+)/i)
+    || userAgent.match(/Chrome\/([\d.]+)/i)
+    || userAgent.match(/Chromium\/([\d.]+)/i)
+    || userAgent.match(/Version\/([\d.]+).*Safari\//i);
+  let name = "Unknown";
+  if (/Edg\//i.test(userAgent)) name = "Microsoft Edge";
+  else if (/Firefox\//i.test(userAgent)) name = "Firefox";
+  else if (/Chrome\//i.test(userAgent)) name = "Google Chrome";
+  else if (/Chromium\//i.test(userAgent)) name = "Chromium";
+  else if (/Safari\//i.test(userAgent)) name = "Safari";
+
+  let operatingSystem = String(globalThis.navigator?.platform || "Unknown");
+  if (/Windows/i.test(userAgent)) operatingSystem = "Windows";
+  else if (/Android/i.test(userAgent)) operatingSystem = "Android";
+  else if (/(iPhone|iPad|iPod)/i.test(userAgent)) operatingSystem = "iOS";
+  else if (/Mac OS X/i.test(userAgent)) operatingSystem = "macOS";
+  else if (/Linux/i.test(userAgent)) operatingSystem = "Linux";
+
+  return {
+    browser: browserMatch ? `${name} ${browserMatch[1]}` : name,
+    operatingSystem,
+  };
+}
+
+function getAboutPageContext() {
+  const path = String(globalThis.location?.pathname || "");
+  if (/\/about\/(modqueue|unmoderated|reports)/i.test(path)) return "moderation queue";
+  if (/\/comments\//i.test(path)) return "post or comment page";
+  if (/\/r\/[^/]+/i.test(path)) return "subreddit page";
+  return "other Reddit page";
+}
+
+function buildAboutBugReport(installedVersion) {
+  const browserInfo = getAboutBrowserInfo();
+  const host = String(globalThis.location?.hostname || "Unknown");
+  return [
+    "ModBox Bug Report Information",
+    "",
+    `ModBox version: ${String(installedVersion || "Unknown")}`,
+    `Browser: ${browserInfo.browser}`,
+    `Operating system: ${browserInfo.operatingSystem}`,
+    `Reddit host: ${host}`,
+    `Page context: ${getAboutPageContext()}`,
+    `Detected UI: ${/old\.reddit\.com/i.test(host) ? "old Reddit" : /sh\.reddit\.com/i.test(host) ? "Shreddit" : "Reddit"}`,
+    `Generated: ${new Date().toISOString()}`,
+    "",
+    "What happened:",
+    "",
+    "Steps to reproduce:",
+    "",
+    "Expected behavior:",
+    "",
+  ].join("\n");
+}
+
+async function copyAboutBugReport() {
+  const statusEl = document.querySelector("[data-about-copy-status]");
+  const report = buildAboutBugReport(aboutPageState?.installedVersion);
+  let copied = false;
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(report);
+      copied = true;
+    }
+  } catch {
+    copied = false;
+  }
+
+  if (!copied) {
+    const fallback = document.createElement("textarea");
+    fallback.className = "rrw-about-page-bug-report-output";
+    fallback.value = report;
+    fallback.setAttribute("aria-label", "Bug report information");
+    document.querySelector(".rrw-about-page-body")?.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+    if (copied) {
+      fallback.remove();
+    }
+  }
+
+  if (statusEl) {
+    statusEl.textContent = copied
+      ? "Bug report information copied to clipboard."
+      : "Copy failed. The report is shown below; select and copy it manually.";
+    statusEl.className = `rrw-about-page-copy-status${copied ? "" : " rrw-about-page-check-status--error"}`;
+  }
+}
+
 function bindAboutPageEvents() {
   const root = document.getElementById("rrw-about-page-root");
   if (!root) return;
@@ -103,6 +200,13 @@ function bindAboutPageEvents() {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       void performUpdateCheckFromAboutPage();
+    });
+  });
+
+  root.querySelectorAll('[data-about-copy-bug-report="1"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      void copyAboutBugReport();
     });
   });
 
@@ -268,6 +372,7 @@ function renderAboutPage() {
           <p class="rrw-about-page-bug-report">
             Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
           </p>
+          <div class="rrw-about-page-copy-status" data-about-copy-status></div>
         </div>
 
         <footer class="rrw-about-page-footer">
@@ -286,6 +391,13 @@ function renderAboutPage() {
             data-about-check-update="1"
           >
             Check for Update
+          </button>
+          <button
+            type="button"
+            class="rrw-about-page-check-btn"
+            data-about-copy-bug-report="1"
+          >
+            Copy Bug Report Info
           </button>
           <button 
             type="button" 

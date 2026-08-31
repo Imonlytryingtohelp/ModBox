@@ -4428,11 +4428,10 @@ function injectStyles() {
     }
 
     .rrw-about-page-changelog {
-      margin: 0 0 20px 0;
+      margin: 0 0 24px 0;
       display: flex;
       flex-direction: column;
-      min-height: 0;
-      flex: 1;
+      flex: 0 0 auto;
     }
 
     .rrw-about-page-changelog-title {
@@ -4456,10 +4455,11 @@ function injectStyles() {
       color: var(--rrw-text);
       font-family: var(--rrw-font-family);
       word-break: break-word;
+      min-height: 120px;
       max-height: 300px;
       overflow-y: auto;
-      min-height: 0;
-      flex: 1;
+      white-space: normal;
+      flex: 0 0 auto;
     }
 
     .rrw-about-page-changelog-text strong,
@@ -4507,8 +4507,32 @@ function injectStyles() {
       color: var(--rrw-link-hover-color, #0052a3);
     }
 
+    .rrw-about-page-copy-status {
+      min-height: 1.2em;
+      margin-top: 8px;
+      color: var(--rrw-text);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      font-family: var(--rrw-font-family);
+    }
+
+    .rrw-about-page-bug-report-output {
+      width: 100%;
+      min-height: 150px;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--rrw-soft-border, rgba(168, 187, 214, 0.56));
+      border-radius: 6px;
+      background: var(--rrw-field-bg, rgba(238, 245, 255, 0.92));
+      color: var(--rrw-text);
+      font: 0.78rem/1.5 monospace;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
     .rrw-about-page-footer {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
       gap: 12px;
       padding: 20px 26px;
       background: var(--rrw-footer-bg-top, rgba(245, 250, 255, 0.98));
@@ -4526,7 +4550,9 @@ function injectStyles() {
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s ease;
-      white-space: nowrap;
+      white-space: normal;
+      line-height: 1.2;
+      min-width: 0;
       background: var(--rrw-card-bg, rgba(245, 250, 255, 0.95));
       color: var(--rrw-text);
       font-family: var(--rrw-font-family);

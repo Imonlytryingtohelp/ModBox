@@ -237,7 +237,7 @@ function deflateUsernotesDoc(notes, version = 6) {
 // USERNOTE LOADING/SAVING
 // ============================================================================
 
-async function loadSubredditUsernotesFromWiki(subreddit) {
+async function loadSubredditUsernotesFromWiki(subreddit, forceFresh = false) {
   const cleanSubreddit = normalizeSubreddit(subreddit);
   if (!cleanSubreddit) {
     throw new Error("Subreddit is required");
@@ -247,11 +247,11 @@ async function loadSubredditUsernotesFromWiki(subreddit) {
   try {
     wikiPayload = await requestJsonViaBackgroundScheduled(
       `/r/${cleanSubreddit}/wiki/usernotes.json?raw_json=1`,
-      { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS },
+      { oauth: true, timeoutMs: BACKGROUND_REQUEST_USERNOTES_TIMEOUT_MS },
       { 
-        cacheTtlMs: 0,
+        cacheTtlMs: forceFresh ? 0 : USERNOTES_CACHE_TTL_MS,
         priority: BACKGROUND_REQUEST_PRIORITY_USERNOTES,
-        dedupe: false
+        dedupe: !forceFresh
       }
     );
   } catch (error) {
