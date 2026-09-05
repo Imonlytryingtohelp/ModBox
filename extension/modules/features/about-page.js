@@ -145,8 +145,12 @@ function buildAboutBugReport(installedVersion) {
 }
 
 async function copyAboutBugReport() {
-  const statusEl = document.querySelector("[data-about-copy-status]");
+  const copyButton = document.querySelector('[data-about-copy-bug-report="1"]');
   const report = buildAboutBugReport(aboutPageState?.installedVersion);
+  if (copyButton instanceof HTMLButtonElement) {
+    copyButton.textContent = "Copying...";
+    copyButton.disabled = true;
+  }
   let copied = false;
   try {
     if (globalThis.navigator?.clipboard?.writeText) {
@@ -175,11 +179,9 @@ async function copyAboutBugReport() {
     }
   }
 
-  if (statusEl) {
-    statusEl.textContent = copied
-      ? "Bug report information copied to clipboard."
-      : "Copy failed. The report is shown below; select and copy it manually.";
-    statusEl.className = `rrw-about-page-copy-status${copied ? "" : " rrw-about-page-check-status--error"}`;
+  if (copyButton instanceof HTMLButtonElement) {
+    copyButton.textContent = copied ? "Copied!" : "Copy failed";
+    copyButton.disabled = false;
   }
 }
 
@@ -371,7 +373,6 @@ function renderAboutPage() {
             <h3 class="rrw-about-page-changelog-title">Latest Changelog</h3>
             <div class="rrw-about-page-changelog-text"></div>
           </div>
-          <div class="rrw-about-page-copy-status" data-about-copy-status></div>
         </div>
 
         <footer class="rrw-about-page-footer">

@@ -4508,15 +4508,6 @@ function injectStyles() {
       color: var(--rrw-link-hover-color, #0052a3);
     }
 
-    .rrw-about-page-copy-status {
-      min-height: 1.2em;
-      margin-top: 8px;
-      color: var(--rrw-text);
-      font-size: 0.78rem;
-      line-height: 1.4;
-      font-family: var(--rrw-font-family);
-    }
-
     .rrw-about-page-bug-report-output {
       width: 100%;
       min-height: 150px;

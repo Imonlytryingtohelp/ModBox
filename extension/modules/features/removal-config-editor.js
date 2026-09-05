@@ -447,6 +447,26 @@ function renderRemovalConfigEditor() {
                         `;
                       }
                       if (block.type === "select") {
+                        const isMultiple = Boolean(block.payload?.multiple);
+                        const selectedValues = isMultiple
+                          ? (Array.isArray(step?.inputs?.[fieldKey]) ? step.inputs[fieldKey] : String(step?.inputs?.[fieldKey] || "").trim() ? [String(step.inputs[fieldKey]).trim()] : [])
+                          : [];
+                        if (isMultiple) {
+                          const checklist = blockOptions(block)
+                            .map((opt) => `
+                              <label class="rrw-check-item">
+                                <input type="checkbox" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}" data-pb-step-input-multiple="1" value="${escapeHtml(opt.value)}" ${selectedValues.includes(opt.value) ? "checked" : ""} />
+                                <span>${escapeHtml(opt.label)}</span>
+                              </label>
+                            `)
+                            .join("");
+                          return `
+                            <div class="rrw-field">
+                              <span>${escapeHtml(label)}</span>
+                              <div class="rrw-checklist">${checklist}</div>
+                            </div>
+                          `;
+                        }
                         const options = blockOptions(block)
                           .map((opt) => `<option value="${escapeHtml(opt.value)}" ${opt.value === value ? "selected" : ""}>${escapeHtml(opt.label)}</option>`)
                           .join("");
@@ -1852,8 +1872,16 @@ function renderRemovalConfigEditor() {
         if (!step.inputs || typeof step.inputs !== "object" || Array.isArray(step.inputs)) {
           step.inputs = {};
         }
-        const value = String(event.target.value || "");
-        if (!value.trim()) {
+        const value = event.currentTarget.getAttribute("data-pb-step-input-multiple") === "1"
+          ? Array.from(modal.querySelectorAll("[data-pb-step-input-key]"))
+            .filter((element) => element.getAttribute("data-pb-index") === String(index)
+              && element.getAttribute("data-pb-step-index") === String(stepIndex)
+              && element.getAttribute("data-pb-step-input-key") === inputKey
+              && element.getAttribute("data-pb-step-input-multiple") === "1"
+              && element.checked)
+            .map((element) => element.value)
+          : String(event.target.value || "");
+        if (Array.isArray(value) ? value.length === 0 : !value.trim()) {
           delete step.inputs[inputKey];
         } else {
           step.inputs[inputKey] = value;

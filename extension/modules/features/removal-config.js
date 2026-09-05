@@ -79,7 +79,7 @@ function normalizeRemovalBlockPayload(type, payload) {
     const options = Array.isArray(source.options)
       ? source.options.map((option) => String(option ?? "")).filter((option) => option.trim())
       : [];
-    return { options };
+    return { options, multiple: true };
   }
   return { placeholder: String(source.placeholder ?? "") };
 }
@@ -527,10 +527,18 @@ function normalizeRemovalConfigDoc(doc, subreddit) {
   if (!doc || typeof doc !== "object") {
     return buildDefaultRemovalConfig(subreddit);
   }
+  const reasons = Array.isArray(doc.reasons)
+    ? doc.reasons.map((reason, index) => ({
+      ...reason,
+      blocks: Array.isArray(reason?.blocks)
+        ? reason.blocks.map((block, blockIndex) => normalizeRemovalReasonBlock(block, blockIndex))
+        : [],
+    }))
+    : [];
   return {
     subreddit: normalizeSubreddit(subreddit || doc.subreddit || ""),
     version: doc.version || 1,
-    reasons: Array.isArray(doc.reasons) ? doc.reasons : [],
+    reasons,
     global_settings: doc.global_settings || { default_send_mode: "reply" },
   };
 }
@@ -800,7 +808,7 @@ function parseToolboxBodyToBlocks(text) {
         required: false,
         remember_last_value: false,
         position,
-        payload: { options },
+        payload: { options, multiple: true },
         help_text: null,
       });
       position += 10;
@@ -858,7 +866,7 @@ function blocksToToolboxBody(blocks) {
       const options = Array.isArray(block?.payload?.options)
         ? block.payload.options.map((option) => `<option>${escapeHtml(String(option || ""))}</option>`).join("\n")
         : "";
-      return `<select id="${escapeHtml(key)}">\n${options}\n</select>`;
+      return `<select id="${escapeHtml(key)}" multiple>\n${options}\n</select>`;
     }
 
     const placeholder = escapeHtml(String(block?.payload?.placeholder ?? ""));
@@ -894,7 +902,7 @@ function interpolateRemovalTemplate(text, author, kind, subreddit, inputs) {
   output = output.replaceAll("{kind}", String(kind || ""));
   output = output.replaceAll("{subreddit}", String(subreddit || ""));
   Object.entries(inputs && typeof inputs === "object" ? inputs : {}).forEach(([key, value]) => {
-    output = output.replaceAll(`{inputs.${key}}`, String(value || ""));
+    output = output.replaceAll(`{inputs.${key}}`, formatRemovalInputValue(value));
   });
   return output;
 }
@@ -903,6 +911,17 @@ function collapseWrappedInlineValues(text) {
   return String(text || "")
     .replace(/(__[^\n]*?:)\s*\n+\s*([^\n]+?)\s*\n+\s*(__)/g, "$1 $2$3")
     .replace(/(__)\s*\n+\s*([^\n_][^\n]*?)\s*\n+\s*(__)/g, "__$2__");
+}
+
+function formatRemovalInputValue(value) {
+  if (!Array.isArray(value)) {
+    return String(value || "");
+  }
+  const values = value.map((item) => String(item || "").trim()).filter(Boolean);
+  if (values.length <= 1) {
+    return values[0] || "";
+  }
+  return `\n\n${values.map((item) => `- ${item}`).join("\n")}\n\n`;
 }
 
 function buildRemovalReasonBody(reason, author, kind, subreddit, inputs) {
@@ -916,7 +935,10 @@ function buildRemovalReasonBody(reason, author, kind, subreddit, inputs) {
       continue;
     }
     const key = String(block?.key || "").trim();
-    const value = key ? String(inputs?.[key] || "").trim() : "";
+    const rawValue = key ? inputs?.[key] : "";
+    const value = Array.isArray(rawValue)
+      ? formatRemovalInputValue(rawValue)
+      : String(rawValue || "").trim();
     if (value) {
       parts.push(interpolateRemovalTemplate(value, author, kind, subreddit, inputs));
     }

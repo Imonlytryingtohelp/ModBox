@@ -534,6 +534,13 @@ function setFieldValue(key, value) {
   }
 }
 
+function hasRemovalFieldValue(value) {
+  if (Array.isArray(value)) {
+    return value.some((item) => String(item || "").trim());
+  }
+  return Boolean(String(value || "").trim());
+}
+
 function validateSelectedFields() {
   if (!overlayState) {
     return true;
@@ -541,10 +548,10 @@ function validateSelectedFields() {
 
   const errors = {};
   for (const block of overlayState.dynamicBlocks || []) {
-    if (!block?.required || !block.key) {
+    if ((!block?.required && block?.type !== "select") || !block.key) {
       continue;
     }
-    if (!String(overlayState.inputValues?.[block.key] || "").trim()) {
+    if (!hasRemovalFieldValue(overlayState.inputValues?.[block.key])) {
       errors[block.key] = `${block.label || block.key} is required.`;
     }
   }

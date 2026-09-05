@@ -44,10 +44,19 @@ function ensureOverlayRoot() {
 function captureOverlayViewState(root) {
   const modal = root.querySelector(".rrw-overlay-modal");
   const checklist = root.querySelector(".rrw-checklist");
+  const inputChecklistScrollTops = {};
+  root.querySelectorAll(".rrw-field .rrw-checklist").forEach((element) => {
+    const input = element.querySelector("[data-input-key]");
+    const key = input?.getAttribute("data-input-key");
+    if (key) {
+      inputChecklistScrollTops[key] = element.scrollTop;
+    }
+  });
   const active = document.activeElement;
   const state = {
     modalScrollTop: modal?.scrollTop || 0,
     checklistScrollTop: checklist?.scrollTop || 0,
+    inputChecklistScrollTops,
     activeTarget: null,
     selectionStart: null,
     selectionEnd: null,
@@ -80,6 +89,13 @@ function restoreOverlayViewState(root, state) {
   if (checklist) {
     checklist.scrollTop = state.checklistScrollTop || 0;
   }
+  Object.entries(state.inputChecklistScrollTops || {}).forEach(([key, scrollTop]) => {
+    const input = Array.from(root.querySelectorAll(`[data-input-key="${CSS.escape(key)}"]`))[0];
+    const inputChecklist = input?.closest(".rrw-checklist");
+    if (inputChecklist) {
+      inputChecklist.scrollTop = scrollTop || 0;
+    }
+  });
 
   let active = null;
   if (state.activeTarget?.type === "id") {
@@ -508,24 +524,45 @@ function renderOverlay() {
     .map((block) => {
       const key = block.key;
       const label = block.label || key;
-      const value = inputValues[key] || "";
+      const value = inputValues[key] || (block.type === "select" && block.payload?.multiple ? [] : "");
       const fieldError = validationErrors?.[key] || "";
       if (block.type === "textarea") {
         return `
           <label class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
-            <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+            <span>${escapeHtml(label)}${block.required || block.type === "select" ? " *" : ""}</span>
             <textarea data-input-key="${escapeHtml(key)}" rows="3">${escapeHtml(value)}</textarea>
             ${fieldError ? `<span class="rrw-field-error">${escapeHtml(fieldError)}</span>` : ""}
           </label>
         `;
       }
       if (block.type === "select") {
+        const isMultiple = Boolean(block.payload?.multiple);
+        const selectedValues = isMultiple
+          ? (Array.isArray(value) ? value : String(value || "").trim() ? [String(value).trim()] : [])
+          : [];
+        if (isMultiple) {
+          const checklist = blockOptions(block)
+            .map((opt) => `
+              <label class="rrw-check-item">
+                <input type="checkbox" data-input-key="${escapeHtml(key)}" data-input-multiple="1" value="${escapeHtml(opt.value)}" ${selectedValues.includes(opt.value) ? "checked" : ""} />
+                <span>${escapeHtml(opt.label)}</span>
+              </label>
+            `)
+            .join("");
+          return `
+            <div class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
+              <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+              <div class="rrw-checklist">${checklist}</div>
+              ${fieldError ? `<span class="rrw-field-error">${escapeHtml(fieldError)}</span>` : ""}
+            </div>
+          `;
+        }
         const opts = blockOptions(block)
           .map((opt) => `<option value="${escapeHtml(opt.value)}" ${opt.value === value ? "selected" : ""}>${escapeHtml(opt.label)}</option>`)
           .join("");
         return `
           <label class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
-            <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+            <span>${escapeHtml(label)}${block.required || block.type === "select" ? " *" : ""}</span>
             <select data-input-key="${escapeHtml(key)}">
               <option value="">- pick one -</option>
               ${opts}
@@ -559,7 +596,12 @@ function renderOverlay() {
   // Check if there are incomplete dropdown fields (all dropdowns are required)
   const incompleteDropdowns = (dynamicBlocks || [])
     .filter((block) => block.type === "select")
-    .filter((block) => !String(inputValues[block.key] || "").trim());
+    .filter((block) => {
+      const value = inputValues[block.key];
+      return block.payload?.multiple
+        ? !Array.isArray(value) || value.length === 0
+        : !String(value || "").trim();
+    });
   const hasIncompleteDropdowns = incompleteDropdowns.length > 0;
   const incompleteDropdownsMessage = hasIncompleteDropdowns
     ? `Please select a value for: ${incompleteDropdowns.map((b) => b.label || b.key).join(", ")}`
@@ -1370,7 +1412,12 @@ function renderOverlay() {
       if (!key) {
         return;
       }
-      setFieldValue(key, event.target.value);
+      const value = event.currentTarget.getAttribute("data-input-multiple") === "1"
+        ? Array.from(root.querySelectorAll(`[data-input-key]`))
+          .filter((element) => element.getAttribute("data-input-key") === key && element.getAttribute("data-input-multiple") === "1" && element.checked)
+          .map((element) => element.value)
+        : event.target.value;
+      setFieldValue(key, value);
       schedulePreview();
     };
 

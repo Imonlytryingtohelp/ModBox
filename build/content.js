@@ -1849,6 +1849,20 @@ function setFieldValue(key, value) {
 
 
 
+function hasRemovalFieldValue(value) {
+
+  if (Array.isArray(value)) {
+
+    return value.some((item) => String(item || "").trim());
+
+  }
+
+  return Boolean(String(value || "").trim());
+
+}
+
+
+
 function validateSelectedFields() {
 
   if (!overlayState) {
@@ -1863,13 +1877,13 @@ function validateSelectedFields() {
 
   for (const block of overlayState.dynamicBlocks || []) {
 
-    if (!block?.required || !block.key) {
+    if ((!block?.required && block?.type !== "select") || !block.key) {
 
       continue;
 
     }
 
-    if (!String(overlayState.inputValues?.[block.key] || "").trim()) {
+    if (!hasRemovalFieldValue(overlayState.inputValues?.[block.key])) {
 
       errors[block.key] = `${block.label || block.key} is required.`;
 
@@ -20603,24 +20617,6 @@ function injectStyles() {
 
 
 
-    .rrw-about-page-copy-status {
-
-      min-height: 1.2em;
-
-      margin-top: 8px;
-
-      color: var(--rrw-text);
-
-      font-size: 0.78rem;
-
-      line-height: 1.4;
-
-      font-family: var(--rrw-font-family);
-
-    }
-
-
-
     .rrw-about-page-bug-report-output {
 
       width: 100%;
@@ -21803,7 +21799,7 @@ function normalizeRemovalBlockPayload(type, payload) {
 
       : [];
 
-    return { options };
+    return { options, multiple: true };
 
   }
 
@@ -22699,13 +22695,29 @@ function normalizeRemovalConfigDoc(doc, subreddit) {
 
   }
 
+  const reasons = Array.isArray(doc.reasons)
+
+    ? doc.reasons.map((reason, index) => ({
+
+      ...reason,
+
+      blocks: Array.isArray(reason?.blocks)
+
+        ? reason.blocks.map((block, blockIndex) => normalizeRemovalReasonBlock(block, blockIndex))
+
+        : [],
+
+    }))
+
+    : [];
+
   return {
 
     subreddit: normalizeSubreddit(subreddit || doc.subreddit || ""),
 
     version: doc.version || 1,
 
-    reasons: Array.isArray(doc.reasons) ? doc.reasons : [],
+    reasons,
 
     global_settings: doc.global_settings || { default_send_mode: "reply" },
 
@@ -23245,7 +23257,7 @@ function parseToolboxBodyToBlocks(text) {
 
         position,
 
-        payload: { options },
+        payload: { options, multiple: true },
 
         help_text: null,
 
@@ -23361,7 +23373,7 @@ function blocksToToolboxBody(blocks) {
 
         : "";
 
-      return `<select id="${escapeHtml(key)}">\n${options}\n</select>`;
+      return `<select id="${escapeHtml(key)}" multiple>\n${options}\n</select>`;
 
     }
 
@@ -23433,7 +23445,7 @@ function interpolateRemovalTemplate(text, author, kind, subreddit, inputs) {
 
   Object.entries(inputs && typeof inputs === "object" ? inputs : {}).forEach(([key, value]) => {
 
-    output = output.replaceAll(`{inputs.${key}}`, String(value || ""));
+    output = output.replaceAll(`{inputs.${key}}`, formatRemovalInputValue(value));
 
   });
 
@@ -23450,6 +23462,28 @@ function collapseWrappedInlineValues(text) {
     .replace(/(__[^\n]*?:)\s*\n+\s*([^\n]+?)\s*\n+\s*(__)/g, "$1 $2$3")
 
     .replace(/(__)\s*\n+\s*([^\n_][^\n]*?)\s*\n+\s*(__)/g, "__$2__");
+
+}
+
+
+
+function formatRemovalInputValue(value) {
+
+  if (!Array.isArray(value)) {
+
+    return String(value || "");
+
+  }
+
+  const values = value.map((item) => String(item || "").trim()).filter(Boolean);
+
+  if (values.length <= 1) {
+
+    return values[0] || "";
+
+  }
+
+  return `\n\n${values.map((item) => `- ${item}`).join("\n")}\n\n`;
 
 }
 
@@ -23477,7 +23511,13 @@ function buildRemovalReasonBody(reason, author, kind, subreddit, inputs) {
 
     const key = String(block?.key || "").trim();
 
-    const value = key ? String(inputs?.[key] || "").trim() : "";
+    const rawValue = key ? inputs?.[key] : "";
+
+    const value = Array.isArray(rawValue)
+
+      ? formatRemovalInputValue(rawValue)
+
+      : String(rawValue || "").trim();
 
     if (value) {
 
@@ -24452,6 +24492,46 @@ function renderRemovalConfigEditor() {
                       }
 
                       if (block.type === "select") {
+
+                        const isMultiple = Boolean(block.payload?.multiple);
+
+                        const selectedValues = isMultiple
+
+                          ? (Array.isArray(step?.inputs?.[fieldKey]) ? step.inputs[fieldKey] : String(step?.inputs?.[fieldKey] || "").trim() ? [String(step.inputs[fieldKey]).trim()] : [])
+
+                          : [];
+
+                        if (isMultiple) {
+
+                          const checklist = blockOptions(block)
+
+                            .map((opt) => `
+
+                              <label class="rrw-check-item">
+
+                                <input type="checkbox" data-pb-index="${index}" data-pb-step-index="${stepIndex}" data-pb-step-field="input_value" data-pb-step-input-key="${escapeHtml(fieldKey)}" data-pb-step-input-multiple="1" value="${escapeHtml(opt.value)}" ${selectedValues.includes(opt.value) ? "checked" : ""} />
+
+                                <span>${escapeHtml(opt.label)}</span>
+
+                              </label>
+
+                            `)
+
+                            .join("");
+
+                          return `
+
+                            <div class="rrw-field">
+
+                              <span>${escapeHtml(label)}</span>
+
+                              <div class="rrw-checklist">${checklist}</div>
+
+                            </div>
+
+                          `;
+
+                        }
 
                         const options = blockOptions(block)
 
@@ -27263,9 +27343,25 @@ function renderRemovalConfigEditor() {
 
         }
 
-        const value = String(event.target.value || "");
+        const value = event.currentTarget.getAttribute("data-pb-step-input-multiple") === "1"
 
-        if (!value.trim()) {
+          ? Array.from(modal.querySelectorAll("[data-pb-step-input-key]"))
+
+            .filter((element) => element.getAttribute("data-pb-index") === String(index)
+
+              && element.getAttribute("data-pb-step-index") === String(stepIndex)
+
+              && element.getAttribute("data-pb-step-input-key") === inputKey
+
+              && element.getAttribute("data-pb-step-input-multiple") === "1"
+
+              && element.checked)
+
+            .map((element) => element.value)
+
+          : String(event.target.value || "");
+
+        if (Array.isArray(value) ? value.length === 0 : !value.trim()) {
 
           delete step.inputs[inputKey];
 
@@ -32727,9 +32823,17 @@ function buildAboutBugReport(installedVersion) {
 
 async function copyAboutBugReport() {
 
-  const statusEl = document.querySelector("[data-about-copy-status]");
+  const copyButton = document.querySelector('[data-about-copy-bug-report="1"]');
 
   const report = buildAboutBugReport(aboutPageState?.installedVersion);
+
+  if (copyButton instanceof HTMLButtonElement) {
+
+    copyButton.textContent = "Copying...";
+
+    copyButton.disabled = true;
+
+  }
 
   let copied = false;
 
@@ -32787,15 +32891,11 @@ async function copyAboutBugReport() {
 
 
 
-  if (statusEl) {
+  if (copyButton instanceof HTMLButtonElement) {
 
-    statusEl.textContent = copied
+    copyButton.textContent = copied ? "Copied!" : "Copy failed";
 
-      ? "Bug report information copied to clipboard."
-
-      : "Copy failed. The report is shown below; select and copy it manually.";
-
-    statusEl.className = `rrw-about-page-copy-status${copied ? "" : " rrw-about-page-check-status--error"}`;
+    copyButton.disabled = false;
 
   }
 
@@ -33179,8 +33279,6 @@ function renderAboutPage() {
 
           </div>
 
-          <div class="rrw-about-page-copy-status" data-about-copy-status></div>
-
         </div>
 
 
@@ -33419,6 +33517,22 @@ function captureOverlayViewState(root) {
 
   const checklist = root.querySelector(".rrw-checklist");
 
+  const inputChecklistScrollTops = {};
+
+  root.querySelectorAll(".rrw-field .rrw-checklist").forEach((element) => {
+
+    const input = element.querySelector("[data-input-key]");
+
+    const key = input?.getAttribute("data-input-key");
+
+    if (key) {
+
+      inputChecklistScrollTops[key] = element.scrollTop;
+
+    }
+
+  });
+
   const active = document.activeElement;
 
   const state = {
@@ -33426,6 +33540,8 @@ function captureOverlayViewState(root) {
     modalScrollTop: modal?.scrollTop || 0,
 
     checklistScrollTop: checklist?.scrollTop || 0,
+
+    inputChecklistScrollTops,
 
     activeTarget: null,
 
@@ -33490,6 +33606,20 @@ function restoreOverlayViewState(root, state) {
     checklist.scrollTop = state.checklistScrollTop || 0;
 
   }
+
+  Object.entries(state.inputChecklistScrollTops || {}).forEach(([key, scrollTop]) => {
+
+    const input = Array.from(root.querySelectorAll(`[data-input-key="${CSS.escape(key)}"]`))[0];
+
+    const inputChecklist = input?.closest(".rrw-checklist");
+
+    if (inputChecklist) {
+
+      inputChecklist.scrollTop = scrollTop || 0;
+
+    }
+
+  });
 
 
 
@@ -34347,7 +34477,7 @@ function renderOverlay() {
 
       const label = block.label || key;
 
-      const value = inputValues[key] || "";
+      const value = inputValues[key] || (block.type === "select" && block.payload?.multiple ? [] : "");
 
       const fieldError = validationErrors?.[key] || "";
 
@@ -34357,7 +34487,7 @@ function renderOverlay() {
 
           <label class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
 
-            <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+            <span>${escapeHtml(label)}${block.required || block.type === "select" ? " *" : ""}</span>
 
             <textarea data-input-key="${escapeHtml(key)}" rows="3">${escapeHtml(value)}</textarea>
 
@@ -34371,6 +34501,48 @@ function renderOverlay() {
 
       if (block.type === "select") {
 
+        const isMultiple = Boolean(block.payload?.multiple);
+
+        const selectedValues = isMultiple
+
+          ? (Array.isArray(value) ? value : String(value || "").trim() ? [String(value).trim()] : [])
+
+          : [];
+
+        if (isMultiple) {
+
+          const checklist = blockOptions(block)
+
+            .map((opt) => `
+
+              <label class="rrw-check-item">
+
+                <input type="checkbox" data-input-key="${escapeHtml(key)}" data-input-multiple="1" value="${escapeHtml(opt.value)}" ${selectedValues.includes(opt.value) ? "checked" : ""} />
+
+                <span>${escapeHtml(opt.label)}</span>
+
+              </label>
+
+            `)
+
+            .join("");
+
+          return `
+
+            <div class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
+
+              <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+
+              <div class="rrw-checklist">${checklist}</div>
+
+              ${fieldError ? `<span class="rrw-field-error">${escapeHtml(fieldError)}</span>` : ""}
+
+            </div>
+
+          `;
+
+        }
+
         const opts = blockOptions(block)
 
           .map((opt) => `<option value="${escapeHtml(opt.value)}" ${opt.value === value ? "selected" : ""}>${escapeHtml(opt.label)}</option>`)
@@ -34381,7 +34553,7 @@ function renderOverlay() {
 
           <label class="rrw-field${fieldError ? " rrw-field--invalid" : ""}">
 
-            <span>${escapeHtml(label)}${block.required ? " *" : ""}</span>
+            <span>${escapeHtml(label)}${block.required || block.type === "select" ? " *" : ""}</span>
 
             <select data-input-key="${escapeHtml(key)}">
 
@@ -34449,7 +34621,17 @@ function renderOverlay() {
 
     .filter((block) => block.type === "select")
 
-    .filter((block) => !String(inputValues[block.key] || "").trim());
+    .filter((block) => {
+
+      const value = inputValues[block.key];
+
+      return block.payload?.multiple
+
+        ? !Array.isArray(value) || value.length === 0
+
+        : !String(value || "").trim();
+
+    });
 
   const hasIncompleteDropdowns = incompleteDropdowns.length > 0;
 
@@ -36071,7 +36253,17 @@ function renderOverlay() {
 
       }
 
-      setFieldValue(key, event.target.value);
+      const value = event.currentTarget.getAttribute("data-input-multiple") === "1"
+
+        ? Array.from(root.querySelectorAll(`[data-input-key]`))
+
+          .filter((element) => element.getAttribute("data-input-key") === key && element.getAttribute("data-input-multiple") === "1" && element.checked)
+
+          .map((element) => element.value)
+
+        : event.target.value;
+
+      setFieldValue(key, value);
 
       schedulePreview();
 
