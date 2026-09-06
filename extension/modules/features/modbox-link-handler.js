@@ -264,12 +264,39 @@ function bindModboxLinkHandler() {
         throw new Error("Could not determine subreddit (not on a moderated subreddit page or valid modmail)");
       }
 
-      // Show immediate toast that ban process has started
-      showModboxLinkToast(">>> Ban process started...", false, 2000);
+      // Queue the ban so it can finish after navigation or a content-script restart.
 
       // Execute the action
       if (parsed.action === "ban") {
-        await executeModboxBanAction(parsed, subreddit);
+        const steps = [{
+          type: "ban_user",
+          duration_days: parsed.durationDays,
+          ban_message_template: parsed.banMessage,
+          ban_note_template: parsed.note,
+        }];
+        if (parsed.note) {
+          steps.push({
+            type: "usernote",
+            text_template: parsed.note,
+            note_type: parsed.notetype || "none",
+          });
+        }
+        const response = await sendMessage({
+          type: "START_MODERATION_JOB",
+          job: {
+            type: "ban",
+            title: `Ban u/${parsed.username}`,
+            fullname: "",
+            subreddit,
+            author: parsed.username,
+            permalink: String(window.location.href || "").trim(),
+            sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+            steps,
+          },
+        });
+        if (!response?.ok) {
+          throw new Error(response?.error || "Unable to queue ban");
+        }
         
         // Build user feedback message
         let toastMessage = `[SUCCESS] Banned u/${parsed.username} in r/${subreddit}`;
@@ -285,8 +312,8 @@ function bindModboxLinkHandler() {
           toastMessage += " + note";
         }
         
-        showModboxLinkToast(toastMessage);
-        console.log("[ModBox Link Handler] Ban action completed for", parsed.username);
+        showModboxLinkToast(`${toastMessage} (queued)`);
+        console.log("[ModBox Link Handler] Ban action queued for", parsed.username);
       }
     } catch (err) {
       const errorMsg = getSafeErrorMessage(err);

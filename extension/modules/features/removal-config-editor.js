@@ -918,6 +918,21 @@ function renderRemovalConfigEditor() {
           </div>
 
           <div class="rrw-config-subsection">
+            <h4>Background processes</h4>
+            <div class="rrw-config-grid">
+              <label class="rrw-field">
+                <span>Notification link host</span>
+                <select data-ext-setting="background_job_link_host">
+                  <option value="extension_preference" ${extensionSettings.background_job_link_host === "extension_preference" ? "selected" : ""}>Follow source Reddit host</option>
+                  <option value="old_reddit" ${extensionSettings.background_job_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>
+                  <option value="new_reddit" ${extensionSettings.background_job_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
+                </select>
+                <small class="rrw-muted rrw-config-help">Controls the Reddit host used when opening completed or failed job notifications.</small>
+              </label>
+            </div>
+          </div>
+
+          <div class="rrw-config-subsection">
             <h4>Appearance</h4>
             <div class="rrw-config-grid">
               <label class="rrw-field">
@@ -1212,6 +1227,8 @@ function renderRemovalConfigEditor() {
         removalConfigEditorState.extensionSettings.queue_bar_fixed_subreddit = clean || null;
       } else if (key === "queue_bar_link_host") {
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
+      } else if (key === "background_job_link_host") {
+        removalConfigEditorState.extensionSettings.background_job_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
       } else if (key === "queue_bar_position") {
         const position = String(event.target.value || "").toLowerCase();
         removalConfigEditorState.extensionSettings.queue_bar_position = ["bottom_left", "bottom_right"].includes(position) ? position : "bottom_right";
@@ -1291,6 +1308,7 @@ function renderRemovalConfigEditor() {
         queue_bar_scope: normalizeQueueBarScope(s.queue_bar_scope, "current_subreddit"),
         queue_bar_fixed_subreddit: normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null,
         queue_bar_link_host: normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference"),
+        background_job_link_host: normalizeQueueBarLinkHost(s.background_job_link_host, "extension_preference"),
         queue_bar_use_old_reddit: typeof s.queue_bar_use_old_reddit === "boolean" ? s.queue_bar_use_old_reddit : false,
         queue_bar_open_in_new_tab:
           typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false,
@@ -1971,6 +1989,7 @@ function renderRemovalConfigEditor() {
         const queueScope = normalizeQueueBarScope(s.queue_bar_scope, "current_subreddit");
         const fixedSubreddit = normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null;
         const linkHost = normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference");
+        const backgroundJobLinkHost = normalizeQueueBarLinkHost(s.background_job_link_host, "extension_preference");
         const useOldReddit = typeof s.queue_bar_use_old_reddit === "boolean" ? s.queue_bar_use_old_reddit : false;
         const openInNewTab = typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false;
         const queuePosition = ["bottom_left", "bottom_right"].includes(String(s.queue_bar_position || "")) ? s.queue_bar_position : "bottom_right";
@@ -1989,6 +2008,7 @@ function renderRemovalConfigEditor() {
           [QUEUE_BAR_SCOPE_KEY]: queueScope,
           [QUEUE_BAR_FIXED_SUBREDDIT_KEY]: fixedSubreddit,
           [QUEUE_BAR_LINK_HOST_KEY]: linkHost,
+          [BACKGROUND_JOB_LINK_HOST_KEY]: backgroundJobLinkHost,
           [QUEUE_BAR_USE_OLD_REDDIT_KEY]: useOldReddit,
           [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: openInNewTab,
           [QUEUE_BAR_POSITION_KEY]: queuePosition,

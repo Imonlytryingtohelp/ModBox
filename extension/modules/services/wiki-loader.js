@@ -1372,6 +1372,7 @@ async function syncWikiExtensionSettingsToStorage(subreddit, wikiPage) {
     [QUEUE_BAR_SCOPE_KEY]: normalizeQueueBarScope(settings.queue_bar_scope, "current_subreddit"),
     [QUEUE_BAR_FIXED_SUBREDDIT_KEY]: normalizeSubreddit(settings.queue_bar_fixed_subreddit || "") || null,
     [QUEUE_BAR_LINK_HOST_KEY]: normalizeQueueBarLinkHost(settings.queue_bar_link_host, "extension_preference"),
+    [BACKGROUND_JOB_LINK_HOST_KEY]: normalizeQueueBarLinkHost(settings.background_job_link_host, "extension_preference"),
     [QUEUE_BAR_USE_OLD_REDDIT_KEY]: normalizeRemovalBoolean(settings.queue_bar_use_old_reddit, false),
     [QUEUE_BAR_OPEN_IN_NEW_TAB_KEY]: normalizeRemovalBoolean(settings.queue_bar_open_in_new_tab, false),
     [QUEUE_BAR_POSITION_KEY]: ["bottom_left", "bottom_right"].includes(String(settings.queue_bar_position || "")) ? settings.queue_bar_position : "bottom_right",

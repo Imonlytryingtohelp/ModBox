@@ -10,7 +10,7 @@
     "48": "assets/icon-48.png",
     "128": "assets/icon-128.png"
   },
-  "permissions": ["storage", "cookies"],
+  "permissions": ["storage", "cookies", "alarms", "notifications"],
   "host_permissions": [
     "https://www.reddit.com/*",
     "https://new.reddit.com/*",

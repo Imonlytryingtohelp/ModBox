@@ -1540,6 +1540,42 @@ function renderOverlay() {
     const isSimpleAction = simpleActions.includes(action);
     
     if (isSimpleAction) {
+      if (action === "remove" || action === "remove_no_reason") {
+        const response = await sendMessage({
+          type: "START_MODERATION_JOB",
+          job: {
+            type: "removal",
+            title: action === "remove_no_reason" ? "Removal" : "Removal with reason",
+            fullname: overlay.resolved?.fullname || overlay.target,
+            subreddit: normalizeSubreddit(overlay.resolved?.subreddit || ""),
+            author: String(overlay.resolved?.author || "").trim(),
+            permalink: String(overlay.resolved?.permalink || "").trim(),
+            sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+            kind: (overlay.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+            reasons: overlay.reasons || [],
+            removalConfig: overlay.removalConfig || {},
+            removalNoteText: String(overlay.removalNoteText || "").trim(),
+            removalNoteType: String(overlay.removalNoteType || "none").trim() || "none",
+            steps: [{
+              type: "remove",
+              reason_keys: action === "remove_no_reason" ? [] : (overlay.selectedReasonKeys || []),
+              send_mode: action === "remove_no_reason" ? "none" : (overlay.sendMode || "reply"),
+              inputs: action === "remove_no_reason" ? {} : (overlay.inputValues || {}),
+              skip_reddit_remove: Boolean(overlay.skipRedditRemove),
+              no_reason: action === "remove_no_reason",
+              comment_as_subreddit: normalizeRemovalBoolean(overlay.removalConfig?.global_settings?.comment_as_subreddit, true),
+            }],
+          },
+        });
+        if (response?.ok) {
+          showToast("Removal queued. You can navigate away safely.", "success");
+          closeOverlay();
+        } else {
+          showToast(`Unable to start removal: ${response?.error || "background worker unavailable"}`, "error");
+        }
+        return;
+      }
+
       // Close the overlay immediately for better UX
       closeOverlay();
       
@@ -2275,6 +2311,30 @@ function renderOverlay() {
         return;
       }
     }
+
+    const jobResponse = await sendMessage({
+      type: "START_MODERATION_JOB",
+      job: {
+        type: "playbook",
+        title: `Playbook: ${playbook.title}`,
+        fullname: overlay.resolved?.fullname || overlay.target,
+        subreddit,
+        author: String(overlay.resolved?.author || "").trim(),
+        permalink: String(overlay.resolved?.permalink || "").trim(),
+        sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+        kind: (overlay.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+        reasons: overlay.reasons || [],
+        removalConfig: overlay.removalConfig || {},
+        steps: playbook.steps || [],
+      },
+    });
+    if (!jobResponse?.ok) {
+      showToast(`Unable to start playbook: ${jobResponse?.error || "background worker unavailable"}`, "error");
+      return;
+    }
+    showToast(`Playbook queued. You can navigate away safely.`, "success");
+    closeOverlay();
+    return;
 
     // For playbooks, keep overlay open during execution (steps need overlayState)
     // Run the playbook synchronously with the overlay still visible

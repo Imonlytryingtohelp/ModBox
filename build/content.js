@@ -65,6 +65,8 @@ const QUEUE_BAR_OPEN_IN_NEW_TAB_KEY = "queueBarOpenInNewTab";
 
 const QUEUE_BAR_FIXED_SUBREDDIT_KEY = "queueBarFixedSubreddit";
 
+const BACKGROUND_JOB_LINK_HOST_KEY = "backgroundJobLinkHost";
+
 const QUEUE_BAR_COLLAPSED_KEY = "queueBarCollapsed";
 
 const QUEUE_BAR_POSITION_KEY = "queueBarPosition";
@@ -7692,6 +7694,8 @@ async function syncWikiExtensionSettingsToStorage(subreddit, wikiPage) {
     [QUEUE_BAR_FIXED_SUBREDDIT_KEY]: normalizeSubreddit(settings.queue_bar_fixed_subreddit || "") || null,
 
     [QUEUE_BAR_LINK_HOST_KEY]: normalizeQueueBarLinkHost(settings.queue_bar_link_host, "extension_preference"),
+
+    [BACKGROUND_JOB_LINK_HOST_KEY]: normalizeQueueBarLinkHost(settings.background_job_link_host, "extension_preference"),
 
     [QUEUE_BAR_USE_OLD_REDDIT_KEY]: normalizeRemovalBoolean(settings.queue_bar_use_old_reddit, false),
 
@@ -22811,6 +22815,8 @@ async function openRemovalConfigEditor(context) {
 
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
 
+      BACKGROUND_JOB_LINK_HOST_KEY,
+
       COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, REPOST_CHECKER_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
 
     ]).catch(() => ({})),
@@ -22864,6 +22870,8 @@ async function openRemovalConfigEditor(context) {
       queue_bar_fixed_subreddit: normalizeSubreddit(stored[QUEUE_BAR_FIXED_SUBREDDIT_KEY] || "") || null,
 
       queue_bar_link_host: normalizeQueueBarLinkHost(stored[QUEUE_BAR_LINK_HOST_KEY], "extension_preference"),
+
+      background_job_link_host: normalizeQueueBarLinkHost(stored[BACKGROUND_JOB_LINK_HOST_KEY], "extension_preference"),
 
       queue_bar_use_old_reddit: typeof stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] === "boolean" ? stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] : false,
 
@@ -25435,6 +25443,36 @@ function renderRemovalConfigEditor() {
 
           <div class="rrw-config-subsection">
 
+            <h4>Background processes</h4>
+
+            <div class="rrw-config-grid">
+
+              <label class="rrw-field">
+
+                <span>Notification link host</span>
+
+                <select data-ext-setting="background_job_link_host">
+
+                  <option value="extension_preference" ${extensionSettings.background_job_link_host === "extension_preference" ? "selected" : ""}>Follow source Reddit host</option>
+
+                  <option value="old_reddit" ${extensionSettings.background_job_link_host === "old_reddit" ? "selected" : ""}>Always old.reddit.com</option>
+
+                  <option value="new_reddit" ${extensionSettings.background_job_link_host === "new_reddit" ? "selected" : ""}>Always www.reddit.com</option>
+
+                </select>
+
+                <small class="rrw-muted rrw-config-help">Controls the Reddit host used when opening completed or failed job notifications.</small>
+
+              </label>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="rrw-config-subsection">
+
             <h4>Appearance</h4>
 
             <div class="rrw-config-grid">
@@ -26023,6 +26061,10 @@ function renderRemovalConfigEditor() {
 
         removalConfigEditorState.extensionSettings.queue_bar_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
 
+      } else if (key === "background_job_link_host") {
+
+        removalConfigEditorState.extensionSettings.background_job_link_host = normalizeQueueBarLinkHost(event.target.value, "extension_preference");
+
       } else if (key === "queue_bar_position") {
 
         const position = String(event.target.value || "").toLowerCase();
@@ -26180,6 +26222,8 @@ function renderRemovalConfigEditor() {
         queue_bar_fixed_subreddit: normalizeSubreddit(s.queue_bar_fixed_subreddit || "") || null,
 
         queue_bar_link_host: normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference"),
+
+        background_job_link_host: normalizeQueueBarLinkHost(s.background_job_link_host, "extension_preference"),
 
         queue_bar_use_old_reddit: typeof s.queue_bar_use_old_reddit === "boolean" ? s.queue_bar_use_old_reddit : false,
 
@@ -27541,6 +27585,8 @@ function renderRemovalConfigEditor() {
 
         const linkHost = normalizeQueueBarLinkHost(s.queue_bar_link_host, "extension_preference");
 
+        const backgroundJobLinkHost = normalizeQueueBarLinkHost(s.background_job_link_host, "extension_preference");
+
         const useOldReddit = typeof s.queue_bar_use_old_reddit === "boolean" ? s.queue_bar_use_old_reddit : false;
 
         const openInNewTab = typeof s.queue_bar_open_in_new_tab === "boolean" ? s.queue_bar_open_in_new_tab : false;
@@ -27576,6 +27622,8 @@ function renderRemovalConfigEditor() {
           [QUEUE_BAR_FIXED_SUBREDDIT_KEY]: fixedSubreddit,
 
           [QUEUE_BAR_LINK_HOST_KEY]: linkHost,
+
+          [BACKGROUND_JOB_LINK_HOST_KEY]: backgroundJobLinkHost,
 
           [QUEUE_BAR_USE_OLD_REDDIT_KEY]: useOldReddit,
 
@@ -36509,6 +36557,78 @@ function renderOverlay() {
 
     if (isSimpleAction) {
 
+      if (action === "remove" || action === "remove_no_reason") {
+
+        const response = await sendMessage({
+
+          type: "START_MODERATION_JOB",
+
+          job: {
+
+            type: "removal",
+
+            title: action === "remove_no_reason" ? "Removal" : "Removal with reason",
+
+            fullname: overlay.resolved?.fullname || overlay.target,
+
+            subreddit: normalizeSubreddit(overlay.resolved?.subreddit || ""),
+
+            author: String(overlay.resolved?.author || "").trim(),
+
+            permalink: String(overlay.resolved?.permalink || "").trim(),
+
+            sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+
+            kind: (overlay.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+
+            reasons: overlay.reasons || [],
+
+            removalConfig: overlay.removalConfig || {},
+
+            removalNoteText: String(overlay.removalNoteText || "").trim(),
+
+            removalNoteType: String(overlay.removalNoteType || "none").trim() || "none",
+
+            steps: [{
+
+              type: "remove",
+
+              reason_keys: action === "remove_no_reason" ? [] : (overlay.selectedReasonKeys || []),
+
+              send_mode: action === "remove_no_reason" ? "none" : (overlay.sendMode || "reply"),
+
+              inputs: action === "remove_no_reason" ? {} : (overlay.inputValues || {}),
+
+              skip_reddit_remove: Boolean(overlay.skipRedditRemove),
+
+              no_reason: action === "remove_no_reason",
+
+              comment_as_subreddit: normalizeRemovalBoolean(overlay.removalConfig?.global_settings?.comment_as_subreddit, true),
+
+            }],
+
+          },
+
+        });
+
+        if (response?.ok) {
+
+          showToast("Removal queued. You can navigate away safely.", "success");
+
+          closeOverlay();
+
+        } else {
+
+          showToast(`Unable to start removal: ${response?.error || "background worker unavailable"}`, "error");
+
+        }
+
+        return;
+
+      }
+
+
+
       // Close the overlay immediately for better UX
 
       closeOverlay();
@@ -37978,6 +38098,54 @@ function renderOverlay() {
       }
 
     }
+
+
+
+    const jobResponse = await sendMessage({
+
+      type: "START_MODERATION_JOB",
+
+      job: {
+
+        type: "playbook",
+
+        title: `Playbook: ${playbook.title}`,
+
+        fullname: overlay.resolved?.fullname || overlay.target,
+
+        subreddit,
+
+        author: String(overlay.resolved?.author || "").trim(),
+
+        permalink: String(overlay.resolved?.permalink || "").trim(),
+
+        sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+
+        kind: (overlay.resolved?.thingType || "submission") === "submission" ? "post" : "comment",
+
+        reasons: overlay.reasons || [],
+
+        removalConfig: overlay.removalConfig || {},
+
+        steps: playbook.steps || [],
+
+      },
+
+    });
+
+    if (!jobResponse?.ok) {
+
+      showToast(`Unable to start playbook: ${jobResponse?.error || "background worker unavailable"}`, "error");
+
+      return;
+
+    }
+
+    showToast(`Playbook queued. You can navigate away safely.`, "success");
+
+    closeOverlay();
+
+    return;
 
 
 
@@ -50059,9 +50227,7 @@ function bindModboxLinkHandler() {
 
 
 
-      // Show immediate toast that ban process has started
-
-      showModboxLinkToast(">>> Ban process started...", false, 2000);
+      // Queue the ban so it can finish after navigation or a content-script restart.
 
 
 
@@ -50069,7 +50235,63 @@ function bindModboxLinkHandler() {
 
       if (parsed.action === "ban") {
 
-        await executeModboxBanAction(parsed, subreddit);
+        const steps = [{
+
+          type: "ban_user",
+
+          duration_days: parsed.durationDays,
+
+          ban_message_template: parsed.banMessage,
+
+          ban_note_template: parsed.note,
+
+        }];
+
+        if (parsed.note) {
+
+          steps.push({
+
+            type: "usernote",
+
+            text_template: parsed.note,
+
+            note_type: parsed.notetype || "none",
+
+          });
+
+        }
+
+        const response = await sendMessage({
+
+          type: "START_MODERATION_JOB",
+
+          job: {
+
+            type: "ban",
+
+            title: `Ban u/${parsed.username}`,
+
+            fullname: "",
+
+            subreddit,
+
+            author: parsed.username,
+
+            permalink: String(window.location.href || "").trim(),
+
+            sourceHost: String(window.location.hostname || "").trim().toLowerCase(),
+
+            steps,
+
+          },
+
+        });
+
+        if (!response?.ok) {
+
+          throw new Error(response?.error || "Unable to queue ban");
+
+        }
 
         
 
@@ -50101,9 +50323,9 @@ function bindModboxLinkHandler() {
 
         
 
-        showModboxLinkToast(toastMessage);
+        showModboxLinkToast(`${toastMessage} (queued)`);
 
-        console.log("[ModBox Link Handler] Ban action completed for", parsed.username);
+        console.log("[ModBox Link Handler] Ban action queued for", parsed.username);
 
       }
 

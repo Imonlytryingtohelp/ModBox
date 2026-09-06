@@ -585,6 +585,7 @@ async function openRemovalConfigEditor(context) {
       ABOUT_PAGE_LINK_GENERATOR_ENABLED_KEY,
       QUEUE_BAR_SCOPE_KEY, QUEUE_BAR_FIXED_SUBREDDIT_KEY, QUEUE_BAR_LINK_HOST_KEY,
       QUEUE_BAR_USE_OLD_REDDIT_KEY, QUEUE_BAR_OPEN_IN_NEW_TAB_KEY, THEME_MODE_KEY,
+      BACKGROUND_JOB_LINK_HOST_KEY,
       COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY, HISTORY_BUTTON_ENABLED_KEY, REPOST_CHECKER_BUTTON_ENABLED_KEY, COMMENT_NUKE_BUTTON_ENABLED_KEY, CANNED_REPLIES_WIKI_URL_KEY,
     ]).catch(() => ({})),
     Promise.resolve(null), // getExtensionSettingsWikiPagePreference stub
@@ -612,6 +613,7 @@ async function openRemovalConfigEditor(context) {
       queue_bar_scope: normalizeQueueBarScope(stored[QUEUE_BAR_SCOPE_KEY], "current_subreddit"),
       queue_bar_fixed_subreddit: normalizeSubreddit(stored[QUEUE_BAR_FIXED_SUBREDDIT_KEY] || "") || null,
       queue_bar_link_host: normalizeQueueBarLinkHost(stored[QUEUE_BAR_LINK_HOST_KEY], "extension_preference"),
+      background_job_link_host: normalizeQueueBarLinkHost(stored[BACKGROUND_JOB_LINK_HOST_KEY], "extension_preference"),
       queue_bar_use_old_reddit: typeof stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] === "boolean" ? stored[QUEUE_BAR_USE_OLD_REDDIT_KEY] : false,
       queue_bar_open_in_new_tab: typeof stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] === "boolean" ? stored[QUEUE_BAR_OPEN_IN_NEW_TAB_KEY] : false,
       comment_nuke_ignore_distinguished: typeof stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] === "boolean" ? stored[COMMENT_NUKE_IGNORE_DISTINGUISHED_KEY] : false,
