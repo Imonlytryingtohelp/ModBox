@@ -63,6 +63,23 @@ function renderRemovalConfigEditor() {
       }
       return `<li><strong>${block.type === "input" ? "Input" : "Textarea"}:</strong> ${escapeHtml(block.key || "unnamed")}</li>`;
     }).join("");
+    const subreasonDefaultsHtml = reason.blocks
+      .map((block, blockIndex) => {
+        if (block?.type !== "select" || !Array.isArray(block?.payload?.options)) return "";
+        const options = block.payload.options.map((option, optionIndex) => {
+          const normalized = typeof option === "object"
+            ? option
+            : { value: String(option || ""), label: String(option || "") };
+          const value = String(normalized.value ?? normalized.label ?? "");
+          if (!value) return "";
+          return `
+            <div class="rrw-config-grid" data-subreason-option="1" data-reason-index="${index}" data-block-index="${blockIndex}" data-option-index="${optionIndex}">
+              <label class="rrw-field"><span>${escapeHtml(String(normalized.label ?? value))} default note</span><input type="text" data-subreason-field="default_note_text" value="${escapeHtml(String(normalized.default_note_text || ""))}" placeholder="Optional default usernote" /></label>
+              <label class="rrw-field"><span>Sub-reason note type</span><select data-subreason-field="default_note_type">${(removalConfigEditorState.playbooksNoteTypes || ["none"]).map((type) => `<option value="${escapeHtml(type)}" ${String(normalized.default_note_type || "none").toLowerCase() === String(type).toLowerCase() ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></label>
+            </div>`;
+        }).join("");
+        return options ? `<div class="rrw-preview-panel"><strong>Default notes for sub-reasons</strong>${options}</div>` : "";
+      }).join("");
 
 
     return `
@@ -150,6 +167,7 @@ function renderRemovalConfigEditor() {
           <span>Toolbox-style body editor</span>
           <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${draft ?? blocksToToolboxBody(reason.blocks)}</textarea>
         </label>
+        ${subreasonDefaultsHtml}
 
         <div class="rrw-preview-panel rrw-config-preview-panel">
           <div class="rrw-preview-panel__header">
@@ -1453,13 +1471,44 @@ function renderRemovalConfigEditor() {
         if (!current.reasons[index]) {
           return;
         }
-        current.reasons[index].blocks = parseToolboxBodyToBlocks(draft);
+        current.reasons[index].blocks = parseToolboxBodyToBlocks(draft, current.reasons[index].blocks);
       });
       if (removalConfigEditorState) {
         removalConfigEditorState.reasonsUserEdited = true;
       }
       delete removalConfigEditorState.toolboxDrafts[index];
       renderRemovalConfigEditor();
+    });
+  });
+
+  modal.querySelectorAll("[data-subreason-field]").forEach((element) => {
+    const applySubreasonChange = (event) => {
+      if (!removalConfigEditorState) return;
+      const container = event.currentTarget.closest("[data-subreason-option]");
+      const reasonIndex = Number.parseInt(container?.getAttribute("data-reason-index") || "", 10);
+      const blockIndex = Number.parseInt(container?.getAttribute("data-block-index") || "", 10);
+      const optionIndex = Number.parseInt(container?.getAttribute("data-option-index") || "", 10);
+      const field = String(event.currentTarget.getAttribute("data-subreason-field") || "");
+      const option = removalConfigEditorState.config?.reasons?.[reasonIndex]?.blocks?.[blockIndex]?.payload?.options?.[optionIndex];
+      if (!Number.isFinite(reasonIndex) || !Number.isFinite(blockIndex) || !Number.isFinite(optionIndex) || !field || !option) return;
+      if (typeof option !== "object") {
+        const value = String(option);
+        removalConfigEditorState.config.reasons[reasonIndex].blocks[blockIndex].payload.options[optionIndex] = {
+          value, label: value, default_note_text: "", default_note_type: "none",
+        };
+      }
+      const normalizedOption = removalConfigEditorState.config.reasons[reasonIndex].blocks[blockIndex].payload.options[optionIndex];
+      normalizedOption[field] = field === "default_note_type"
+        ? String(event.target.value || "none").trim().toLowerCase() || "none"
+        : String(event.target.value || "");
+      removalConfigEditorState.reasonsUserEdited = true;
+    };
+    element.addEventListener("input", applySubreasonChange);
+    element.addEventListener("change", (event) => {
+      applySubreasonChange(event);
+      if (event.currentTarget.getAttribute("data-subreason-field") !== "default_note_text") {
+        renderRemovalConfigEditor();
+      }
     });
   });
 
