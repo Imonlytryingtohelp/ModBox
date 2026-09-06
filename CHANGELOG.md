@@ -5,7 +5,6 @@ All notable changes to this project are documented in this file.
 ## UNRELEASED 1.11.0 - Multi-Selection Removal Reasons
 
 - **Added** navigation-safe background processing for one-click bans, removals, and playbooks,. With persisted jobs, step checkpoints, cancellation checks, queued-job resumption, and browser notifications.
-- **Added** clear success/failure notifications that open the related post or comment when clicked, with configurable Reddit link hosts under Background processes settings.
 - **Added** multi-selection support for removal-reason option lists.
 - **Improved** Copy Bug Report Info now confirms the action by changing the button text without covering the changelog.
 
