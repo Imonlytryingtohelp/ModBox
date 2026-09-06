@@ -1817,6 +1817,10 @@ function blockOptions(block) {
 
         value: String(opt.value ?? opt.label ?? "option"),
 
+        default_note_text: String(opt.default_note_text ?? opt.suggestedNoteText ?? ""),
+
+        default_note_type: String(opt.default_note_type ?? opt.suggestedNoteType ?? "none").trim().toLowerCase() || "none",
+
       };
 
     }
@@ -21795,7 +21799,35 @@ function normalizeRemovalBlockPayload(type, payload) {
 
     const options = Array.isArray(source.options)
 
-      ? source.options.map((option) => String(option ?? "")).filter((option) => option.trim())
+      ? source.options.map((option) => {
+
+        if (typeof option === "string") {
+
+          const value = option.trim();
+
+          return value ? { value, label: value, default_note_text: "", default_note_type: "none" } : null;
+
+        }
+
+        if (!option || typeof option !== "object") return null;
+
+        const value = String(option.value ?? option.label ?? "").trim();
+
+        if (!value) return null;
+
+        return {
+
+          value,
+
+          label: String(option.label ?? value),
+
+          default_note_text: String(option.default_note_text ?? option.suggestedNoteText ?? ""),
+
+          default_note_type: String(option.default_note_type ?? option.suggestedNoteType ?? "none").trim().toLowerCase() || "none",
+
+        };
+
+      }).filter(Boolean)
 
       : [];
 
@@ -23129,7 +23161,7 @@ async function openRemovalConfigEditor(context) {
 
 
 
-function parseToolboxBodyToBlocks(text) {
+function parseToolboxBodyToBlocks(text, existingBlocks = []) {
 
   const pattern = /(<select\b[^>]*>[\s\S]*?<\/select>|<textarea\b[^>]*>[\s\S]*?<\/textarea>|<input\b[^>]*\/?>)/gi;
 
@@ -23257,7 +23289,31 @@ function parseToolboxBodyToBlocks(text) {
 
         position,
 
-        payload: { options, multiple: true },
+        payload: {
+
+          options: options.map((option) => {
+
+            const previousBlock = Array.isArray(existingBlocks) ? existingBlocks.find((block) => block?.type === "select" && block?.key === key) : null;
+
+            const previousOption = previousBlock?.payload?.options?.find((candidate) => {
+
+              const value = typeof candidate === "object" ? candidate.value ?? candidate.label : candidate;
+
+              return String(value || "") === option;
+
+            });
+
+            return typeof previousOption === "object"
+
+              ? { ...previousOption, value: option, label: String(previousOption.label || option) }
+
+              : { value: option, label: option, default_note_text: "", default_note_type: "none" };
+
+          }),
+
+          multiple: true,
+
+        },
 
         help_text: null,
 
@@ -23369,7 +23425,13 @@ function blocksToToolboxBody(blocks) {
 
       const options = Array.isArray(block?.payload?.options)
 
-        ? block.payload.options.map((option) => `<option>${escapeHtml(String(option || ""))}</option>`).join("\n")
+        ? block.payload.options.map((option) => {
+
+          const label = typeof option === "object" ? option.label ?? option.value : option;
+
+          return `<option>${escapeHtml(String(label || ""))}</option>`;
+
+        }).join("\n")
 
         : "";
 
@@ -23725,6 +23787,40 @@ function renderRemovalConfigEditor() {
 
     }).join("");
 
+    const subreasonDefaultsHtml = reason.blocks
+
+      .map((block, blockIndex) => {
+
+        if (block?.type !== "select" || !Array.isArray(block?.payload?.options)) return "";
+
+        const options = block.payload.options.map((option, optionIndex) => {
+
+          const normalized = typeof option === "object"
+
+            ? option
+
+            : { value: String(option || ""), label: String(option || "") };
+
+          const value = String(normalized.value ?? normalized.label ?? "");
+
+          if (!value) return "";
+
+          return `
+
+            <div class="rrw-config-grid" data-subreason-option="1" data-reason-index="${index}" data-block-index="${blockIndex}" data-option-index="${optionIndex}">
+
+              <label class="rrw-field"><span>${escapeHtml(String(normalized.label ?? value))} default note</span><input type="text" data-subreason-field="default_note_text" value="${escapeHtml(String(normalized.default_note_text || ""))}" placeholder="Optional default usernote" /></label>
+
+              <label class="rrw-field"><span>Sub-reason note type</span><select data-subreason-field="default_note_type">${(removalConfigEditorState.playbooksNoteTypes || ["none"]).map((type) => `<option value="${escapeHtml(type)}" ${String(normalized.default_note_type || "none").toLowerCase() === String(type).toLowerCase() ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></label>
+
+            </div>`;
+
+        }).join("");
+
+        return options ? `<div class="rrw-preview-panel"><strong>Default notes for sub-reasons</strong>${options}</div>` : "";
+
+      }).join("");
+
 
 
 
@@ -23898,6 +23994,8 @@ function renderRemovalConfigEditor() {
           <textarea rows="10" data-reason-index="${index}" data-reason-body="1">${draft ?? blocksToToolboxBody(reason.blocks)}</textarea>
 
         </label>
+
+        ${subreasonDefaultsHtml}
 
 
 
@@ -26469,7 +26567,7 @@ function renderRemovalConfigEditor() {
 
         }
 
-        current.reasons[index].blocks = parseToolboxBodyToBlocks(draft);
+        current.reasons[index].blocks = parseToolboxBodyToBlocks(draft, current.reasons[index].blocks);
 
       });
 
@@ -26482,6 +26580,68 @@ function renderRemovalConfigEditor() {
       delete removalConfigEditorState.toolboxDrafts[index];
 
       renderRemovalConfigEditor();
+
+    });
+
+  });
+
+
+
+  modal.querySelectorAll("[data-subreason-field]").forEach((element) => {
+
+    const applySubreasonChange = (event) => {
+
+      if (!removalConfigEditorState) return;
+
+      const container = event.currentTarget.closest("[data-subreason-option]");
+
+      const reasonIndex = Number.parseInt(container?.getAttribute("data-reason-index") || "", 10);
+
+      const blockIndex = Number.parseInt(container?.getAttribute("data-block-index") || "", 10);
+
+      const optionIndex = Number.parseInt(container?.getAttribute("data-option-index") || "", 10);
+
+      const field = String(event.currentTarget.getAttribute("data-subreason-field") || "");
+
+      const option = removalConfigEditorState.config?.reasons?.[reasonIndex]?.blocks?.[blockIndex]?.payload?.options?.[optionIndex];
+
+      if (!Number.isFinite(reasonIndex) || !Number.isFinite(blockIndex) || !Number.isFinite(optionIndex) || !field || !option) return;
+
+      if (typeof option !== "object") {
+
+        const value = String(option);
+
+        removalConfigEditorState.config.reasons[reasonIndex].blocks[blockIndex].payload.options[optionIndex] = {
+
+          value, label: value, default_note_text: "", default_note_type: "none",
+
+        };
+
+      }
+
+      const normalizedOption = removalConfigEditorState.config.reasons[reasonIndex].blocks[blockIndex].payload.options[optionIndex];
+
+      normalizedOption[field] = field === "default_note_type"
+
+        ? String(event.target.value || "none").trim().toLowerCase() || "none"
+
+        : String(event.target.value || "");
+
+      removalConfigEditorState.reasonsUserEdited = true;
+
+    };
+
+    element.addEventListener("input", applySubreasonChange);
+
+    element.addEventListener("change", (event) => {
+
+      applySubreasonChange(event);
+
+      if (event.currentTarget.getAttribute("data-subreason-field") !== "default_note_text") {
+
+        renderRemovalConfigEditor();
+
+      }
 
     });
 
@@ -34213,6 +34373,104 @@ function applyActionBorderToElement(fullname, actionType) {
 
 
 
+function getRemovalNoteDefaults(reasons, inputs) {
+
+  const subreasonTexts = [];
+
+  const subreasonTypes = [];
+
+  (Array.isArray(reasons) ? reasons : []).forEach((reason) => {
+
+    (Array.isArray(reason?.blocks) ? reason.blocks : []).forEach((block) => {
+
+      if (block?.type !== "select" || !block.key) return;
+
+      const selectedValues = Array.isArray(inputs?.[block.key]) ? inputs[block.key] : [inputs?.[block.key]];
+
+      const selected = new Set(selectedValues.map((value) => String(value || "").trim()).filter(Boolean));
+
+      blockOptions(block).forEach((option) => {
+
+        if (!selected.has(String(option.value || "").trim())) return;
+
+        const text = String(option.default_note_text || "").trim();
+
+        if (text) subreasonTexts.push(text);
+
+        const type = String(option.default_note_type || "none").trim();
+
+        if (type && type !== "none") subreasonTypes.push(type);
+
+      });
+
+    });
+
+  });
+
+  return {
+
+    text: subreasonTexts.join(" + "),
+
+    type: subreasonTypes.length > 0 && subreasonTypes.every((type) => type === subreasonTypes[0]) ? subreasonTypes[0] : "none",
+
+  };
+
+}
+
+
+
+function applyRemovalNoteDefaultsForSelection(overlay) {
+
+  if (!overlay) return;
+
+  const selectedReasons = (overlay.reasons || []).filter((reason) => (overlay.selectedReasonKeys || []).includes(reason.external_key));
+
+  const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlay.inputValues || {});
+
+  const suggestedTexts = selectedReasons.map((reason) => String(reason.suggestedNoteText || "").trim()).filter(Boolean);
+
+  const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
+
+  const previousAutoText = overlay._lastAutoRemovalNoteText || "";
+
+  const currentText = String(overlay.removalNoteText || "").trim();
+
+  if (!currentText || currentText === previousAutoText) {
+
+    overlay.removalNoteText = autoText;
+
+    overlay._lastAutoRemovalNoteText = autoText;
+
+  }
+
+  const suggestedTypes = subreasonDefaults.type !== "none"
+
+    ? [subreasonDefaults.type]
+
+    : selectedReasons.map((reason) => String(reason.suggestedNoteType || "none").trim()).filter((type) => type && type !== "none");
+
+  const autoType = suggestedTypes.length > 0 && suggestedTypes.every((type) => type === suggestedTypes[0])
+
+    ? suggestedTypes[0]
+
+    : "none";
+
+  const previousAutoType = overlay._lastAutoRemovalNoteType || "none";
+
+  const currentType = String(overlay.removalNoteType || "none").trim();
+
+  if (!currentType || currentType === previousAutoType) {
+
+    overlay.removalNoteType = autoType;
+
+    overlay._lastAutoRemovalNoteType = autoType;
+
+  }
+
+}
+
+
+
 function renderOverlay() {
 
   if (!overlayState) {
@@ -35777,9 +36035,11 @@ function renderOverlay() {
 
       // Prefill text
 
+      const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlayState.inputValues || {});
+
       const suggestedTexts = selectedReasons.map(r => (r.suggestedNoteText || "").trim()).filter(Boolean);
 
-      const autoText = suggestedTexts.join(" + ");
+      const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
 
       const prevAutoText = overlayState._lastAutoRemovalNoteText || "";
 
@@ -35795,7 +36055,11 @@ function renderOverlay() {
 
       // Prefill type
 
-      const suggestedTypes = selectedReasons.map(r => (r.suggestedNoteType || "none").trim()).filter(t => t && t !== "none");
+      const suggestedTypes = subreasonDefaults.type !== "none"
+
+        ? [subreasonDefaults.type]
+
+        : selectedReasons.map(r => (r.suggestedNoteType || "none").trim()).filter(t => t && t !== "none");
 
       let autoType = "none";
 
@@ -35855,9 +36119,11 @@ function renderOverlay() {
 
       // Prefill text
 
+      const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlayState.inputValues || {});
+
       const suggestedTexts = selectedReasons.map(r => (r.suggestedNoteText || "").trim()).filter(Boolean);
 
-      const autoText = suggestedTexts.join(" + ");
+      const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
 
       const prevAutoText = overlayState._lastAutoRemovalNoteText || "";
 
@@ -35873,7 +36139,11 @@ function renderOverlay() {
 
       // Prefill type
 
-      const suggestedTypes = selectedReasons.map(r => (r.suggestedNoteType || "none").trim()).filter(t => t && t !== "none");
+      const suggestedTypes = subreasonDefaults.type !== "none"
+
+        ? [subreasonDefaults.type]
+
+        : selectedReasons.map(r => (r.suggestedNoteType || "none").trim()).filter(t => t && t !== "none");
 
       let autoType = "none";
 
@@ -36264,6 +36534,8 @@ function renderOverlay() {
         : event.target.value;
 
       setFieldValue(key, value);
+
+      applyRemovalNoteDefaultsForSelection(overlayState);
 
       schedulePreview();
 

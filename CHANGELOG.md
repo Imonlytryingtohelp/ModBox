@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## UNRELEASED 1.11.0 - Multi-Selection Removal Reasons
 
-- **Added** multi-selection support for removal-reason option lists.
+- **Added** multi-selection support for removal-reason option lists, with per-option default notes.
 - **Improved** Copy Bug Report Info now confirms the action by changing the button text without covering the changelog.
 
 ## 1.10.0 - Note Types Editor + Bug Fixes

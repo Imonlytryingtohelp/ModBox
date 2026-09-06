@@ -77,7 +77,21 @@ function normalizeRemovalBlockPayload(type, payload) {
   }
   if (type === "select") {
     const options = Array.isArray(source.options)
-      ? source.options.map((option) => String(option ?? "")).filter((option) => option.trim())
+      ? source.options.map((option) => {
+        if (typeof option === "string") {
+          const value = option.trim();
+          return value ? { value, label: value, default_note_text: "", default_note_type: "none" } : null;
+        }
+        if (!option || typeof option !== "object") return null;
+        const value = String(option.value ?? option.label ?? "").trim();
+        if (!value) return null;
+        return {
+          value,
+          label: String(option.label ?? value),
+          default_note_text: String(option.default_note_text ?? option.suggestedNoteText ?? ""),
+          default_note_type: String(option.default_note_type ?? option.suggestedNoteType ?? "none").trim().toLowerCase() || "none",
+        };
+      }).filter(Boolean)
       : [];
     return { options, multiple: true };
   }
@@ -744,7 +758,7 @@ async function openRemovalConfigEditor(context) {
 
 // ──── Toolbox Body Parser & Serializer (for removal-config-editor) ────
 
-function parseToolboxBodyToBlocks(text) {
+function parseToolboxBodyToBlocks(text, existingBlocks = []) {
   const pattern = /(<select\b[^>]*>[\s\S]*?<\/select>|<textarea\b[^>]*>[\s\S]*?<\/textarea>|<input\b[^>]*\/?>)/gi;
   const blocks = [];
   let position = 10;
@@ -808,7 +822,19 @@ function parseToolboxBodyToBlocks(text) {
         required: false,
         remember_last_value: false,
         position,
-        payload: { options, multiple: true },
+        payload: {
+          options: options.map((option) => {
+            const previousBlock = Array.isArray(existingBlocks) ? existingBlocks.find((block) => block?.type === "select" && block?.key === key) : null;
+            const previousOption = previousBlock?.payload?.options?.find((candidate) => {
+              const value = typeof candidate === "object" ? candidate.value ?? candidate.label : candidate;
+              return String(value || "") === option;
+            });
+            return typeof previousOption === "object"
+              ? { ...previousOption, value: option, label: String(previousOption.label || option) }
+              : { value: option, label: option, default_note_text: "", default_note_type: "none" };
+          }),
+          multiple: true,
+        },
         help_text: null,
       });
       position += 10;
@@ -864,7 +890,10 @@ function blocksToToolboxBody(blocks) {
     const key = String(block?.key || `${block.type}_${index + 1}`).trim();
     if (block.type === "select") {
       const options = Array.isArray(block?.payload?.options)
-        ? block.payload.options.map((option) => `<option>${escapeHtml(String(option || ""))}</option>`).join("\n")
+        ? block.payload.options.map((option) => {
+          const label = typeof option === "object" ? option.label ?? option.value : option;
+          return `<option>${escapeHtml(String(label || ""))}</option>`;
+        }).join("\n")
         : "";
       return `<select id="${escapeHtml(key)}" multiple>\n${options}\n</select>`;
     }

@@ -518,6 +518,8 @@ function blockOptions(block) {
       return {
         label: String(opt.label ?? opt.value ?? "option"),
         value: String(opt.value ?? opt.label ?? "option"),
+        default_note_text: String(opt.default_note_text ?? opt.suggestedNoteText ?? ""),
+        default_note_type: String(opt.default_note_type ?? opt.suggestedNoteType ?? "none").trim().toLowerCase() || "none",
       };
     }
     return { label: "option", value: "option" };
