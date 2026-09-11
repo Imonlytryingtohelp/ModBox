@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## UNRELEASED 1.11.0 - Multi-Selection Removal Reasons
+## 1.11.0 - Multi-Selection Removal Reasons
 
 - **Added** multi-selection support for removal-reason option lists, with per-option default notes.
 - **Added** usernote templates can now be configured for each sub-reason in a removal-reason. 
