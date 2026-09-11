@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.11.1 - Bot Commands
+
+- **Added** Bot actions in the ModBox overlay, letting moderators copy configured commands for the current post or comment.
+- **Added** Bot action templates support variables like author, post title, post ID, permalink, subreddit, and item kind, with optional bot username targeting.
+
 ## 1.11.0 - Multi-Selection Removal Reasons
 
 - **Added** multi-selection support for removal-reason option lists, with per-option default notes.
