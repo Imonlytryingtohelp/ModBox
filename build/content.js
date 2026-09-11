@@ -101,6 +101,10 @@ const QUICK_ACTIONS_WIKI_PAGE = "modbox/quickactions";
 
 const QUICK_ACTIONS_WIKI_SCHEMA = "ModBox/quick-actions/v1";
 
+const BOT_ACTIONS_WIKI_PAGE = "modbox/botactions";
+
+const BOT_ACTIONS_WIKI_SCHEMA = "ModBox/bot-actions/v1";
+
 const PLAYBOOKS_WIKI_PAGE = "modbox/playbooks";
 
 const PLAYBOOKS_WIKI_SCHEMA = "ModBox/playbooks/v1";
@@ -4217,6 +4221,16 @@ async function resolveTargetViaReddit(target) {
 
 
 
+  const id = String(data.id || "").trim();
+
+  const parentPostId = String(data.link_id || "").replace(/^t3_/, "").trim();
+
+  const postId = thingType === "submission" ? id : parentPostId || id;
+
+  const commentId = thingType === "comment" ? id : "";
+
+
+
   return {
 
     fullname,
@@ -4226,6 +4240,12 @@ async function resolveTargetViaReddit(target) {
     subreddit,
 
     author: data.author || null,
+
+    id,
+
+    post_id: postId,
+
+    comment_id: commentId,
 
     title: thingType === "submission" ? String(data.title || "") : null,
 
@@ -5837,11 +5857,111 @@ function interpolateQuickActionTemplate(template, context) {
 
 
 
+function normalizeBotAction(action, index) {
+
+  const name = String(action?.name || action?.title || `Bot action ${index + 1}`).trim() || `Bot action ${index + 1}`;
+
+  const content = String(action?.content || action?.body || action?.text || action?.message || "").trim();
+
+  const bot = String(action?.bot || action?.bot_username || action?.username || "").trim();
+
+  return {
+
+    key: String(action?.key || action?.id || "").trim() || slugifyReasonKey(name, `bot-action-${index + 1}`),
+
+    name,
+
+    bot: bot ? bot.replace(/^u\//i, "") : "",
+
+    content,
+
+    position: Number.isFinite(Number(action?.position)) ? Number(action.position) : (index + 1) * 10,
+
+  };
+
+}
+
+
+
+function normalizeBotActionsDoc(doc, subreddit) {
+
+  const fallback = buildDefaultBotActionsConfig(subreddit);
+
+  if (!doc || typeof doc !== "object") {
+
+    return fallback;
+
+  }
+
+  const actions = Array.isArray(doc.actions) ? doc.actions : [];
+
+  return {
+
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+
+    version: Number.isFinite(Number(doc.version)) ? Number(doc.version) : 1,
+
+    subreddit: normalizeSubreddit(subreddit || doc.subreddit || ""),
+
+    actions: actions
+
+      .map((a, i) => normalizeBotAction(a, i))
+
+      .sort((a, b) => (a.position || 0) - (b.position || 0)),
+
+  };
+
+}
+
+
+
+function interpolateBotActionTemplate(template, context) {
+
+  const text = String(template || "");
+
+  return text
+
+    .replace(/\{author\}/gi, String(context?.author || "[deleted]"))
+
+    .replace(/\{subreddit\}/gi, String(context?.subreddit || "unknown"))
+
+    .replace(/\{kind\}/gi, String(context?.kind || "item"))
+
+    .replace(/\{post_title\}/gi, String(context?.post_title || ""))
+
+    .replace(/\{post_id\}/gi, String(context?.post_id || ""))
+
+    .replace(/\{comment_id\}/gi, String(context?.comment_id || ""))
+
+    .replace(/\{permalink\}/gi, String(context?.permalink || ""));
+
+}
+
+
+
 function buildDefaultQuickActionsConfig(subreddit) {
 
   return {
 
     schema: QUICK_ACTIONS_WIKI_SCHEMA,
+
+    version: 1,
+
+    subreddit: normalizeSubreddit(subreddit),
+
+    actions: [],
+
+  };
+
+}
+
+
+
+function buildDefaultBotActionsConfig(subreddit) {
+
+  return {
+
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
 
     version: 1,
 
@@ -5904,6 +6024,64 @@ function clearInMemoryQuickActions(subreddit) {
   }
 
   inMemoryQuickActionsCache.delete(key);
+
+}
+
+
+
+let inMemoryBotActionsCache = null;
+
+
+
+function getInMemoryBotActions(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryBotActionsCache) {
+
+    return null;
+
+  }
+
+  return inMemoryBotActionsCache.get(key) || null;
+
+}
+
+
+
+function setInMemoryBotActions(subreddit, config) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key) {
+
+    return;
+
+  }
+
+  if (!inMemoryBotActionsCache) {
+
+    inMemoryBotActionsCache = new Map();
+
+  }
+
+  inMemoryBotActionsCache.set(key, normalizeBotActionsDoc(config, subreddit));
+
+}
+
+
+
+function clearInMemoryBotActions(subreddit) {
+
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+
+  if (!key || !inMemoryBotActionsCache) {
+
+    return;
+
+  }
+
+  inMemoryBotActionsCache.delete(key);
 
 }
 
@@ -6010,6 +6188,114 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
   await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
 
   setInMemoryQuickActions(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+async function loadBotActionsFromWiki(subreddit) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    throw new Error("Subreddit is required to load bot actions");
+
+  }
+
+  const cached = getInMemoryBotActions(cleanSubreddit);
+
+  if (cached) {
+
+    return cached;
+
+  }
+
+  let wikiPayload;
+
+  const wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${BOT_ACTIONS_WIKI_PAGE}.json?raw_json=1`;
+
+  try {
+
+    wikiPayload = await withRetry(
+
+      () => requestJsonViaBackground(wikiPath, { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS }),
+
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+
+    );
+
+  } catch (error) {
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+
+      return buildDefaultBotActionsConfig(cleanSubreddit);
+
+    }
+
+    throw error;
+
+  }
+
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+
+  if (!raw) {
+
+    return buildDefaultBotActionsConfig(cleanSubreddit);
+
+  }
+
+  let doc;
+
+  try {
+
+    doc = JSON.parse(raw);
+
+  } catch (e) {
+
+    throw new Error("Bot actions wiki page is not valid JSON");
+
+  }
+
+  const normalized = normalizeBotActionsDoc(doc, cleanSubreddit);
+
+  setInMemoryBotActions(cleanSubreddit, normalized);
+
+  return normalized;
+
+}
+
+
+
+async function saveBotActionsToWiki(subreddit, config, reason) {
+
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+
+  if (!cleanSubreddit) {
+
+    throw new Error("Subreddit is required to save bot actions");
+
+  }
+
+  const normalized = normalizeBotActionsDoc(config, cleanSubreddit);
+
+  const payload = JSON.stringify(normalized, null, 2);
+
+  const params = new URLSearchParams();
+
+  params.set("content", payload);
+
+  params.set("page", BOT_ACTIONS_WIKI_PAGE);
+
+  params.set("reason", String(reason || "updated bot actions via ModBox"));
+
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+
+  setInMemoryBotActions(cleanSubreddit, normalized);
 
   return normalized;
 
@@ -22339,6 +22625,24 @@ function normalizeQuickAction(action, index) {
 
 
 
+function buildDefaultBotActionsConfig(subreddit) {
+
+  return {
+
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+
+    version: 1,
+
+    subreddit: normalizeSubreddit(subreddit),
+
+    actions: [],
+
+  };
+
+}
+
+
+
 function buildDefaultPlaybooksConfig(subreddit) {
 
   return {
@@ -22945,6 +23249,18 @@ async function openRemovalConfigEditor(context) {
 
     quickActionsImporting: false,
 
+    botActionsConfig: buildDefaultBotActionsConfig(context.subreddit),
+
+    botActionsLoading: true,
+
+    botActionsSaving: false,
+
+    botActionsError: "",
+
+    botActionsStatus: "",
+
+    botActionsSaveNote: "",
+
     playbooksConfig: buildDefaultPlaybooksConfig(context.subreddit),
 
     playbooksLoading: true,
@@ -23048,6 +23364,38 @@ async function openRemovalConfigEditor(context) {
       if (!removalConfigEditorState) return;
 
       removalConfigEditorState.quickActionsLoading = false;
+
+      renderRemovalConfigEditor();
+
+    });
+
+
+
+  // Load bot actions in background
+
+  void loadBotActionsFromWiki(removalConfigEditorState.subreddit)
+
+    .then((config) => {
+
+      if (!removalConfigEditorState) return;
+
+      removalConfigEditorState.botActionsConfig = config;
+
+    })
+
+    .catch((error) => {
+
+      if (!removalConfigEditorState) return;
+
+      removalConfigEditorState.botActionsError = error instanceof Error ? error.message : String(error);
+
+    })
+
+    .finally(() => {
+
+      if (!removalConfigEditorState) return;
+
+      removalConfigEditorState.botActionsLoading = false;
 
       renderRemovalConfigEditor();
 
@@ -23741,7 +24089,7 @@ function renderRemovalConfigEditor() {
 
   const modboxLogoUrl = chrome.runtime.getURL("assets/modbox-logo.svg");
 
-  const activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(state.activeTab)
+  const activeTab = ["extension_settings", "quick_actions", "bot_actions", "playbooks", "note_types"].includes(state.activeTab)
 
     ? state.activeTab
 
@@ -24055,6 +24403,8 @@ function renderRemovalConfigEditor() {
 
       <button type="button" class="rrw-removal-config-tab ${activeTab === "quick_actions" ? "is-active" : ""}" data-config-tab="quick_actions" role="tab" aria-selected="${activeTab === "quick_actions" ? "true" : "false"}">Quick Actions</button>
 
+      <button type="button" class="rrw-removal-config-tab ${activeTab === "bot_actions" ? "is-active" : ""}" data-config-tab="bot_actions" role="tab" aria-selected="${activeTab === "bot_actions" ? "true" : "false"}">Bot actions</button>
+
       <button type="button" class="rrw-removal-config-tab ${activeTab === "playbooks" ? "is-active" : ""}" data-config-tab="playbooks" role="tab" aria-selected="${activeTab === "playbooks" ? "true" : "false"}">Playbooks</button>
 
       <button type="button" class="rrw-removal-config-tab ${activeTab === "note_types" ? "is-active" : ""}" data-config-tab="note_types" role="tab" aria-selected="${activeTab === "note_types" ? "true" : "false"}">Note Types</button>
@@ -24354,6 +24704,92 @@ function renderRemovalConfigEditor() {
               `).join("")
 
             }
+
+          </div>
+
+        </section>
+
+      ` : activeTab === "bot_actions" ? `
+
+        ${state.botActionsError ? `<div class="rrw-error">${escapeHtml(state.botActionsError)}</div>` : ""}
+
+        ${state.botActionsStatus ? `<div class="rrw-success">${escapeHtml(state.botActionsStatus)}</div>` : ""}
+
+        ${state.botActionsLoading ? `<p class="rrw-muted">Loading bot actions from wiki...</p>` : ""}
+
+
+
+        <section class="rrw-config-section rrw-config-section--playbooks">
+
+          <div class="rrw-config-toolbar rrw-config-toolbar--sticky">
+
+            <div>
+
+              <h3>Bot actions</h3>
+
+              <p class="rrw-muted">${(state.botActionsConfig?.actions || []).length} configured &middot; wiki/${BOT_ACTIONS_WIKI_PAGE}</p>
+
+            </div>
+
+            <div class="rrw-actions rrw-ext-wiki-actions">
+
+              <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-bot-add-action" ${state.botActionsLoading ? "disabled" : ""}>Add action</button>
+
+            </div>
+
+          </div>
+
+          <div class="rrw-config-reason-list" id="rrw-bot-action-list">
+
+            ${(state.botActionsConfig?.actions || []).length === 0
+
+              ? '<div class="rrw-preview-panel"><p class="rrw-muted">No bot actions configured yet.</p></div>'
+
+              : (state.botActionsConfig?.actions || []).map((action, index) => `
+
+                <article class="rrw-config-reason-card" data-bot-index="${index}">
+
+                  <div class="rrw-config-reason-head">
+
+                    <div class="rrw-field">
+
+                      <span>Button label</span>
+
+                      <div class="rrw-config-reason-title-row">
+
+                        <input type="text" data-bot-index="${index}" data-bot-field="name" value="${escapeHtml(action.name || "")}" placeholder="Button label" />
+
+                        <button type="button" class="rrw-btn rrw-btn-secondary" data-bot-move="up" data-bot-index="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+
+                        <button type="button" class="rrw-btn rrw-btn-secondary" data-bot-move="down" data-bot-index="${index}" ${index === (state.botActionsConfig?.actions || []).length - 1 ? "disabled" : ""}>Down</button>
+
+                        <button type="button" class="rrw-btn rrw-btn-danger" data-bot-delete="${index}">Delete</button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <label class="rrw-field">
+
+                    <span>Bot username (optional, e.g. u/modbox)</span>
+
+                    <input type="text" data-bot-index="${index}" data-bot-field="bot" value="${escapeHtml(action.bot || "")}" placeholder="u/modbox" />
+
+                  </label>
+
+                  <label class="rrw-field">
+
+                    <span>Clipboard contents (supports {author}, {post_title}, {post_id}, {permalink}, {subreddit}, {kind})</span>
+
+                    <textarea rows="6" data-bot-index="${index}" data-bot-field="content" placeholder="Write content to copy">${escapeHtml(action.content || "")}</textarea>
+
+                  </label>
+
+                </article>
+
+              `).join("")}
 
           </div>
 
@@ -25725,7 +26161,7 @@ function renderRemovalConfigEditor() {
 
     <footer class="rrw-removal-config-footer">
 
-      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "playbooks" || activeTab === "note_types" ? `
+      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "bot_actions" || activeTab === "playbooks" || activeTab === "note_types" ? `
 
         <label class="rrw-field rrw-removal-config-note">
 
@@ -25737,7 +26173,7 @@ function renderRemovalConfigEditor() {
 
             id="rrw-config-save-note"
 
-            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : activeTab === "note_types" ? (state.noteTypesSaveNote || "") : (state.saveNote || ""))}"
+            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "bot_actions" ? (state.botActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : activeTab === "note_types" ? (state.noteTypesSaveNote || "") : (state.saveNote || ""))}"
 
             placeholder="Optional revision note"
 
@@ -25759,15 +26195,15 @@ function renderRemovalConfigEditor() {
 
           id="rrw-config-save"
 
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving) ? "disabled" : ""}
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "bot_actions" ? state.botActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving) ? "disabled" : ""}
 
         >
 
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving)
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "bot_actions" ? state.botActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving)
 
             ? "Saving..."
 
-            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "playbooks" ? "Save playbooks" : activeTab === "note_types" ? "Save note types" : "Save settings")}
+            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "bot_actions" ? "Save bot actions" : activeTab === "playbooks" ? "Save playbooks" : activeTab === "note_types" ? "Save note types" : "Save settings")}
 
         </button>
 
@@ -25887,7 +26323,7 @@ function renderRemovalConfigEditor() {
 
       const nextTab = String(event.currentTarget.getAttribute("data-config-tab") || "");
 
-      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(nextTab) ? nextTab : "reasons";
+      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "bot_actions", "playbooks", "note_types"].includes(nextTab) ? nextTab : "reasons";
 
       removalConfigEditorState.error = "";
 
@@ -26034,6 +26470,10 @@ function renderRemovalConfigEditor() {
       if (removalConfigEditorState.activeTab === "quick_actions") {
 
         removalConfigEditorState.quickActionsSaveNote = String(event.target.value || "");
+
+      } else if (removalConfigEditorState.activeTab === "bot_actions") {
+
+        removalConfigEditorState.botActionsSaveNote = String(event.target.value || "");
 
       } else if (removalConfigEditorState.activeTab === "playbooks") {
 
@@ -26651,6 +27091,32 @@ function renderRemovalConfigEditor() {
 
   // Quick Actions event handlers
 
+  modal.querySelector("#rrw-bot-add-action")?.addEventListener("click", () => {
+
+    if (!removalConfigEditorState) {
+
+      return;
+
+    }
+
+    const actions = removalConfigEditorState.botActionsConfig?.actions;
+
+    if (!Array.isArray(actions)) {
+
+      return;
+
+    }
+
+    const newIndex = actions.length;
+
+    actions.push(normalizeBotAction({}, newIndex));
+
+    renderRemovalConfigEditor();
+
+  });
+
+
+
   modal.querySelector("#rrw-qa-add-action")?.addEventListener("click", () => {
 
     if (!removalConfigEditorState) {
@@ -26797,6 +27263,104 @@ function renderRemovalConfigEditor() {
 
 
 
+  modal.querySelectorAll("[data-bot-field]").forEach((element) => {
+
+    element.addEventListener("input", (event) => {
+
+      if (!removalConfigEditorState) {
+
+        return;
+
+      }
+
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-index") || ""), 10);
+
+      const field = String(event.currentTarget.getAttribute("data-bot-field") || "");
+
+      if (!Number.isFinite(index) || !field || !removalConfigEditorState.botActionsConfig) {
+
+        return;
+
+      }
+
+      const action = removalConfigEditorState.botActionsConfig.actions[index];
+
+      if (!action) {
+
+        return;
+
+      }
+
+      action[field] = String(event.target.value || "");
+
+    });
+
+  });
+
+
+
+  modal.querySelectorAll("[data-bot-delete]").forEach((button) => {
+
+    button.addEventListener("click", (event) => {
+
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-delete") || ""), 10);
+
+      if (!Number.isFinite(index) || !removalConfigEditorState?.botActionsConfig) {
+
+        return;
+
+      }
+
+      removalConfigEditorState.botActionsConfig.actions = removalConfigEditorState.botActionsConfig.actions
+
+        .filter((_, i) => i !== index)
+
+        .map((a, i) => ({ ...a, position: (i + 1) * 10 }));
+
+      renderRemovalConfigEditor();
+
+    });
+
+  });
+
+
+
+  modal.querySelectorAll("[data-bot-move]").forEach((button) => {
+
+    button.addEventListener("click", (event) => {
+
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-index") || ""), 10);
+
+      const direction = String(event.currentTarget.getAttribute("data-bot-move") || "");
+
+      if (!Number.isFinite(index) || !removalConfigEditorState?.botActionsConfig) {
+
+        return;
+
+      }
+
+      const actions = removalConfigEditorState.botActionsConfig.actions;
+
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+
+      if (swapIndex < 0 || swapIndex >= actions.length) {
+
+        return;
+
+      }
+
+      [actions[index], actions[swapIndex]] = [actions[swapIndex], actions[index]];
+
+      actions.forEach((a, i) => { a.position = (i + 1) * 10; });
+
+      renderRemovalConfigEditor();
+
+    });
+
+  });
+
+
+
   modal.querySelectorAll("[data-qa-field]").forEach((element) => {
 
     const applyQaChange = (event) => {
@@ -26843,7 +27407,9 @@ function renderRemovalConfigEditor() {
 
       applyQaChange(event);
 
-      if (field === "key_override" || element.tagName === "SELECT" || element.type === "checkbox") {
+      const fieldName = String(event.currentTarget.getAttribute("data-qa-field") || "");
+
+      if (fieldName === "key_override" || element.tagName === "SELECT" || element.type === "checkbox") {
 
         renderRemovalConfigEditor();
 
@@ -27872,6 +28438,72 @@ function renderRemovalConfigEditor() {
         if (removalConfigEditorState) {
 
           removalConfigEditorState.quickActionsSaving = false;
+
+          renderRemovalConfigEditor();
+
+        }
+
+      }
+
+      return;
+
+    }
+
+
+
+    if (removalConfigEditorState.activeTab === "bot_actions") {
+
+      try {
+
+        removalConfigEditorState.botActionsSaving = true;
+
+        removalConfigEditorState.botActionsError = "";
+
+        removalConfigEditorState.botActionsStatus = "";
+
+        renderRemovalConfigEditor();
+
+        const normalized = normalizeBotActionsDoc(
+
+          removalConfigEditorState.botActionsConfig,
+
+          removalConfigEditorState.subreddit,
+
+        );
+
+        const saved = await saveBotActionsToWiki(
+
+          removalConfigEditorState.subreddit,
+
+          normalized,
+
+          String(removalConfigEditorState.botActionsSaveNote || "").trim(),
+
+        );
+
+        if (removalConfigEditorState) {
+
+          removalConfigEditorState.botActionsConfig = saved;
+
+          removalConfigEditorState.botActionsSaveNote = "";
+
+          removalConfigEditorState.botActionsStatus = "Bot actions saved to wiki.";
+
+        }
+
+      } catch (error) {
+
+        if (removalConfigEditorState) {
+
+          removalConfigEditorState.botActionsError = error instanceof Error ? error.message : String(error);
+
+        }
+
+      } finally {
+
+        if (removalConfigEditorState) {
+
+          removalConfigEditorState.botActionsSaving = false;
 
           renderRemovalConfigEditor();
 
@@ -34613,6 +35245,14 @@ function renderOverlay() {
 
     quickActionsStatus,
 
+    botActionsConfig,
+
+    botActionsLoading,
+
+    botActionsError,
+
+    botActionsStatus,
+
     playbooksConfig,
 
     playbooksLoading,
@@ -34927,9 +35567,9 @@ function renderOverlay() {
 
   const overlayTab = quickActionsOnlyMode
 
-    ? (["quick_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
+    ? (["quick_actions", "bot_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
 
-    : (["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
+    : (["kind_actions", "quick_actions", "bot_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
 
   const canRunUserActions = canAct && Boolean(resolved?.author);
 
@@ -35006,6 +35646,18 @@ function renderOverlay() {
     return appliesTo === "comments";
 
   });
+
+
+
+  const botActions = normalizeBotActionsDoc(
+
+    botActionsConfig || getInMemoryBotActions(resolvedSubreddit) || buildDefaultBotActionsConfig(resolvedSubreddit),
+
+    resolvedSubreddit,
+
+  ).actions;
+
+  const visibleBotActions = botActions.filter((action) => true);
 
 
 
@@ -35148,6 +35800,16 @@ function renderOverlay() {
               data-overlay-tab="user_actions"
 
             >User Actions</button>` : ""}
+
+            <button
+
+              type="button"
+
+              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
+
+              data-overlay-tab="bot_actions"
+
+            >Bot actions</button>
 
           </div>
 
@@ -35346,6 +36008,80 @@ function renderOverlay() {
                         ${submitting || !canAct ? "disabled" : ""}
 
                       >${escapeHtml(action.title)}${action.lock_post && thingType === "submission" ? ' [locks post]' : ""}</button>
+
+                    `;
+
+                  }).join("")}
+
+              </div>
+
+            </section>
+
+
+
+            <div class="rrw-footer-links rrw-footer-links--solo">
+
+            </div>
+
+          ` : ""}
+
+
+
+          ${overlayTab === "bot_actions" ? `
+
+            <section class="rrw-user-actions-panel">
+
+              <h3>Bot actions</h3>
+
+              <p class="rrw-muted">Copy configured commands for the active item.</p>
+
+              ${botActionsLoading ? `<p class="rrw-muted">Loading bot actions...</p>` : ""}
+
+              ${botActionsError ? `<div class="rrw-error">${escapeHtml(botActionsError)}</div>` : ""}
+
+              ${botActionsStatus ? `<div class="rrw-success">${escapeHtml(botActionsStatus)}</div>` : ""}
+
+              <div class="rrw-actions rrw-actions--inline rrw-quick-actions-grid">
+
+                ${visibleBotActions.length === 0
+
+                  ? `<p class="rrw-muted">No bot actions available for this target.</p>`
+
+                  : visibleBotActions.map((action) => {
+
+                    const rendered = interpolateBotActionTemplate(action.content, {
+
+                      author: resolved?.author,
+
+                      subreddit: resolved?.subreddit,
+
+                      kind: thingType === "submission" ? "post" : "comment",
+
+                      post_title: resolved?.title || "",
+
+                      post_id: String(resolved?.post_id || resolved?.id || "").trim(),
+
+                      comment_id: String(resolved?.comment_id || resolved?.id || "").trim(),
+
+                      permalink: resolved?.permalink || "",
+
+                    });
+
+                    return `
+
+                      <button
+
+                        type="button"
+
+                        class="rrw-btn rrw-btn-secondary rrw-quick-action-btn"
+
+                        data-bot-action-key="${escapeHtml(action.key)}"
+
+                        title="${escapeHtml(rendered.slice(0, 240))}"
+
+                        ${submitting || !canAct ? "disabled" : ""}
+
+                      >${escapeHtml(action.name || action.key || "Bot action")}</button>
 
                     `;
 
@@ -35813,7 +36549,7 @@ function renderOverlay() {
 
       const tab = event.currentTarget.getAttribute("data-overlay-tab");
 
-      if (!["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(String(tab || ""))) {
+      if (!["kind_actions", "quick_actions", "bot_actions", "playbooks", "user_actions"].includes(String(tab || ""))) {
 
         return;
 
@@ -36224,6 +36960,114 @@ function renderOverlay() {
     });
 
   }
+
+
+
+  root.querySelectorAll("[data-bot-action-key]").forEach((buttonEl) => {
+
+    buttonEl.addEventListener("click", async (event) => {
+
+      const overlay = overlayState;
+
+      if (!overlay) {
+
+        return;
+
+      }
+
+      const actionKey = String(event.currentTarget.getAttribute("data-bot-action-key") || "").trim();
+
+      if (!actionKey) {
+
+        return;
+
+      }
+
+      const subreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+
+      const allActions = normalizeBotActionsDoc(
+
+        overlay.botActionsConfig || getInMemoryBotActions(subreddit) || buildDefaultBotActionsConfig(subreddit),
+
+        subreddit,
+
+      ).actions;
+
+      const action = allActions.find((item) => String(item?.key || "").trim() === actionKey);
+
+      if (!action) {
+
+        showToast("Bot action not found", "error");
+
+        return;
+
+      }
+
+      const rendered = interpolateBotActionTemplate(action.content, {
+
+        author: overlay?.resolved?.author,
+
+        subreddit: overlay?.resolved?.subreddit,
+
+        kind: overlay?.resolved?.thingType === "submission" ? "post" : "comment",
+
+        post_title: overlay?.resolved?.title || "",
+
+        post_id: String(overlay?.resolved?.post_id || overlay?.resolved?.id || "").trim(),
+
+        comment_id: String(overlay?.resolved?.comment_id || overlay?.resolved?.id || "").trim(),
+
+        permalink: overlay?.resolved?.permalink || "",
+
+      });
+
+      const targetUsername = String(action?.bot || "").trim();
+
+      const normalizedUsername = targetUsername.replace(/^u\//i, "");
+
+      const copyMessage = targetUsername
+
+        ? `Copied to clipboard! Send it to u/${normalizedUsername}`
+
+        : "Copied bot action to clipboard";
+
+      try {
+
+        await navigator.clipboard.writeText(rendered);
+
+        showToast(copyMessage, "success");
+
+      } catch (error) {
+
+        const fallback = document.createElement("textarea");
+
+        fallback.value = rendered;
+
+        document.body.appendChild(fallback);
+
+        fallback.select();
+
+        try {
+
+          document.execCommand("copy");
+
+          showToast(copyMessage, "success");
+
+        } catch {
+
+          showToast("Unable to copy bot action", "error");
+
+        } finally {
+
+          fallback.remove();
+
+        }
+
+      }
+
+    });
+
+  });
 
 
 
@@ -36685,7 +37529,7 @@ function renderOverlay() {
 
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 
-      z-index: 10000;
+      z-index: 2147483647;
 
       animation: rrw-toast-slide-in 0.3s ease-out;
 
@@ -39153,6 +39997,14 @@ async function openOverlay(target, options = {}) {
 
     quickActionsStatus: "",
 
+    botActionsConfig: buildDefaultBotActionsConfig(""),
+
+    botActionsLoading: false,
+
+    botActionsError: "",
+
+    botActionsStatus: "",
+
     playbooksConfig: buildDefaultPlaybooksConfig(""),
 
     playbooksLoading: false,
@@ -39275,6 +40127,8 @@ async function openOverlay(target, options = {}) {
 
       const formattedUrl = formatRedditUrl(subreddit, postId) || formatRedditByIdUrl(cleanTarget);
 
+      const fallbackId = String(cleanTarget || "").split("_").slice(1).join("_").trim();
+
       overlayState.resolved = {
 
         fullname: cleanTarget.toLowerCase(),
@@ -39284,6 +40138,12 @@ async function openOverlay(target, options = {}) {
         subreddit: subreddit || "unknown",
 
         author: null,
+
+        id: fallbackId,
+
+        post_id: cleanTarget.toLowerCase().startsWith("t3_") ? fallbackId : "",
+
+        comment_id: cleanTarget.toLowerCase().startsWith("t1_") ? fallbackId : "",
 
         title: null,
 
@@ -39375,13 +40235,15 @@ async function openOverlay(target, options = {}) {
 
     let quickActionsPromise = Promise.resolve(null);
 
+    let botActionsPromise = Promise.resolve(null);
+
     let playbooksPromise = Promise.resolve(null);
 
     let cannedRepliesPromise = Promise.resolve(null);
 
     if (resolvedSubreddit) {
 
-      console.log("[ModBox] openOverlay: Starting quick actions and playbooks load for subreddit:", resolvedSubreddit);
+      console.log("[ModBox] openOverlay: Starting quick actions and bot actions load for subreddit:", resolvedSubreddit);
 
       overlayState.quickActionsLoading = true;
 
@@ -39420,6 +40282,44 @@ async function openOverlay(target, options = {}) {
           if (overlayState !== overlayRef) return;
 
           overlayRef.quickActionsLoading = false;
+
+          renderOverlay();
+
+        });
+
+
+
+      overlayState.botActionsLoading = true;
+
+      overlayState.botActionsError = "";
+
+      console.log("[ModBox] openOverlay: Calling loadBotActionsFromWiki");
+
+      botActionsPromise = loadBotActionsFromWiki(resolvedSubreddit)
+
+        .then((botConfig) => {
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.botActionsConfig = normalizeBotActionsDoc(botConfig, resolvedSubreddit);
+
+        })
+
+        .catch((botError) => {
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.botActionsError = botError instanceof Error ? botError.message : String(botError);
+
+          overlayRef.botActionsConfig = buildDefaultBotActionsConfig(resolvedSubreddit);
+
+        })
+
+        .finally(() => {
+
+          if (overlayState !== overlayRef) return;
+
+          overlayRef.botActionsLoading = false;
 
           renderOverlay();
 

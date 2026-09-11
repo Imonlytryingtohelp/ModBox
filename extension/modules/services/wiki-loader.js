@@ -442,9 +442,59 @@ function interpolateQuickActionTemplate(template, context) {
     .replace(/\{kind\}/gi, String(context?.kind || "item"));
 }
 
+function normalizeBotAction(action, index) {
+  const name = String(action?.name || action?.title || `Bot action ${index + 1}`).trim() || `Bot action ${index + 1}`;
+  const content = String(action?.content || action?.body || action?.text || action?.message || "").trim();
+  const bot = String(action?.bot || action?.bot_username || action?.username || "").trim();
+  return {
+    key: String(action?.key || action?.id || "").trim() || slugifyReasonKey(name, `bot-action-${index + 1}`),
+    name,
+    bot: bot ? bot.replace(/^u\//i, "") : "",
+    content,
+    position: Number.isFinite(Number(action?.position)) ? Number(action.position) : (index + 1) * 10,
+  };
+}
+
+function normalizeBotActionsDoc(doc, subreddit) {
+  const fallback = buildDefaultBotActionsConfig(subreddit);
+  if (!doc || typeof doc !== "object") {
+    return fallback;
+  }
+  const actions = Array.isArray(doc.actions) ? doc.actions : [];
+  return {
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+    version: Number.isFinite(Number(doc.version)) ? Number(doc.version) : 1,
+    subreddit: normalizeSubreddit(subreddit || doc.subreddit || ""),
+    actions: actions
+      .map((a, i) => normalizeBotAction(a, i))
+      .sort((a, b) => (a.position || 0) - (b.position || 0)),
+  };
+}
+
+function interpolateBotActionTemplate(template, context) {
+  const text = String(template || "");
+  return text
+    .replace(/\{author\}/gi, String(context?.author || "[deleted]"))
+    .replace(/\{subreddit\}/gi, String(context?.subreddit || "unknown"))
+    .replace(/\{kind\}/gi, String(context?.kind || "item"))
+    .replace(/\{post_title\}/gi, String(context?.post_title || ""))
+    .replace(/\{post_id\}/gi, String(context?.post_id || ""))
+    .replace(/\{comment_id\}/gi, String(context?.comment_id || ""))
+    .replace(/\{permalink\}/gi, String(context?.permalink || ""));
+}
+
 function buildDefaultQuickActionsConfig(subreddit) {
   return {
     schema: QUICK_ACTIONS_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    actions: [],
+  };
+}
+
+function buildDefaultBotActionsConfig(subreddit) {
+  return {
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
     version: 1,
     subreddit: normalizeSubreddit(subreddit),
     actions: [],
@@ -476,6 +526,35 @@ function clearInMemoryQuickActions(subreddit) {
     return;
   }
   inMemoryQuickActionsCache.delete(key);
+}
+
+let inMemoryBotActionsCache = null;
+
+function getInMemoryBotActions(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryBotActionsCache) {
+    return null;
+  }
+  return inMemoryBotActionsCache.get(key) || null;
+}
+
+function setInMemoryBotActions(subreddit, config) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key) {
+    return;
+  }
+  if (!inMemoryBotActionsCache) {
+    inMemoryBotActionsCache = new Map();
+  }
+  inMemoryBotActionsCache.set(key, normalizeBotActionsDoc(config, subreddit));
+}
+
+function clearInMemoryBotActions(subreddit) {
+  const key = normalizeSubreddit(subreddit).toLowerCase();
+  if (!key || !inMemoryBotActionsCache) {
+    return;
+  }
+  inMemoryBotActionsCache.delete(key);
 }
 
 async function loadQuickActionsFromWiki(subreddit) {
@@ -529,6 +608,60 @@ async function saveQuickActionsToWiki(subreddit, config, reason) {
   params.set("reason", String(reason || "updated quick actions via ModBox"));
   await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
   setInMemoryQuickActions(cleanSubreddit, normalized);
+  return normalized;
+}
+
+async function loadBotActionsFromWiki(subreddit) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to load bot actions");
+  }
+  const cached = getInMemoryBotActions(cleanSubreddit);
+  if (cached) {
+    return cached;
+  }
+  let wikiPayload;
+  const wikiPath = `/r/${encodeURIComponent(cleanSubreddit)}/wiki/${BOT_ACTIONS_WIKI_PAGE}.json?raw_json=1`;
+  try {
+    wikiPayload = await withRetry(
+      () => requestJsonViaBackground(wikiPath, { oauth: true, timeoutMs: BACKGROUND_REQUEST_WIKI_TIMEOUT_MS }),
+      { maxRetries: BACKGROUND_REQUEST_MAX_RETRIES, baseDelayMs: BACKGROUND_REQUEST_RETRY_DELAY_MS }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/PAGE_NOT_CREATED|WIKI_DISABLED|404|NOT_FOUND|NO_WIKI_PAGE/i.test(message)) {
+      return buildDefaultBotActionsConfig(cleanSubreddit);
+    }
+    throw error;
+  }
+  const raw = String(wikiPayload?.data?.content_md || "").trim();
+  if (!raw) {
+    return buildDefaultBotActionsConfig(cleanSubreddit);
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch (e) {
+    throw new Error("Bot actions wiki page is not valid JSON");
+  }
+  const normalized = normalizeBotActionsDoc(doc, cleanSubreddit);
+  setInMemoryBotActions(cleanSubreddit, normalized);
+  return normalized;
+}
+
+async function saveBotActionsToWiki(subreddit, config, reason) {
+  const cleanSubreddit = normalizeSubreddit(subreddit);
+  if (!cleanSubreddit) {
+    throw new Error("Subreddit is required to save bot actions");
+  }
+  const normalized = normalizeBotActionsDoc(config, cleanSubreddit);
+  const payload = JSON.stringify(normalized, null, 2);
+  const params = new URLSearchParams();
+  params.set("content", payload);
+  params.set("page", BOT_ACTIONS_WIKI_PAGE);
+  params.set("reason", String(reason || "updated bot actions via ModBox"));
+  await redditFormRequest(`/r/${encodeURIComponent(cleanSubreddit)}/api/wiki/edit`, params);
+  setInMemoryBotActions(cleanSubreddit, normalized);
   return normalized;
 }
 

@@ -978,11 +978,19 @@ async function resolveTargetViaReddit(target) {
     ? sanitizeProfileRenderedHtml(decodeHtmlEntities(renderedBody))
     : renderProfileMarkdown(bodyRaw);
 
+  const id = String(data.id || "").trim();
+  const parentPostId = String(data.link_id || "").replace(/^t3_/, "").trim();
+  const postId = thingType === "submission" ? id : parentPostId || id;
+  const commentId = thingType === "comment" ? id : "";
+
   return {
     fullname,
     thingType,
     subreddit,
     author: data.author || null,
+    id,
+    post_id: postId,
+    comment_id: commentId,
     title: thingType === "submission" ? String(data.title || "") : null,
     bodyPreview: bodyRaw.slice(0, 500),
     bodyHtml,
