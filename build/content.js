@@ -5863,11 +5863,15 @@ function normalizeBotAction(action, index) {
 
   const content = String(action?.content || action?.body || action?.text || action?.message || "").trim();
 
+  const bot = String(action?.bot || action?.bot_username || action?.username || "").trim();
+
   return {
 
     key: String(action?.key || action?.id || "").trim() || slugifyReasonKey(name, `bot-action-${index + 1}`),
 
     name,
+
+    bot: bot ? bot.replace(/^u\//i, "") : "",
 
     content,
 
@@ -24769,6 +24773,14 @@ function renderRemovalConfigEditor() {
 
                   <label class="rrw-field">
 
+                    <span>Bot username (optional, e.g. u/modbox)</span>
+
+                    <input type="text" data-bot-index="${index}" data-bot-field="bot" value="${escapeHtml(action.bot || "")}" placeholder="u/modbox" />
+
+                  </label>
+
+                  <label class="rrw-field">
+
                     <span>Clipboard contents (supports {author}, {post_title}, {post_id}, {permalink}, {subreddit}, {kind})</span>
 
                     <textarea rows="6" data-bot-index="${index}" data-bot-field="content" placeholder="Write content to copy">${escapeHtml(action.content || "")}</textarea>
@@ -37009,11 +37021,15 @@ function renderOverlay() {
 
       });
 
+      const targetUsername = String(action?.bot || "").trim();
+
+      const copyMessage = targetUsername ? `Send it to u/${targetUsername.replace(/^u\//i, "")}.` : "Copied bot action to clipboard";
+
       try {
 
         await navigator.clipboard.writeText(rendered);
 
-        showToast("Copied bot action to clipboard", "success");
+        showToast(copyMessage, "success");
 
       } catch (error) {
 
@@ -37029,7 +37045,7 @@ function renderOverlay() {
 
           document.execCommand("copy");
 
-          showToast("Copied bot action to clipboard", "success");
+          showToast(copyMessage, "success");
 
         } catch {
 

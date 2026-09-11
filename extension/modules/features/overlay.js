@@ -1393,7 +1393,10 @@ function renderOverlay() {
         permalink: overlay?.resolved?.permalink || "",
       });
       const targetUsername = String(action?.bot || "").trim();
-      const copyMessage = targetUsername ? `Send it to u/${targetUsername.replace(/^u\//i, "")}.` : "Copied bot action to clipboard";
+      const normalizedUsername = targetUsername.replace(/^u\//i, "");
+      const copyMessage = targetUsername
+        ? `Copied to clipboard! Send it to u/${normalizedUsername}`
+        : "Copied bot action to clipboard";
       try {
         await navigator.clipboard.writeText(rendered);
         showToast(copyMessage, "success");
