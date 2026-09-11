@@ -40,7 +40,7 @@ function renderRemovalConfigEditor() {
 
   const state = removalConfigEditorState;
   const modboxLogoUrl = chrome.runtime.getURL("assets/modbox-logo.svg");
-  const activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(state.activeTab)
+  const activeTab = ["extension_settings", "quick_actions", "bot_actions", "playbooks", "note_types"].includes(state.activeTab)
     ? state.activeTab
     : "reasons";
   const config = state.config;
@@ -197,6 +197,7 @@ function renderRemovalConfigEditor() {
     <div class="rrw-removal-config-tabs" role="tablist" aria-label="ModBox settings tabs">
       <button type="button" class="rrw-removal-config-tab ${activeTab === "reasons" ? "is-active" : ""}" data-config-tab="reasons" role="tab" aria-selected="${activeTab === "reasons" ? "true" : "false"}">Removal Reasons</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "quick_actions" ? "is-active" : ""}" data-config-tab="quick_actions" role="tab" aria-selected="${activeTab === "quick_actions" ? "true" : "false"}">Quick Actions</button>
+      <button type="button" class="rrw-removal-config-tab ${activeTab === "bot_actions" ? "is-active" : ""}" data-config-tab="bot_actions" role="tab" aria-selected="${activeTab === "bot_actions" ? "true" : "false"}">Bot actions</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "playbooks" ? "is-active" : ""}" data-config-tab="playbooks" role="tab" aria-selected="${activeTab === "playbooks" ? "true" : "false"}">Playbooks</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "note_types" ? "is-active" : ""}" data-config-tab="note_types" role="tab" aria-selected="${activeTab === "note_types" ? "true" : "false"}">Note Types</button>
       <button type="button" class="rrw-removal-config-tab ${activeTab === "extension_settings" ? "is-active" : ""}" data-config-tab="extension_settings" role="tab" aria-selected="${activeTab === "extension_settings" ? "true" : "false"}">Extension Settings</button>
@@ -347,6 +348,45 @@ function renderRemovalConfigEditor() {
                 </article>
               `).join("")
             }
+          </div>
+        </section>
+      ` : activeTab === "bot_actions" ? `
+        ${state.botActionsError ? `<div class="rrw-error">${escapeHtml(state.botActionsError)}</div>` : ""}
+        ${state.botActionsStatus ? `<div class="rrw-success">${escapeHtml(state.botActionsStatus)}</div>` : ""}
+        ${state.botActionsLoading ? `<p class="rrw-muted">Loading bot actions from wiki...</p>` : ""}
+
+        <section class="rrw-config-section rrw-config-section--playbooks">
+          <div class="rrw-config-toolbar rrw-config-toolbar--sticky">
+            <div>
+              <h3>Bot actions</h3>
+              <p class="rrw-muted">${(state.botActionsConfig?.actions || []).length} configured &middot; wiki/${BOT_ACTIONS_WIKI_PAGE}</p>
+            </div>
+            <div class="rrw-actions rrw-ext-wiki-actions">
+              <button type="button" class="rrw-btn rrw-btn-primary" id="rrw-bot-add-action" ${state.botActionsLoading ? "disabled" : ""}>Add action</button>
+            </div>
+          </div>
+          <div class="rrw-config-reason-list" id="rrw-bot-action-list">
+            ${(state.botActionsConfig?.actions || []).length === 0
+              ? '<div class="rrw-preview-panel"><p class="rrw-muted">No bot actions configured yet.</p></div>'
+              : (state.botActionsConfig?.actions || []).map((action, index) => `
+                <article class="rrw-config-reason-card" data-bot-index="${index}">
+                  <div class="rrw-config-reason-head">
+                    <div class="rrw-field">
+                      <span>Button label</span>
+                      <div class="rrw-config-reason-title-row">
+                        <input type="text" data-bot-index="${index}" data-bot-field="name" value="${escapeHtml(action.name || "")}" placeholder="Button label" />
+                        <button type="button" class="rrw-btn rrw-btn-secondary" data-bot-move="up" data-bot-index="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+                        <button type="button" class="rrw-btn rrw-btn-secondary" data-bot-move="down" data-bot-index="${index}" ${index === (state.botActionsConfig?.actions || []).length - 1 ? "disabled" : ""}>Down</button>
+                        <button type="button" class="rrw-btn rrw-btn-danger" data-bot-delete="${index}">Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                  <label class="rrw-field">
+                    <span>Clipboard contents (supports {author}, {post_title}, {post_id}, {permalink}, {subreddit}, {kind})</span>
+                    <textarea rows="6" data-bot-index="${index}" data-bot-field="content" placeholder="Write content to copy">${escapeHtml(action.content || "")}</textarea>
+                  </label>
+                </article>
+              `).join("")}
           </div>
         </section>
       ` : activeTab === "playbooks" ? `
@@ -1032,13 +1072,13 @@ function renderRemovalConfigEditor() {
     </div>
 
     <footer class="rrw-removal-config-footer">
-      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "playbooks" || activeTab === "note_types" ? `
+      ${activeTab === "reasons" || activeTab === "quick_actions" || activeTab === "bot_actions" || activeTab === "playbooks" || activeTab === "note_types" ? `
         <label class="rrw-field rrw-removal-config-note">
           <span>Wiki revision note</span>
           <input
             type="text"
             id="rrw-config-save-note"
-            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : activeTab === "note_types" ? (state.noteTypesSaveNote || "") : (state.saveNote || ""))}"
+            value="${escapeHtml(activeTab === "quick_actions" ? (state.quickActionsSaveNote || "") : activeTab === "bot_actions" ? (state.botActionsSaveNote || "") : activeTab === "playbooks" ? (state.playbooksSaveNote || "") : activeTab === "note_types" ? (state.noteTypesSaveNote || "") : (state.saveNote || ""))}"
             placeholder="Optional revision note"
           />
         </label>
@@ -1049,11 +1089,11 @@ function renderRemovalConfigEditor() {
           type="button"
           class="rrw-btn rrw-btn-primary"
           id="rrw-config-save"
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving) ? "disabled" : ""}
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "bot_actions" ? state.botActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving) ? "disabled" : ""}
         >
-          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving)
+          ${(activeTab === "reasons" ? state.saving : activeTab === "quick_actions" ? state.quickActionsSaving : activeTab === "bot_actions" ? state.botActionsSaving : activeTab === "playbooks" ? state.playbooksSaving : activeTab === "note_types" ? state.noteTypesSaving : state.extensionSettingsSaving)
             ? "Saving..."
-            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "playbooks" ? "Save playbooks" : activeTab === "note_types" ? "Save note types" : "Save settings")}
+            : (activeTab === "reasons" ? "Save removal reasons" : activeTab === "quick_actions" ? "Save quick actions" : activeTab === "bot_actions" ? "Save bot actions" : activeTab === "playbooks" ? "Save playbooks" : activeTab === "note_types" ? "Save note types" : "Save settings")}
         </button>
       </div>
     </footer>
@@ -1113,7 +1153,7 @@ function renderRemovalConfigEditor() {
         return;
       }
       const nextTab = String(event.currentTarget.getAttribute("data-config-tab") || "");
-      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "playbooks", "note_types"].includes(nextTab) ? nextTab : "reasons";
+      removalConfigEditorState.activeTab = ["extension_settings", "quick_actions", "bot_actions", "playbooks", "note_types"].includes(nextTab) ? nextTab : "reasons";
       removalConfigEditorState.error = "";
       removalConfigEditorState.status = "";
       renderRemovalConfigEditor();
@@ -1187,6 +1227,8 @@ function renderRemovalConfigEditor() {
       }
       if (removalConfigEditorState.activeTab === "quick_actions") {
         removalConfigEditorState.quickActionsSaveNote = String(event.target.value || "");
+      } else if (removalConfigEditorState.activeTab === "bot_actions") {
+        removalConfigEditorState.botActionsSaveNote = String(event.target.value || "");
       } else if (removalConfigEditorState.activeTab === "playbooks") {
         removalConfigEditorState.playbooksSaveNote = String(event.target.value || "");
       } else if (removalConfigEditorState.activeTab === "note_types") {
@@ -1495,6 +1537,19 @@ function renderRemovalConfigEditor() {
   });
 
   // Quick Actions event handlers
+  modal.querySelector("#rrw-bot-add-action")?.addEventListener("click", () => {
+    if (!removalConfigEditorState) {
+      return;
+    }
+    const actions = removalConfigEditorState.botActionsConfig?.actions;
+    if (!Array.isArray(actions)) {
+      return;
+    }
+    const newIndex = actions.length;
+    actions.push(normalizeBotAction({}, newIndex));
+    renderRemovalConfigEditor();
+  });
+
   modal.querySelector("#rrw-qa-add-action")?.addEventListener("click", () => {
     if (!removalConfigEditorState) {
       return;
@@ -1568,6 +1623,55 @@ function renderRemovalConfigEditor() {
     }
   });
 
+  modal.querySelectorAll("[data-bot-field]").forEach((element) => {
+    element.addEventListener("input", (event) => {
+      if (!removalConfigEditorState) {
+        return;
+      }
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-index") || ""), 10);
+      const field = String(event.currentTarget.getAttribute("data-bot-field") || "");
+      if (!Number.isFinite(index) || !field || !removalConfigEditorState.botActionsConfig) {
+        return;
+      }
+      const action = removalConfigEditorState.botActionsConfig.actions[index];
+      if (!action) {
+        return;
+      }
+      action[field] = String(event.target.value || "");
+    });
+  });
+
+  modal.querySelectorAll("[data-bot-delete]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-delete") || ""), 10);
+      if (!Number.isFinite(index) || !removalConfigEditorState?.botActionsConfig) {
+        return;
+      }
+      removalConfigEditorState.botActionsConfig.actions = removalConfigEditorState.botActionsConfig.actions
+        .filter((_, i) => i !== index)
+        .map((a, i) => ({ ...a, position: (i + 1) * 10 }));
+      renderRemovalConfigEditor();
+    });
+  });
+
+  modal.querySelectorAll("[data-bot-move]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const index = Number.parseInt(String(event.currentTarget.getAttribute("data-bot-index") || ""), 10);
+      const direction = String(event.currentTarget.getAttribute("data-bot-move") || "");
+      if (!Number.isFinite(index) || !removalConfigEditorState?.botActionsConfig) {
+        return;
+      }
+      const actions = removalConfigEditorState.botActionsConfig.actions;
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= actions.length) {
+        return;
+      }
+      [actions[index], actions[swapIndex]] = [actions[swapIndex], actions[index]];
+      actions.forEach((a, i) => { a.position = (i + 1) * 10; });
+      renderRemovalConfigEditor();
+    });
+  });
+
   modal.querySelectorAll("[data-qa-field]").forEach((element) => {
     const applyQaChange = (event) => {
       if (!removalConfigEditorState) {
@@ -1591,7 +1695,8 @@ function renderRemovalConfigEditor() {
     element.addEventListener("input", applyQaChange);
     element.addEventListener("change", (event) => {
       applyQaChange(event);
-      if (field === "key_override" || element.tagName === "SELECT" || element.type === "checkbox") {
+      const fieldName = String(event.currentTarget.getAttribute("data-qa-field") || "");
+      if (fieldName === "key_override" || element.tagName === "SELECT" || element.type === "checkbox") {
         renderRemovalConfigEditor();
       }
     });
@@ -2106,6 +2211,39 @@ function renderRemovalConfigEditor() {
       } finally {
         if (removalConfigEditorState) {
           removalConfigEditorState.quickActionsSaving = false;
+          renderRemovalConfigEditor();
+        }
+      }
+      return;
+    }
+
+    if (removalConfigEditorState.activeTab === "bot_actions") {
+      try {
+        removalConfigEditorState.botActionsSaving = true;
+        removalConfigEditorState.botActionsError = "";
+        removalConfigEditorState.botActionsStatus = "";
+        renderRemovalConfigEditor();
+        const normalized = normalizeBotActionsDoc(
+          removalConfigEditorState.botActionsConfig,
+          removalConfigEditorState.subreddit,
+        );
+        const saved = await saveBotActionsToWiki(
+          removalConfigEditorState.subreddit,
+          normalized,
+          String(removalConfigEditorState.botActionsSaveNote || "").trim(),
+        );
+        if (removalConfigEditorState) {
+          removalConfigEditorState.botActionsConfig = saved;
+          removalConfigEditorState.botActionsSaveNote = "";
+          removalConfigEditorState.botActionsStatus = "Bot actions saved to wiki.";
+        }
+      } catch (error) {
+        if (removalConfigEditorState) {
+          removalConfigEditorState.botActionsError = error instanceof Error ? error.message : String(error);
+        }
+      } finally {
+        if (removalConfigEditorState) {
+          removalConfigEditorState.botActionsSaving = false;
           renderRemovalConfigEditor();
         }
       }

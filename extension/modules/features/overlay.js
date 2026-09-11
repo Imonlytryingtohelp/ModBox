@@ -504,6 +504,10 @@ function renderOverlay() {
     quickActionsLoading,
     quickActionsError,
     quickActionsStatus,
+    botActionsConfig,
+    botActionsLoading,
+    botActionsError,
+    botActionsStatus,
     playbooksConfig,
     playbooksLoading,
     playbooksError,
@@ -661,8 +665,8 @@ function renderOverlay() {
 
   const actionsTabLabel = thingType === "submission" ? "Post Actions" : "Comment Actions";
   const overlayTab = quickActionsOnlyMode
-    ? (["quick_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
-    : (["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
+    ? (["quick_actions", "bot_actions", "playbooks"].includes(activeTab) ? activeTab : "quick_actions")
+    : (["kind_actions", "quick_actions", "bot_actions", "playbooks", "user_actions"].includes(activeTab) ? activeTab : "kind_actions");
   const canRunUserActions = canAct && Boolean(resolved?.author);
   const effectiveBanDays = banDurationOption === "custom"
     ? Number.parseInt(String(banCustomDays || ""), 10)
@@ -701,6 +705,12 @@ function renderOverlay() {
     }
     return appliesTo === "comments";
   });
+
+  const botActions = normalizeBotActionsDoc(
+    botActionsConfig || getInMemoryBotActions(resolvedSubreddit) || buildDefaultBotActionsConfig(resolvedSubreddit),
+    resolvedSubreddit,
+  ).actions;
+  const visibleBotActions = botActions.filter((action) => true);
 
   const playbooks = normalizePlaybooksDoc(
     playbooksConfig || getInMemoryPlaybooks(resolvedSubreddit) || buildDefaultPlaybooksConfig(resolvedSubreddit),
@@ -762,6 +772,11 @@ function renderOverlay() {
               class="rrw-tab-btn ${overlayTab === "quick_actions" ? "rrw-tab-btn--active" : ""}"
               data-overlay-tab="quick_actions"
             >Quick Actions</button>
+            <button
+              type="button"
+              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
+              data-overlay-tab="bot_actions"
+            >Bot actions</button>
             <button
               type="button"
               class="rrw-tab-btn ${overlayTab === "playbooks" ? "rrw-tab-btn--active" : ""}"
@@ -871,6 +886,43 @@ function renderOverlay() {
                         title="${escapeHtml(`${preview.slice(0, 240)}${action.lock_post && thingType === "submission" ? "\n\nThis action will also lock the post." : ""}`)}"
                         ${submitting || !canAct ? "disabled" : ""}
                       >${escapeHtml(action.title)}${action.lock_post && thingType === "submission" ? ' [locks post]' : ""}</button>
+                    `;
+                  }).join("")}
+              </div>
+            </section>
+
+            <div class="rrw-footer-links rrw-footer-links--solo">
+            </div>
+          ` : ""}
+
+          ${overlayTab === "bot_actions" ? `
+            <section class="rrw-user-actions-panel">
+              <h3>Bot actions</h3>
+              <p class="rrw-muted">Copy configured commands for the active item.</p>
+              ${botActionsLoading ? `<p class="rrw-muted">Loading bot actions...</p>` : ""}
+              ${botActionsError ? `<div class="rrw-error">${escapeHtml(botActionsError)}</div>` : ""}
+              ${botActionsStatus ? `<div class="rrw-success">${escapeHtml(botActionsStatus)}</div>` : ""}
+              <div class="rrw-actions rrw-actions--inline rrw-quick-actions-grid">
+                ${visibleBotActions.length === 0
+                  ? `<p class="rrw-muted">No bot actions available for this target.</p>`
+                  : visibleBotActions.map((action) => {
+                    const rendered = interpolateBotActionTemplate(action.content, {
+                      author: resolved?.author,
+                      subreddit: resolved?.subreddit,
+                      kind: thingType === "submission" ? "post" : "comment",
+                      post_title: resolved?.title || "",
+                      post_id: String(resolved?.post_id || resolved?.id || "").trim(),
+                      comment_id: String(resolved?.comment_id || resolved?.id || "").trim(),
+                      permalink: resolved?.permalink || "",
+                    });
+                    return `
+                      <button
+                        type="button"
+                        class="rrw-btn rrw-btn-secondary rrw-quick-action-btn"
+                        data-bot-action-key="${escapeHtml(action.key)}"
+                        title="${escapeHtml(rendered.slice(0, 240))}"
+                        ${submitting || !canAct ? "disabled" : ""}
+                      >${escapeHtml(action.name || action.key || "Bot action")}</button>
                     `;
                   }).join("")}
               </div>
@@ -1104,7 +1156,7 @@ function renderOverlay() {
   root.querySelectorAll("[data-overlay-tab]").forEach((tabButton) => {
     tabButton.addEventListener("click", (event) => {
       const tab = event.currentTarget.getAttribute("data-overlay-tab");
-      if (!["kind_actions", "quick_actions", "playbooks", "user_actions"].includes(String(tab || ""))) {
+      if (!["kind_actions", "quick_actions", "bot_actions", "playbooks", "user_actions"].includes(String(tab || ""))) {
         return;
       }
       overlayState.activeTab = tab;
@@ -1310,6 +1362,55 @@ function renderOverlay() {
       renderOverlay();
     });
   }
+
+  root.querySelectorAll("[data-bot-action-key]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", async (event) => {
+      const overlay = overlayState;
+      if (!overlay) {
+        return;
+      }
+      const actionKey = String(event.currentTarget.getAttribute("data-bot-action-key") || "").trim();
+      if (!actionKey) {
+        return;
+      }
+      const subreddit = normalizeSubreddit(overlay?.resolved?.subreddit || "");
+      const allActions = normalizeBotActionsDoc(
+        overlay.botActionsConfig || getInMemoryBotActions(subreddit) || buildDefaultBotActionsConfig(subreddit),
+        subreddit,
+      ).actions;
+      const action = allActions.find((item) => String(item?.key || "").trim() === actionKey);
+      if (!action) {
+        showToast("Bot action not found", "error");
+        return;
+      }
+      const rendered = interpolateBotActionTemplate(action.content, {
+        author: overlay?.resolved?.author,
+        subreddit: overlay?.resolved?.subreddit,
+        kind: overlay?.resolved?.thingType === "submission" ? "post" : "comment",
+        post_title: overlay?.resolved?.title || "",
+        post_id: String(overlay?.resolved?.post_id || overlay?.resolved?.id || "").trim(),
+        comment_id: String(overlay?.resolved?.comment_id || overlay?.resolved?.id || "").trim(),
+        permalink: overlay?.resolved?.permalink || "",
+      });
+      try {
+        await navigator.clipboard.writeText(rendered);
+        showToast("Copied bot action to clipboard", "success");
+      } catch (error) {
+        const fallback = document.createElement("textarea");
+        fallback.value = rendered;
+        document.body.appendChild(fallback);
+        fallback.select();
+        try {
+          document.execCommand("copy");
+          showToast("Copied bot action to clipboard", "success");
+        } catch {
+          showToast("Unable to copy bot action", "error");
+        } finally {
+          fallback.remove();
+        }
+      }
+    });
+  });
 
   root.querySelectorAll("[data-quick-action-key]").forEach((buttonEl) => {
     buttonEl.addEventListener("click", async (event) => {
@@ -1540,7 +1641,7 @@ function renderOverlay() {
       font-size: 14px;
       font-weight: 500;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 10000;
+      z-index: 2147483647;
       animation: rrw-toast-slide-in 0.3s ease-out;
     `;
     
@@ -2774,6 +2875,10 @@ async function openOverlay(target, options = {}) {
     quickActionsLoading: false,
     quickActionsError: "",
     quickActionsStatus: "",
+    botActionsConfig: buildDefaultBotActionsConfig(""),
+    botActionsLoading: false,
+    botActionsError: "",
+    botActionsStatus: "",
     playbooksConfig: buildDefaultPlaybooksConfig(""),
     playbooksLoading: false,
     playbooksError: "",
@@ -2835,11 +2940,15 @@ async function openOverlay(target, options = {}) {
       const subreddit = overrideSubreddit || parseSubredditFromPath(window.location.pathname);
       const postId = parsePostIdFromPath(window.location.pathname);
       const formattedUrl = formatRedditUrl(subreddit, postId) || formatRedditByIdUrl(cleanTarget);
+      const fallbackId = String(cleanTarget || "").split("_").slice(1).join("_").trim();
       overlayState.resolved = {
         fullname: cleanTarget.toLowerCase(),
         thingType: cleanTarget.toLowerCase().startsWith("t3_") ? "submission" : "comment",
         subreddit: subreddit || "unknown",
         author: null,
+        id: fallbackId,
+        post_id: cleanTarget.toLowerCase().startsWith("t3_") ? fallbackId : "",
+        comment_id: cleanTarget.toLowerCase().startsWith("t1_") ? fallbackId : "",
         title: null,
         bodyPreview: null,
         bodyHtml: "",
@@ -2885,10 +2994,11 @@ async function openOverlay(target, options = {}) {
     let userFlairTemplatesPromise = Promise.resolve([]);
     let postFlairTemplatesPromise = Promise.resolve([]);
     let quickActionsPromise = Promise.resolve(null);
+    let botActionsPromise = Promise.resolve(null);
     let playbooksPromise = Promise.resolve(null);
     let cannedRepliesPromise = Promise.resolve(null);
     if (resolvedSubreddit) {
-      console.log("[ModBox] openOverlay: Starting quick actions and playbooks load for subreddit:", resolvedSubreddit);
+      console.log("[ModBox] openOverlay: Starting quick actions and bot actions load for subreddit:", resolvedSubreddit);
       overlayState.quickActionsLoading = true;
       overlayState.quickActionsError = "";
       console.log("[ModBox] openOverlay: Calling loadQuickActionsFromWiki");
@@ -2908,6 +3018,25 @@ async function openOverlay(target, options = {}) {
         .finally(() => {
           if (overlayState !== overlayRef) return;
           overlayRef.quickActionsLoading = false;
+          renderOverlay();
+        });
+
+      overlayState.botActionsLoading = true;
+      overlayState.botActionsError = "";
+      console.log("[ModBox] openOverlay: Calling loadBotActionsFromWiki");
+      botActionsPromise = loadBotActionsFromWiki(resolvedSubreddit)
+        .then((botConfig) => {
+          if (overlayState !== overlayRef) return;
+          overlayRef.botActionsConfig = normalizeBotActionsDoc(botConfig, resolvedSubreddit);
+        })
+        .catch((botError) => {
+          if (overlayState !== overlayRef) return;
+          overlayRef.botActionsError = botError instanceof Error ? botError.message : String(botError);
+          overlayRef.botActionsConfig = buildDefaultBotActionsConfig(resolvedSubreddit);
+        })
+        .finally(() => {
+          if (overlayState !== overlayRef) return;
+          overlayRef.botActionsLoading = false;
           renderOverlay();
         });
 

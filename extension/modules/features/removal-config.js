@@ -347,6 +347,15 @@ function normalizeQuickAction(action, index) {
 
 // ──── Playbooks Helper Functions (for removal config editor) ────
 
+function buildDefaultBotActionsConfig(subreddit) {
+  return {
+    schema: BOT_ACTIONS_WIKI_SCHEMA,
+    version: 1,
+    subreddit: normalizeSubreddit(subreddit),
+    actions: [],
+  };
+}
+
 function buildDefaultPlaybooksConfig(subreddit) {
   return {
     schema: PLAYBOOKS_WIKI_SCHEMA,
@@ -650,6 +659,12 @@ async function openRemovalConfigEditor(context) {
     quickActionsStatus: "",
     quickActionsSaveNote: "",
     quickActionsImporting: false,
+    botActionsConfig: buildDefaultBotActionsConfig(context.subreddit),
+    botActionsLoading: true,
+    botActionsSaving: false,
+    botActionsError: "",
+    botActionsStatus: "",
+    botActionsSaveNote: "",
     playbooksConfig: buildDefaultPlaybooksConfig(context.subreddit),
     playbooksLoading: true,
     playbooksUserEdited: false,
@@ -702,6 +717,22 @@ async function openRemovalConfigEditor(context) {
     .finally(() => {
       if (!removalConfigEditorState) return;
       removalConfigEditorState.quickActionsLoading = false;
+      renderRemovalConfigEditor();
+    });
+
+  // Load bot actions in background
+  void loadBotActionsFromWiki(removalConfigEditorState.subreddit)
+    .then((config) => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.botActionsConfig = config;
+    })
+    .catch((error) => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.botActionsError = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => {
+      if (!removalConfigEditorState) return;
+      removalConfigEditorState.botActionsLoading = false;
       renderRemovalConfigEditor();
     });
 
