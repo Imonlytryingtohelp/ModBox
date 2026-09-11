@@ -1392,9 +1392,11 @@ function renderOverlay() {
         comment_id: String(overlay?.resolved?.comment_id || overlay?.resolved?.id || "").trim(),
         permalink: overlay?.resolved?.permalink || "",
       });
+      const targetUsername = String(action?.bot || "").trim();
+      const copyMessage = targetUsername ? `Send it to u/${targetUsername.replace(/^u\//i, "")}.` : "Copied bot action to clipboard";
       try {
         await navigator.clipboard.writeText(rendered);
-        showToast("Copied bot action to clipboard", "success");
+        showToast(copyMessage, "success");
       } catch (error) {
         const fallback = document.createElement("textarea");
         fallback.value = rendered;
@@ -1402,7 +1404,7 @@ function renderOverlay() {
         fallback.select();
         try {
           document.execCommand("copy");
-          showToast("Copied bot action to clipboard", "success");
+          showToast(copyMessage, "success");
         } catch {
           showToast("Unable to copy bot action", "error");
         } finally {

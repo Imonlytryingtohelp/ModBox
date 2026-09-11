@@ -382,6 +382,10 @@ function renderRemovalConfigEditor() {
                     </div>
                   </div>
                   <label class="rrw-field">
+                    <span>Bot username (optional, e.g. u/modbox)</span>
+                    <input type="text" data-bot-index="${index}" data-bot-field="bot" value="${escapeHtml(action.bot || "")}" placeholder="u/modbox" />
+                  </label>
+                  <label class="rrw-field">
                     <span>Clipboard contents (supports {author}, {post_title}, {post_id}, {permalink}, {subreddit}, {kind})</span>
                     <textarea rows="6" data-bot-index="${index}" data-bot-field="content" placeholder="Write content to copy">${escapeHtml(action.content || "")}</textarea>
                   </label>

@@ -445,9 +445,11 @@ function interpolateQuickActionTemplate(template, context) {
 function normalizeBotAction(action, index) {
   const name = String(action?.name || action?.title || `Bot action ${index + 1}`).trim() || `Bot action ${index + 1}`;
   const content = String(action?.content || action?.body || action?.text || action?.message || "").trim();
+  const bot = String(action?.bot || action?.bot_username || action?.username || "").trim();
   return {
     key: String(action?.key || action?.id || "").trim() || slugifyReasonKey(name, `bot-action-${index + 1}`),
     name,
+    bot: bot ? bot.replace(/^u\//i, "") : "",
     content,
     position: Number.isFinite(Number(action?.position)) ? Number(action.position) : (index + 1) * 10,
   };
