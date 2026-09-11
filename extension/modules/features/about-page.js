@@ -78,12 +78,7 @@ function getAboutPageDownloadUrl(updateStatus) {
     return String(updateStatus.latestEntry.downloadUrl || "").trim();
   }
 
-  const latestVersion = String(updateStatus?.latest || "").trim();
-  if (latestVersion) {
-    return `https://github.com/Imonlytryingtohelp/ModBox/releases/tag/${encodeURIComponent(latestVersion)}`;
-  }
-
-  return "https://github.com/Imonlytryingtohelp/ModBox/releases";
+  return "https://modbox.fyi/releases";
 }
 
 function getAboutBrowserInfo() {
@@ -137,19 +132,22 @@ function buildAboutBugReport(installedVersion) {
     "",
     "What happened:",
     "",
-    "Steps to reproduce:",
-    "",
     "Expected behavior:",
+    "",
+    "Steps to reproduce:",
     "",
   ].join("\n");
 }
 
-async function copyAboutBugReport() {
-  const copyButton = document.querySelector('[data-about-copy-bug-report="1"]');
+async function copyAboutBugReport(targetElement = document.querySelector('[data-about-copy-bug-report="1"]')) {
   const report = buildAboutBugReport(aboutPageState?.installedVersion);
-  if (copyButton instanceof HTMLButtonElement) {
-    copyButton.textContent = "Copying...";
-    copyButton.disabled = true;
+  if (targetElement instanceof HTMLElement) {
+    const originalText = targetElement.textContent;
+    targetElement.textContent = "Copying...";
+    if (targetElement instanceof HTMLButtonElement) {
+      targetElement.disabled = true;
+    }
+    targetElement.dataset.__aboutCopyOriginalText = originalText;
   }
   let copied = false;
   try {
@@ -179,9 +177,26 @@ async function copyAboutBugReport() {
     }
   }
 
-  if (copyButton instanceof HTMLButtonElement) {
-    copyButton.textContent = copied ? "Copied!" : "Copy failed";
-    copyButton.disabled = false;
+  if (targetElement instanceof HTMLElement) {
+    if (targetElement instanceof HTMLButtonElement) {
+      targetElement.disabled = false;
+    }
+
+    if (copied) {
+      targetElement.textContent = targetElement.dataset.aboutCopyBugTemplate === "1"
+        ? "copied to your clipboard"
+        : "Copied!";
+
+      if (targetElement.dataset.aboutCopyBugTemplate === "1") {
+        setTimeout(() => {
+          if (targetElement.isConnected) {
+            targetElement.textContent = "Grab your bug template";
+          }
+        }, 3500);
+      }
+    } else {
+      targetElement.textContent = "Copy failed";
+    }
   }
 }
 
@@ -205,10 +220,10 @@ function bindAboutPageEvents() {
     });
   });
 
-  root.querySelectorAll('[data-about-copy-bug-report="1"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+  root.querySelectorAll('[data-about-copy-bug-template="1"]').forEach((link) => {
+    link.addEventListener("click", (e) => {
       e.preventDefault();
-      void copyAboutBugReport();
+      void copyAboutBugReport(link);
     });
   });
 
@@ -365,7 +380,7 @@ function renderAboutPage() {
             ${updateStatusHtml}
             <div class="rrw-about-page-check-status" data-about-check-status></div>
             <p class="rrw-about-page-bug-report">
-              Found a bug? <a href="https://github.com/Imonlytryingtohelp/ModBox/issues" target="_blank" rel="noopener noreferrer">Report it on GitHub.</a>
+              Found a bug? <a href="#" data-about-copy-bug-template="1" title="Copy the bug report template">Grab your bug template</a> then <a href="https://github.com/Imonlytryingtohelp/ModBox/issues/new" target="_blank" rel="noopener noreferrer">report it on GitHub.</a>
             </p>
           </div>
 
@@ -391,13 +406,6 @@ function renderAboutPage() {
             data-about-check-update="1"
           >
             Check for Update
-          </button>
-          <button
-            type="button"
-            class="rrw-about-page-check-btn"
-            data-about-copy-bug-report="1"
-          >
-            Copy Bug Report Info
           </button>
           <button 
             type="button" 
