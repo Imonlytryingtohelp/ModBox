@@ -774,11 +774,6 @@ function renderOverlay() {
             >Quick Actions</button>
             <button
               type="button"
-              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
-              data-overlay-tab="bot_actions"
-            >Bot actions</button>
-            <button
-              type="button"
               class="rrw-tab-btn ${overlayTab === "playbooks" ? "rrw-tab-btn--active" : ""}"
               data-overlay-tab="playbooks"
             >Playbooks</button>
@@ -787,6 +782,11 @@ function renderOverlay() {
               class="rrw-tab-btn ${overlayTab === "user_actions" ? "rrw-tab-btn--active" : ""}"
               data-overlay-tab="user_actions"
             >User Actions</button>` : ""}
+            <button
+              type="button"
+              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
+              data-overlay-tab="bot_actions"
+            >Bot actions</button>
           </div>
 
           ${overlayTab === "kind_actions" ? `

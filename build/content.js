@@ -35785,16 +35785,6 @@ function renderOverlay() {
 
               type="button"
 
-              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
-
-              data-overlay-tab="bot_actions"
-
-            >Bot actions</button>
-
-            <button
-
-              type="button"
-
               class="rrw-tab-btn ${overlayTab === "playbooks" ? "rrw-tab-btn--active" : ""}"
 
               data-overlay-tab="playbooks"
@@ -35810,6 +35800,16 @@ function renderOverlay() {
               data-overlay-tab="user_actions"
 
             >User Actions</button>` : ""}
+
+            <button
+
+              type="button"
+
+              class="rrw-tab-btn ${overlayTab === "bot_actions" ? "rrw-tab-btn--active" : ""}"
+
+              data-overlay-tab="bot_actions"
+
+            >Bot actions</button>
 
           </div>
 
@@ -37023,7 +37023,13 @@ function renderOverlay() {
 
       const targetUsername = String(action?.bot || "").trim();
 
-      const copyMessage = targetUsername ? `Send it to u/${targetUsername.replace(/^u\//i, "")}.` : "Copied bot action to clipboard";
+      const normalizedUsername = targetUsername.replace(/^u\//i, "");
+
+      const copyMessage = targetUsername
+
+        ? `Copied to clipboard! Send it to u/${normalizedUsername}`
+
+        : "Copied bot action to clipboard";
 
       try {
 
