@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## UNRELEASED
+
+- **Fixed** Sub-reason usernote defaults now preserve top-level removal notes when selecting and reselecting removal reasons in different orders.
+
 ## 1.11.1 - Bot Commands
 
 - **Added** Bot actions in the ModBox overlay, letting moderators copy configured commands for the current post or comment.

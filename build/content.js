@@ -35067,17 +35067,103 @@ function getRemovalNoteDefaults(reasons, inputs) {
 
 
 
+function getSelectedReasonsInOrder(reasons, selectedKeys) {
+
+  const reasonMap = new Map((Array.isArray(reasons) ? reasons : []).map((reason) => [String(reason?.external_key || ""), reason]));
+
+  return (Array.isArray(selectedKeys) ? selectedKeys : [])
+
+    .map((key) => reasonMap.get(String(key)))
+
+    .filter(Boolean);
+
+}
+
+
+
+function updateSelectedReasonKeys(keys, key, checked) {
+
+  const ordered = Array.from(new Set(Array.isArray(keys) ? keys : []));
+
+  if (checked) {
+
+    const existingIndex = ordered.indexOf(key);
+
+    if (existingIndex >= 0) {
+
+      ordered.splice(existingIndex, 1);
+
+    }
+
+    ordered.push(key);
+
+    return ordered;
+
+  }
+
+  return ordered.filter((existingKey) => existingKey !== key);
+
+}
+
+
+
+function buildAutoRemovalNoteText(reasons, selectedKeys, inputs) {
+
+  const selectedReasons = getSelectedReasonsInOrder(reasons, selectedKeys);
+
+  const merged = [];
+
+  selectedReasons.forEach((reason) => {
+
+    const topLevelText = String(reason?.suggestedNoteText || "").trim();
+
+    if (topLevelText && !merged.includes(topLevelText)) {
+
+      merged.push(topLevelText);
+
+    }
+
+    (Array.isArray(reason?.blocks) ? reason.blocks : []).forEach((block) => {
+
+      if (block?.type !== "select" || !block.key) return;
+
+      const selectedValues = Array.isArray(inputs?.[block.key]) ? inputs[block.key] : [inputs?.[block.key]];
+
+      const selected = new Set(selectedValues.map((value) => String(value || "").trim()).filter(Boolean));
+
+      blockOptions(block).forEach((option) => {
+
+        if (!selected.has(String(option.value || "").trim())) return;
+
+        const text = String(option.default_note_text || "").trim();
+
+        if (text && !merged.includes(text)) {
+
+          merged.push(text);
+
+        }
+
+      });
+
+    });
+
+  });
+
+
+
+  return merged.join(" + ");
+
+}
+
+
+
 function applyRemovalNoteDefaultsForSelection(overlay) {
 
   if (!overlay) return;
 
-  const selectedReasons = (overlay.reasons || []).filter((reason) => (overlay.selectedReasonKeys || []).includes(reason.external_key));
+  const selectedReasons = getSelectedReasonsInOrder(overlay.reasons || [], overlay.selectedReasonKeys || []);
 
-  const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlay.inputValues || {});
-
-  const suggestedTexts = selectedReasons.map((reason) => String(reason.suggestedNoteText || "").trim()).filter(Boolean);
-
-  const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
+  const autoText = buildAutoRemovalNoteText(overlay.reasons || [], overlay.selectedReasonKeys || [], overlay.inputValues || {});
 
   const previousAutoText = overlay._lastAutoRemovalNoteText || "";
 
@@ -35090,6 +35176,8 @@ function applyRemovalNoteDefaultsForSelection(overlay) {
     overlay._lastAutoRemovalNoteText = autoText;
 
   }
+
+  const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlay.inputValues || {});
 
   const suggestedTypes = subreasonDefaults.type !== "none"
 
@@ -36765,33 +36853,17 @@ function renderOverlay() {
 
       const checked = Boolean(event.target.checked);
 
-      const current = new Set(overlayState.selectedReasonKeys || []);
-
-      if (checked) {
-
-        current.add(key);
-
-      } else {
-
-        current.delete(key);
-
-      }
-
-      overlayState.selectedReasonKeys = Array.from(current);
+      overlayState.selectedReasonKeys = updateSelectedReasonKeys(overlayState.selectedReasonKeys || [], key, checked);
 
 
 
       // Prefill usernote text and type from selected reasons if user hasn't edited
 
-      const selectedReasons = (overlayState.reasons || []).filter(r => current.has(r.external_key));
+      const selectedReasons = getSelectedReasonsInOrder(overlayState.reasons || [], overlayState.selectedReasonKeys || []);
 
       // Prefill text
 
-      const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlayState.inputValues || {});
-
-      const suggestedTexts = selectedReasons.map(r => (r.suggestedNoteText || "").trim()).filter(Boolean);
-
-      const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
+      const autoText = buildAutoRemovalNoteText(overlayState.reasons || [], overlayState.selectedReasonKeys || [], overlayState.inputValues || {});
 
       const prevAutoText = overlayState._lastAutoRemovalNoteText || "";
 
@@ -36807,89 +36879,7 @@ function renderOverlay() {
 
       // Prefill type
 
-      const suggestedTypes = subreasonDefaults.type !== "none"
-
-        ? [subreasonDefaults.type]
-
-        : selectedReasons.map(r => (r.suggestedNoteType || "none").trim()).filter(t => t && t !== "none");
-
-      let autoType = "none";
-
-      if (suggestedTypes.length > 0 && suggestedTypes.every(t => t === suggestedTypes[0])) {
-
-        autoType = suggestedTypes[0];
-
-      }
-
-      const prevAutoType = overlayState._lastAutoRemovalNoteType || "none";
-
-      const currentType = String(overlayState.removalNoteType || "none").trim();
-
-      if (!currentType || currentType === prevAutoType) {
-
-        overlayState.removalNoteType = autoType;
-
-        overlayState._lastAutoRemovalNoteType = autoType;
-
-      }
-
-
-
-      renderOverlay();
-
-      schedulePreview();
-
-    });
-
-  });
-
-
-
-  root.querySelectorAll("[data-remove-reason]").forEach((chipEl) => {
-
-    chipEl.addEventListener("click", (event) => {
-
-      const key = event.currentTarget.getAttribute("data-remove-reason");
-
-      if (!key) {
-
-        return;
-
-      }
-
-      const current = new Set(overlayState.selectedReasonKeys || []);
-
-      current.delete(key);
-
-      overlayState.selectedReasonKeys = Array.from(current);
-
-
-
-      // Prefill usernote text and type from selected reasons if user hasn't edited
-
-      const selectedReasons = (overlayState.reasons || []).filter(r => current.has(r.external_key));
-
-      // Prefill text
-
       const subreasonDefaults = getRemovalNoteDefaults(selectedReasons, overlayState.inputValues || {});
-
-      const suggestedTexts = selectedReasons.map(r => (r.suggestedNoteText || "").trim()).filter(Boolean);
-
-      const autoText = subreasonDefaults.text || suggestedTexts.join(" + ");
-
-      const prevAutoText = overlayState._lastAutoRemovalNoteText || "";
-
-      const currentText = String(overlayState.removalNoteText || "").trim();
-
-      if (!currentText || currentText === prevAutoText) {
-
-        overlayState.removalNoteText = autoText;
-
-        overlayState._lastAutoRemovalNoteText = autoText;
-
-      }
-
-      // Prefill type
 
       const suggestedTypes = subreasonDefaults.type !== "none"
 
